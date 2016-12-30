@@ -363,7 +363,7 @@ public class CopyMapper extends Mapper<Text, CopyListingFileStatus, Text, Text> 
         " to " + target, exception);
 
     if (ignoreFailures &&
-        ExceptionUtils.indexOfType(exception, CopyReadException.class) != -1) {
+        ExceptionUtils.indexOfType(exception, CopyReadException.class) != -1 && ExceptionUtils.indexOfType(exception, CopyReadException.class) != -1 ) {
       incrementCounter(context, Counter.FAIL, 1);
       incrementCounter(context, Counter.BYTESFAILED, sourceFileStatus.getLen());
       context.write(null, new Text("FAIL: " + sourceFileStatus.getPath() + " - " +
