@@ -37,6 +37,7 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.util.Shell;
+import org.slf4j.Logger;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IO_FILE_BUFFER_SIZE_DEFAULT;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IO_FILE_BUFFER_SIZE_KEY;
@@ -259,7 +260,29 @@ public class IOUtils {
   }
 
   /**
-   * Closes the stream ignoring {@link IOException}.
+   * Close the Closeable objects and <b>ignore</b> any {@link Throwable} or
+   * null pointers. Must only be used for cleanup in exception handlers.
+   *
+   * @param logger the log to record problems to at debug level. Can be null.
+   * @param closeables the objects to close
+   */
+  public static void cleanupWithLogger(Logger logger,
+      java.io.Closeable... closeables) {
+    for (java.io.Closeable c : closeables) {
+      if (c != null) {
+        try {
+          c.close();
+        } catch (Throwable e) {
+          if (logger != null) {
+            logger.debug("Exception in closing {}", c, e);
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * Closes the stream ignoring {@link Throwable}.
    * Must only be called in cleaning up from exception handlers.
    *
    * @param stream the Stream to close
