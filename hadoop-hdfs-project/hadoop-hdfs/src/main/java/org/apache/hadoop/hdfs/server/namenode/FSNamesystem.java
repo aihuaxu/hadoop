@@ -95,7 +95,6 @@ import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_REPLICATION_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_REPLICATION_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_SUPPORT_APPEND_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_SUPPORT_APPEND_KEY;
-import static org.apache.hadoop.hdfs.server.common.HdfsServerConstants.SECURITY_XATTR_UNREADABLE_BY_SUPERUSER;
 import static org.apache.hadoop.hdfs.server.namenode.FSDirStatAndListingOp.*;
 import static org.apache.hadoop.util.Time.now;
 import static org.apache.hadoop.util.Time.monotonicNow;
@@ -150,8 +149,6 @@ import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.crypto.CryptoProtocolVersion;
-import org.apache.hadoop.crypto.key.KeyProvider;
-import org.apache.hadoop.crypto.CryptoCodec;
 import org.apache.hadoop.crypto.key.KeyProvider.Metadata;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.hdfs.AddBlockFlag;
@@ -7514,6 +7511,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
         };
 
     private boolean isCallerContextEnabled;
+    private boolean isLogEnabledForLockTime;
     private int callerContextMaxLen;
     private int callerSignatureMaxLen;
 
@@ -7534,6 +7532,9 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       logTokenTrackingId = conf.getBoolean(
           DFSConfigKeys.DFS_NAMENODE_AUDIT_LOG_TOKEN_TRACKING_ID_KEY,
           DFSConfigKeys.DFS_NAMENODE_AUDIT_LOG_TOKEN_TRACKING_ID_DEFAULT);
+      isLogEnabledForLockTime = conf.getBoolean(
+          DFSConfigKeys.DFS_NAMENODE_AUDIT_LOG_LOCK_TIME_KEY,
+          DFSConfigKeys.DFS_NAMENODE_AUDIT_LOG_LOCK_TIME_DEFAULT);
 
       debugCmdSet.addAll(Arrays.asList(conf.getTrimmedStrings(
           DFSConfigKeys.DFS_NAMENODE_AUDIT_LOG_DEBUG_CMDLIST)));
@@ -7600,6 +7601,12 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
             sb.append(new String(callerContext.getSignature(),
                 CallerContext.SIGNATURE_ENCODING));
           }
+        }
+        if (isLogEnabledForLockTime) {
+           sb.append("\t").append("lockType=")
+               .append(FSNamesystemLock.isReadLock() ? "READ" : "WRITE");
+           sb.append("\t").append("lockTime=")
+               .append(FSNamesystemLock.getLockIntervalInMs());
         }
         logAuditMessage(sb.toString());
       }

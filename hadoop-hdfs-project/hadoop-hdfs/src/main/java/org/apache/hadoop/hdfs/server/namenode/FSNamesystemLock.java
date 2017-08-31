@@ -101,6 +101,10 @@ class FSNamesystemLock {
   /** Longest time (ms) a read lock was held since the last report. */
   private final AtomicLong longestReadLockHeldIntervalMs = new AtomicLong(0);
 
+  /* Lock-related information */
+  private static final ThreadLocal<Boolean> IS_READ_LOCK = new ThreadLocal<Boolean>();
+  private static final ThreadLocal<Long> LOCK_INTERVAL_MS = new ThreadLocal<Long>();
+
   @VisibleForTesting
   static final String OP_NAME_OTHER = "OTHER";
   private static final String READ_LOCK_METRIC_PREFIX = "FSNReadLock";
@@ -161,6 +165,8 @@ class FSNamesystemLock {
     }
     final long readLockIntervalMs =
         TimeUnit.NANOSECONDS.toMillis(readLockIntervalNanos);
+    IS_READ_LOCK.set(true);
+    LOCK_INTERVAL_MS.set(readLockIntervalMs);
     if (needReport && readLockIntervalMs >= this.readLockReportingThresholdMs) {
       long localLongestReadLock;
       do {
@@ -220,6 +226,8 @@ class FSNamesystemLock {
     final long currentTimeMs = TimeUnit.NANOSECONDS.toMillis(currentTimeNanos);
     final long writeLockIntervalMs =
         TimeUnit.NANOSECONDS.toMillis(writeLockIntervalNanos);
+    IS_READ_LOCK.set(false);
+    LOCK_INTERVAL_MS.set(writeLockIntervalMs);
 
     boolean logReport = false;
     int numSuppressedWarnings = 0;
@@ -300,4 +308,11 @@ class FSNamesystemLock {
     }
   }
 
+  public static boolean isReadLock() {
+    return IS_READ_LOCK.get();
+  }
+
+  public static long getLockIntervalInMs() {
+    return LOCK_INTERVAL_MS.get();
+  }
 }
