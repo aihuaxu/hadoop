@@ -57,8 +57,8 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaS
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerNode;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.AppAttemptRemovedSchedulerEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.NodeUpdateSchedulerEvent;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.placement.PlacementSet;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.placement.SimplePlacementSet;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.placement.CandidateNodeSet;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.placement.SimpleCandidateNodeSet;
 import org.apache.hadoop.yarn.server.scheduler.SchedulerRequestKey;
 import org.apache.hadoop.yarn.util.resource.Resources;
 import org.junit.Assert;
@@ -478,8 +478,8 @@ public class TestCapacitySchedulerAsyncScheduling {
         Mockito.any(CSAssignment.class));
 
     // allocation on nm1, test return null when get scheduler container
-    PlacementSet<FiCaSchedulerNode> candidateNodeSet =
-        new SimplePlacementSet(sn1);
+    CandidateNodeSet<FiCaSchedulerNode> candidateNodeSet =
+        new SimpleCandidateNodeSet(sn1);
     spyCs.allocateContainersToNode(candidateNodeSet, false);
     // make sure unconfirmed resource is decreased correctly
     Assert.assertTrue(spyCs.getApplicationAttempt(am1.getApplicationAttemptId())
@@ -492,7 +492,7 @@ public class TestCapacitySchedulerAsyncScheduling {
     // allocation on nm2,
     // test return null when get scheduler container to release
     candidateNodeSet =
-        new SimplePlacementSet(sn2);
+        new SimpleCandidateNodeSet(sn2);
     spyCs.allocateContainersToNode(candidateNodeSet, false);
     // make sure unconfirmed resource is decreased correctly
     Assert.assertTrue(spyCs.getApplicationAttempt(am1.getApplicationAttemptId())

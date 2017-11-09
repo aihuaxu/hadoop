@@ -70,8 +70,8 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.ResourceCo
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.SchedulerContainer;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerApp;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerNode;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.placement.PlacementSet;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.placement.PlacementSetUtils;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.placement.CandidateNodeSet;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.placement.CandidateNodeSetUtils;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.policy.FifoOrderingPolicyForPendingApps;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.policy.OrderingPolicy;
 import org.apache.hadoop.yarn.server.utils.Lock;
@@ -990,84 +990,86 @@ public class LeafQueue extends AbstractCSQueue {
         limits.setIsAllowPreemption(usedCapacity < guaranteedCapacity);
     }
 
-    private CSAssignment allocateFromReservedContainer(
-            Resource clusterResource, PlacementSet<FiCaSchedulerNode> ps,
-            ResourceLimits currentResourceLimits, SchedulingMode schedulingMode) {
-        FiCaSchedulerNode node = PlacementSetUtils.getSingleNode(ps);
-        if (null == node) {
-            return null;
-        }
+  private CSAssignment allocateFromReservedContainer(Resource clusterResource,
+      CandidateNodeSet<FiCaSchedulerNode> candidates,
+      ResourceLimits currentResourceLimits, SchedulingMode schedulingMode) {
+    FiCaSchedulerNode node = CandidateNodeSetUtils.getSingleNode(candidates);
+    if (null == node) {
+      return null;
+    }
 
-        RMContainer reservedContainer = node.getReservedContainer();
-        if (reservedContainer != null) {
-            FiCaSchedulerApp application = getApplication(
-                    reservedContainer.getApplicationAttemptId());
+    RMContainer reservedContainer = node.getReservedContainer();
+    if (reservedContainer != null) {
+      FiCaSchedulerApp application = getApplication(
+          reservedContainer.getApplicationAttemptId());
 
-            if (null != application) {
-                ActivitiesLogger.APP.startAppAllocationRecording(activitiesManager,
-                        node.getNodeID(), SystemClock.getInstance().getTime(), application);
-                CSAssignment assignment = application.assignContainers(clusterResource,
-                        ps, currentResourceLimits, schedulingMode, reservedContainer);
-                return assignment;
-            }
+      if (null != application) {
+        ActivitiesLogger.APP.startAppAllocationRecording(activitiesManager,
+            node.getNodeID(), SystemClock.getInstance().getTime(), application);
+        CSAssignment assignment = application.assignContainers(clusterResource,
+            candidates, currentResourceLimits, schedulingMode,
+            reservedContainer);
+        return assignment;
+      }
 
-        LOG.info("Reserved container " +
-                " application attempt=" + application.getApplicationAttemptId() +
-                " container=" + reservedContainer +
-                " queue=" + this.toString() +
-                " usedCapacity=" + getUsedCapacity() +
-                " absoluteUsedCapacity=" + getAbsoluteUsedCapacity() +
-                " cluster=" + clusterResource);
-        }
+      LOG.info("Reserved container " +
+              " application attempt=" + application.getApplicationAttemptId() +
+              " container=" + reservedContainer +
+              " queue=" + this.toString() +
+              " usedCapacity=" + getUsedCapacity() +
+              " absoluteUsedCapacity=" + getAbsoluteUsedCapacity() +
+              " cluster=" + clusterResource);
+    }
 
         return null;
     }
 
-    @Override
-    public CSAssignment assignContainers(Resource clusterResource,
-                                         PlacementSet<FiCaSchedulerNode> ps, ResourceLimits currentResourceLimits,
-                                         SchedulingMode schedulingMode) {
-        updateCurrentResourceLimits(currentResourceLimits, clusterResource);
-        FiCaSchedulerNode node = PlacementSetUtils.getSingleNode(ps);
+  @Override
+  public CSAssignment assignContainers(Resource clusterResource,
+      CandidateNodeSet<FiCaSchedulerNode> candidates,
+      ResourceLimits currentResourceLimits, SchedulingMode schedulingMode) {
+    updateCurrentResourceLimits(currentResourceLimits, clusterResource);
+    FiCaSchedulerNode node = CandidateNodeSetUtils.getSingleNode(candidates);
 
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("assignContainers: partition=" + ps.getPartition()
-                    + " #applications=" + orderingPolicy.getNumSchedulableEntities());
-        }
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("assignContainers: partition=" + candidates.getPartition()
+          + " #applications=" + orderingPolicy.getNumSchedulableEntities());
+    }
 
-        setPreemptionAllowed(currentResourceLimits, ps.getPartition());
+    setPreemptionAllowed(currentResourceLimits, candidates.getPartition());
 
-        // Check for reserved resources, try to allocate reserved container first.
-        CSAssignment assignment = allocateFromReservedContainer(clusterResource,
-                ps, currentResourceLimits, schedulingMode);
-        if (null != assignment) {
-            return assignment;
-        }
+    // Check for reserved resources, try to allocate reserved container first.
+    CSAssignment assignment = allocateFromReservedContainer(clusterResource,
+        candidates, currentResourceLimits, schedulingMode);
+    if (null != assignment) {
+      return assignment;
+    }
 
-        // if our queue cannot access this node, just return
-        if (schedulingMode == SchedulingMode.RESPECT_PARTITION_EXCLUSIVITY
-                && !accessibleToPartition(ps.getPartition())) {
-            ActivitiesLogger.QUEUE.recordQueueActivity(activitiesManager, node,
-                    getParent().getQueueName(), getQueueName(), ActivityState.REJECTED,
-                    ActivityDiagnosticConstant.NOT_ABLE_TO_ACCESS_PARTITION + ps
-                            .getPartition());
-            return CSAssignment.NULL_ASSIGNMENT;
-        }
+    // if our queue cannot access this node, just return
+    if (schedulingMode == SchedulingMode.RESPECT_PARTITION_EXCLUSIVITY
+        && !accessibleToPartition(candidates.getPartition())) {
+      ActivitiesLogger.QUEUE.recordQueueActivity(activitiesManager, node,
+          getParent().getQueueName(), getQueueName(), ActivityState.REJECTED,
+          ActivityDiagnosticConstant.NOT_ABLE_TO_ACCESS_PARTITION + candidates
+              .getPartition());
+      return CSAssignment.NULL_ASSIGNMENT;
+    }
 
-        // Check if this queue need more resource, simply skip allocation if this
-        // queue doesn't need more resources.
-        if (!hasPendingResourceRequest(ps.getPartition(), clusterResource,
-                schedulingMode)) {
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("Skip this queue=" + getQueuePath()
-                        + ", because it doesn't need more resource, schedulingMode="
-                        + schedulingMode.name() + " node-partition=" + ps.getPartition());
-            }
-            ActivitiesLogger.QUEUE.recordQueueActivity(activitiesManager, node,
-                    getParent().getQueueName(), getQueueName(), ActivityState.SKIPPED,
-                    ActivityDiagnosticConstant.QUEUE_DO_NOT_NEED_MORE_RESOURCE);
-            return CSAssignment.NULL_ASSIGNMENT;
-        }
+    // Check if this queue need more resource, simply skip allocation if this
+    // queue doesn't need more resources.
+    if (!hasPendingResourceRequest(candidates.getPartition(), clusterResource,
+        schedulingMode)) {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Skip this queue=" + getQueuePath()
+            + ", because it doesn't need more resource, schedulingMode="
+            + schedulingMode.name() + " node-partition=" + candidates
+            .getPartition());
+      }
+      ActivitiesLogger.QUEUE.recordQueueActivity(activitiesManager, node,
+          getParent().getQueueName(), getQueueName(), ActivityState.SKIPPED,
+          ActivityDiagnosticConstant.QUEUE_DO_NOT_NEED_MORE_RESOURCE);
+      return CSAssignment.NULL_ASSIGNMENT;
+    }
 
         Map<String, CachedUserLimit> userLimits = new HashMap<>();
         boolean needAssignToQueueCheck = true;
@@ -1100,41 +1102,42 @@ public class LeafQueue extends AbstractCSQueue {
                 }
             }
 
-            CachedUserLimit cul = userLimits.get(application.getUser());
-            Resource cachedUserLimit = null;
-            if (cul != null) {
-                cachedUserLimit = cul.userLimit;
-            }
-            Resource userLimit = computeUserLimitAndSetHeadroom(application,
-                    clusterResource, ps.getPartition(), schedulingMode, cachedUserLimit);
-            if (cul == null) {
-                cul = new CachedUserLimit(userLimit);
-                userLimits.put(application.getUser(), cul);
-            }
-            // Check user limit
-            boolean userAssignable = true;
-            if (!cul.canAssign && Resources.fitsIn(appReserved, cul.reservation)) {
-                userAssignable = false;
-            } else {
-                userAssignable = canAssignToUser(clusterResource, application.getUser(),
-                        userLimit, application, node.getPartition(), currentResourceLimits);
-                if (!userAssignable && Resources.fitsIn(cul.reservation, appReserved)) {
-                    cul.canAssign = false;
-                    cul.reservation = appReserved;
-                }
-            }
-            if (!userAssignable) {
-                application.updateAMContainerDiagnostics(AMState.ACTIVATED,
-                        "User capacity has reached its maximum limit.");
-                ActivitiesLogger.APP.recordRejectedAppActivityFromLeafQueue(
-                        activitiesManager, node, application, application.getPriority(),
-                        ActivityDiagnosticConstant.USER_CAPACITY_MAXIMUM_LIMIT);
-                continue;
-            }
+      CachedUserLimit cul = userLimits.get(application.getUser());
+      Resource cachedUserLimit = null;
+      if (cul != null) {
+        cachedUserLimit = cul.userLimit;
+      }
+      Resource userLimit = computeUserLimitAndSetHeadroom(application,
+          clusterResource, candidates.getPartition(), schedulingMode,
+          cachedUserLimit);
+      if (cul == null) {
+        cul = new CachedUserLimit(userLimit);
+        userLimits.put(application.getUser(), cul);
+      }
+      // Check user limit
+      boolean userAssignable = true;
+      if (!cul.canAssign && Resources.fitsIn(appReserved, cul.reservation)) {
+        userAssignable = false;
+      } else {
+        userAssignable = canAssignToUser(clusterResource, application.getUser(),
+            userLimit, application, node.getPartition(), currentResourceLimits);
+        if (!userAssignable && Resources.fitsIn(cul.reservation, appReserved)) {
+          cul.canAssign = false;
+          cul.reservation = appReserved;
+        }
+      }
+      if (!userAssignable) {
+        application.updateAMContainerDiagnostics(AMState.ACTIVATED,
+            "User capacity has reached its maximum limit.");
+        ActivitiesLogger.APP.recordRejectedAppActivityFromLeafQueue(
+            activitiesManager, node, application, application.getPriority(),
+            ActivityDiagnosticConstant.USER_CAPACITY_MAXIMUM_LIMIT);
+        continue;
+      }
 
-            // Try to schedule
-            assignment = application.assignContainers(clusterResource,
-                    ps, currentResourceLimits, schedulingMode, null);
+      // Try to schedule
+      assignment = application.assignContainers(clusterResource,
+          candidates, currentResourceLimits, schedulingMode, null);
 
             if (LOG.isDebugEnabled()) {
                 LOG.debug("post-assignContainers for application " + application
