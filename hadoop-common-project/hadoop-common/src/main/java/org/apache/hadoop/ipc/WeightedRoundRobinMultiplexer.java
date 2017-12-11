@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ipc;
 
+import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.commons.logging.Log;
@@ -53,23 +54,70 @@ public class WeightedRoundRobinMultiplexer implements RpcMultiplexer {
 
   private int[] queueWeights; // The weights for each queue
 
-  public WeightedRoundRobinMultiplexer(int aNumQueues, String ns,
-    Configuration conf) {
-    if (aNumQueues <= 0) {
-      throw new IllegalArgumentException("Requested queues (" + aNumQueues +
-        ") must be greater than zero.");
+  public WeightedRoundRobinMultiplexer(int aNumSharedQueues, String ns,
+      Configuration conf) {
+    this(aNumSharedQueues, null, ns, conf);
+  }
+
+  public WeightedRoundRobinMultiplexer(int aNumSharedQueues,
+      double[] aNumReservedShares, String ns, Configuration conf) {
+    if (aNumSharedQueues <= 0) {
+      throw new IllegalArgumentException("Requested shared queues (" +
+          aNumSharedQueues + ") must be greater than zero.");
     }
 
-    this.numQueues = aNumQueues;
-    this.queueWeights = conf.getInts(ns + "." +
-      IPC_CALLQUEUE_WRRMUX_WEIGHTS_KEY);
+    int numReservedQueues =
+        aNumReservedShares == null ? 0 : aNumReservedShares.length;
+    this.numQueues = aNumSharedQueues + numReservedQueues;
+    LOG.info("WeightRoundRobinMultiplexer is configured with " +
+        aNumSharedQueues + " shared queues and " + numReservedQueues +
+        " reserved queues.");
 
-    if (this.queueWeights.length == 0) {
-      this.queueWeights = getDefaultQueueWeights(this.numQueues);
-    } else if (this.queueWeights.length != this.numQueues) {
+    // Set the weights for shared queues
+    int[] sharedQueueWeights = conf.getInts(ns + "." +
+        IPC_CALLQUEUE_WRRMUX_WEIGHTS_KEY);
+
+    if (sharedQueueWeights.length == 0) {
+      sharedQueueWeights = getDefaultQueueWeights(aNumSharedQueues);
+    } else if (sharedQueueWeights.length != aNumSharedQueues) {
       throw new IllegalArgumentException(ns + "." +
         IPC_CALLQUEUE_WRRMUX_WEIGHTS_KEY + " must specify exactly " +
-        this.numQueues + " weights: one for each priority level.");
+        aNumSharedQueues + " weights: one for each priority level.");
+    }
+
+    // Set the weights for reserved queues
+    int[] reservedQueueWeights = null;
+    if (numReservedQueues > 0) {
+      int totalSharedWeight = 0;
+      for (int weight : sharedQueueWeights) {
+        totalSharedWeight += weight;
+      }
+      double totalReservedShare = 0.0;
+      for (double share : aNumReservedShares) {
+        totalReservedShare += share;
+      }
+      int totalWeight =
+          (int) (Math.ceil(totalSharedWeight / (1 - totalReservedShare)));
+      reservedQueueWeights = new int[numReservedQueues];
+      for (int i = 0; i < numReservedQueues; i ++) {
+        reservedQueueWeights[i] =
+            (int) Math.ceil(totalWeight * aNumReservedShares[i]);
+      }
+      LOG.info("Reserved queues have shares " +
+          Arrays.toString(aNumReservedShares) +
+          ", and their corresponding weights are " +
+          Arrays.toString(reservedQueueWeights) + ".");
+    }
+
+    // Merge two sets of weights together
+    if (numReservedQueues > 0) {
+      this.queueWeights = new int[this.numQueues];
+      System.arraycopy(sharedQueueWeights, 0,
+          queueWeights, 0, aNumSharedQueues);
+      System.arraycopy(reservedQueueWeights, 0,
+          queueWeights, aNumSharedQueues, numReservedQueues);
+    } else {
+      this.queueWeights = sharedQueueWeights;
     }
 
     this.currentQueueIndex = new AtomicInteger(0);
