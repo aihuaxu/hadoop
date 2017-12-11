@@ -558,6 +558,10 @@ public class DecayRpcScheduler implements RpcScheduler,
       identity = DECAYSCHEDULER_UNKNOWN_IDENTITY;
     }
 
+    return getPriorityLevel(identity);
+  }
+
+  protected int getPriorityLevel(String identity) {
     return cachedOrComputedPriorityLevel(identity);
   }
 
@@ -945,5 +949,13 @@ public class DecayRpcScheduler implements RpcScheduler,
   public void stop() {
     metricsProxy.unregisterSource(namespace);
     MetricsProxy.removeInstance(namespace);
+  }
+
+  protected IdentityProvider getIdentityProvider() {
+    return this.identityProvider;
+  }
+
+  protected boolean isBackOffByResponseTimeEnabled() {
+    return this.backOffByResponseTimeEnabled;
   }
 }
