@@ -634,6 +634,10 @@ public abstract class Server {
             FairCallQueue.class.getCanonicalName())) {
           conf.setClass(schedulerKeyname, DecayRpcScheduler.class,
               RpcScheduler.class);
+        } else if (queueClass.getCanonicalName().equals(
+            FairCallQueueWithReservation.class.getCanonicalName())) {
+          conf.setClass(schedulerKeyname,
+              DecayWithReservationRpcScheduler.class, RpcScheduler.class);
         }
       }
     }
