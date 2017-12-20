@@ -114,6 +114,13 @@ public class CommonConfigurationKeys extends CommonConfigurationKeysPublic {
       "scheduler.priority.levels";
   public static final int IPC_SCHEDULER_PRIORITY_LEVELS_DEFAULT_KEY = 4;
 
+  /**
+   * IPC scheduler reserved shares. Each reserved user has a config field like:
+   * scheduler.reserved.share.<USER>=<SHARE_IN_PERCENT>
+   */
+  public static final String IPC_SCHEDULER_RESERVED_SHARE_PREFIX =
+      "scheduler.reserved.share.";
+
   /** This is for specifying the implementation for the mappings from
    * hostnames to the racks they belong to
    */

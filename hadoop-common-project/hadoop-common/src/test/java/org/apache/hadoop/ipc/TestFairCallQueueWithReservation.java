@@ -27,7 +27,6 @@ import static org.mockito.Mockito.times;
 
 import junit.framework.TestCase;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.ipc.protobuf.RpcHeaderProtos;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.ipc.protobuf.RpcHeaderProtos.RpcResponseHeaderProto.RpcStatusProto;
 import org.junit.Test;
@@ -425,7 +424,7 @@ public class TestFairCallQueueWithReservation extends TestCase {
     Mockito.verify(fcq, times(1)).putQueue(4, p4);
   }
 
-  private void checkOverflowException(Exception ex, RpcHeaderProtos.RpcResponseHeaderProto.RpcStatusProto status) {
+  private void checkOverflowException(Exception ex, RpcStatusProto status) {
     // should be an overflow exception
     assertTrue(ex.getClass().getName() + " != CallQueueOverflowException",
         ex instanceof CallQueueManager.CallQueueOverflowException);

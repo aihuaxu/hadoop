@@ -23,7 +23,9 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.util.AbstractQueue;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -72,11 +74,21 @@ public class CallQueueManager<E extends Schedulable>
                           Class<? extends RpcScheduler> schedulerClass,
       boolean clientBackOffEnabled, int maxQueueSize, String namespace,
       Configuration conf) {
-    int priorityLevels = parseNumLevels(namespace, conf);
-    this.scheduler = createScheduler(schedulerClass, priorityLevels,
-        namespace, conf);
+    // List of reserved users and their corresponding shares
+    Map<String, Double> reservedMap = parseReservedShares(namespace, conf);
+    String[] reservedUsers = reservedMap.isEmpty() ? null :
+        reservedMap.keySet().toArray(new String[reservedMap.size()]);
+    double[] reservedShares = reservedMap.isEmpty() ? null :
+        new double[reservedMap.size()];
+    for (int i = 0; i < reservedMap.size(); i++) {
+      reservedShares[i] = reservedMap.get(reservedUsers[i]);
+    }
+    // Number of levels shared by other users
+    int sharedPriorityLevels = parseNumSharedLevels(namespace, conf);
+    this.scheduler = createScheduler(schedulerClass, sharedPriorityLevels,
+        reservedUsers, namespace, conf);
     BlockingQueue<E> bq = createCallQueueInstance(backingClass,
-        priorityLevels, maxQueueSize, namespace, conf);
+        sharedPriorityLevels, reservedShares, maxQueueSize, namespace, conf);
     this.clientBackOffEnabled = clientBackOffEnabled;
     this.putRef = new AtomicReference<BlockingQueue<E>>(bq);
     this.takeRef = new AtomicReference<BlockingQueue<E>>(bq);
@@ -94,12 +106,25 @@ public class CallQueueManager<E extends Schedulable>
   }
 
   private static <T extends RpcScheduler> T createScheduler(
-      Class<T> theClass, int priorityLevels, String ns, Configuration conf) {
+      Class<T> theClass, int sharedPriorityLevels, String[] reservedUsers,
+      String ns, Configuration conf) {
     // Used for custom, configurable scheduler
     try {
       Constructor<T> ctor = theClass.getDeclaredConstructor(int.class,
+          String[].class, String.class, Configuration.class);
+      return ctor.newInstance(sharedPriorityLevels, reservedUsers, ns, conf);
+    } catch (RuntimeException e) {
+      throw e;
+    } catch (InvocationTargetException e) {
+      throw new RuntimeException(theClass.getName()
+          + " could not be constructed.", e.getCause());
+    } catch (Exception e) {
+    }
+
+    try {
+      Constructor<T> ctor = theClass.getDeclaredConstructor(int.class,
           String.class, Configuration.class);
-      return ctor.newInstance(priorityLevels, ns, conf);
+      return ctor.newInstance(sharedPriorityLevels, ns, conf);
     } catch (RuntimeException e) {
       throw e;
     } catch (InvocationTargetException e) {
@@ -110,7 +135,7 @@ public class CallQueueManager<E extends Schedulable>
 
     try {
       Constructor<T> ctor = theClass.getDeclaredConstructor(int.class);
-      return ctor.newInstance(priorityLevels);
+      return ctor.newInstance(sharedPriorityLevels);
     } catch (RuntimeException e) {
       throw e;
     } catch (InvocationTargetException e) {
@@ -137,14 +162,27 @@ public class CallQueueManager<E extends Schedulable>
   }
 
   private <T extends BlockingQueue<E>> T createCallQueueInstance(
-      Class<T> theClass, int priorityLevels, int maxLen, String ns,
-      Configuration conf) {
+      Class<T> theClass, int sharedPriorityLevels, double[] reservedShares,
+      int maxLen, String ns, Configuration conf) {
 
     // Used for custom, configurable callqueues
     try {
       Constructor<T> ctor = theClass.getDeclaredConstructor(int.class,
+          double[].class, int.class, String.class, Configuration.class);
+      return ctor.newInstance(sharedPriorityLevels, reservedShares, maxLen, ns,
+          conf);
+    } catch (RuntimeException e) {
+      throw e;
+    } catch (InvocationTargetException e) {
+      throw new RuntimeException(theClass.getName()
+          + " could not be constructed.", e.getCause());
+    } catch (Exception e) {
+    }
+
+    try {
+      Constructor<T> ctor = theClass.getDeclaredConstructor(int.class,
           int.class, String.class, Configuration.class);
-      return ctor.newInstance(priorityLevels, maxLen, ns, conf);
+      return ctor.newInstance(sharedPriorityLevels, maxLen, ns, conf);
     } catch (RuntimeException e) {
       throw e;
     } catch (InvocationTargetException e) {
@@ -300,12 +338,12 @@ public class CallQueueManager<E extends Schedulable>
   }
 
   /**
-   * Read the number of levels from the configuration.
+   * Read the number of shared levels from the configuration.
    * This will affect the FairCallQueue's overall capacity.
    * @throws IllegalArgumentException on invalid queue count
    */
   @SuppressWarnings("deprecation")
-  private static int parseNumLevels(String ns, Configuration conf) {
+  private static int parseNumSharedLevels(String ns, Configuration conf) {
     // Fair call queue levels (IPC_CALLQUEUE_PRIORITY_LEVELS_KEY)
     // takes priority over the scheduler level key
     // (IPC_SCHEDULER_PRIORITY_LEVELS_KEY)
@@ -327,6 +365,47 @@ public class CallQueueManager<E extends Schedulable>
   }
 
   /**
+   * Parse out all reserved users and their corresponding shares.
+   */
+  @VisibleForTesting
+  static Map<String, Double> parseReservedShares(String ns, Configuration conf) {
+    Map<String, Double> userShares = new HashMap<String, Double>();
+    Map<String, String> reservedConfigs = conf.getPropsWithPrefix(ns + "." +
+        CommonConfigurationKeys.IPC_SCHEDULER_RESERVED_SHARE_PREFIX + ".");
+    double sumShare = 0.0;
+    for (Map.Entry<String, String> entry : reservedConfigs.entrySet()) {
+      // Name of the reserved user
+      String user = entry.getKey();
+      if (user.isEmpty()) {
+        throw new IllegalArgumentException("Empty username found in config " +
+            "fields " + ns + "." +
+            CommonConfigurationKeys.IPC_SCHEDULER_RESERVED_SHARE_PREFIX + ".");
+      }
+      // Corresponding share, should be (0, 1)
+      double share = 0.0;
+      try {
+        share = Double.parseDouble(entry.getValue());
+      } catch (NumberFormatException e) {
+        LOG.error("Reserved share " + share + " for user " + user + " is " +
+            "invalid format. The value should be a double with range (0, 1).");
+        throw e;
+      }
+      if (share <= 0 || share >= 1.0) {
+        throw new IllegalArgumentException("Reserved share " + share +
+            " for user " + user + " is invalid. The value should be (0, 1).");
+      }
+      userShares.put(user, share);
+      sumShare += share;
+    }
+    if (sumShare >= 1.0) {
+      throw new IllegalArgumentException("The sum of reserved shares should " +
+          "be less than 100%. Current value is " +
+          (int) (sumShare * 100) + "%.");
+    }
+    return userShares;
+  }
+
+  /**
    * Replaces active queue with the newly requested one and transfers
    * all calls to the newQ before returning.
    */
@@ -334,12 +413,23 @@ public class CallQueueManager<E extends Schedulable>
       Class<? extends RpcScheduler> schedulerClass,
       Class<? extends BlockingQueue<E>> queueClassToUse, int maxSize,
       String ns, Configuration conf) {
-    int priorityLevels = parseNumLevels(ns, conf);
+    // List of reserved users and their corresponding shares
+    Map<String, Double> reservedMap = parseReservedShares(ns, conf);
+    String[] reservedUsers = reservedMap.isEmpty() ?
+        null : reservedMap.keySet().toArray(
+        new String[reservedMap.size()]);
+    double[] reservedShares = reservedMap.isEmpty() ?
+        null : new double[reservedMap.size()];
+    for (int i = 0; i < reservedMap.size(); i++) {
+      reservedShares[i] = reservedMap.get(reservedUsers[i]);
+    }
+    // Number of levels shared by other users
+    int sharedPriorityLevels = parseNumSharedLevels(ns, conf);
     this.scheduler.stop();
-    RpcScheduler newScheduler = createScheduler(schedulerClass, priorityLevels,
-        ns, conf);
+    RpcScheduler newScheduler = createScheduler(schedulerClass, sharedPriorityLevels,
+        reservedUsers, ns, conf);
     BlockingQueue<E> newQ = createCallQueueInstance(queueClassToUse,
-        priorityLevels, maxSize, ns, conf);
+        sharedPriorityLevels, reservedShares, maxSize, ns, conf);
 
     // Our current queue becomes the old queue
     BlockingQueue<E> oldQ = putRef.get();

@@ -30,6 +30,7 @@ import static org.mockito.Mockito.verify;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
@@ -229,12 +230,69 @@ public class TestCallQueueManager {
   }
 
   @Test
+  public void testFcqWithReservationBackwardCompatibility() throws InterruptedException {
+    // Test BackwardCompatibility to ensure existing FairCallQueueWithReservation
+    // deployment still work without explicitly specifying DecayWithReservationRpcScheduler
+    Configuration conf = new Configuration();
+    final String ns = CommonConfigurationKeys.IPC_NAMESPACE + ".0";
+
+    final String queueClassName = "org.apache.hadoop.ipc.FairCallQueueWithReservation";
+    conf.setStrings(ns + "." + CommonConfigurationKeys.IPC_CALLQUEUE_IMPL_KEY,
+        queueClassName);
+
+    // Specify only FairCallQueueWithReservation without a scheduler
+    // Ensure the DecayScheduler will be added to avoid breaking.
+    Class<? extends RpcScheduler> scheduler = Server.getSchedulerClass(ns,
+        conf);
+    assertTrue(scheduler.getCanonicalName().
+        equals("org.apache.hadoop.ipc.DecayWithReservationRpcScheduler"));
+
+    Class<? extends BlockingQueue<FakeCall>> queue =
+        (Class<? extends BlockingQueue<FakeCall>>) getQueueClass(ns, conf);
+    assertTrue(queue.getCanonicalName().equals(queueClassName));
+
+    manager = new CallQueueManager<FakeCall>(queue, scheduler, false,
+        8, "", conf);
+
+    // Default FCQ has 4 levels and the max capacity is 8
+    assertCanPut(manager, 3, 3);
+  }
+
+  @Test
   public void testSchedulerWithoutFCQ() throws InterruptedException {
     Configuration conf = new Configuration();
     // Test DecayedRpcScheduler without FCQ
     // Ensure the default LinkedBlockingQueue can work with DecayedRpcScheduler
     final String ns = CommonConfigurationKeys.IPC_NAMESPACE + ".0";
     final String schedulerClassName = "org.apache.hadoop.ipc.DecayRpcScheduler";
+    conf.setStrings(ns + "." + CommonConfigurationKeys.IPC_SCHEDULER_IMPL_KEY,
+        schedulerClassName);
+
+    Class<? extends BlockingQueue<FakeCall>> queue =
+        (Class<? extends BlockingQueue<FakeCall>>) getQueueClass(ns, conf);
+    assertTrue(queue.getCanonicalName().equals("java.util.concurrent." +
+        "LinkedBlockingQueue"));
+
+    manager = new CallQueueManager<FakeCall>(queue,
+        Server.getSchedulerClass(ns, conf), false,
+        3, "", conf);
+
+    // LinkedBlockingQueue with a capacity of 3 can put 3 calls
+    assertCanPut(manager, 3, 3);
+    // LinkedBlockingQueue with a capacity of 3 can't put 1 more call
+    assertCanPut(manager, 0, 1);
+  }
+
+  @Test
+  public void testReservationSchedulerWithoutFCQ() throws InterruptedException {
+    Configuration conf = new Configuration();
+    // Test DecayedWithReservationRpcScheduler without
+    // FairCallQueueWithReservation
+    // Ensure the default LinkedBlockingQueue
+    // can work with DecayedWithReservationRpcScheduler
+    final String ns = CommonConfigurationKeys.IPC_NAMESPACE + ".0";
+    final String schedulerClassName =
+        "org.apache.hadoop.ipc.DecayWithReservationRpcScheduler";
     conf.setStrings(ns + "." + CommonConfigurationKeys.IPC_SCHEDULER_IMPL_KEY,
         schedulerClassName);
 
@@ -434,5 +492,74 @@ public class TestCallQueueManager {
     }
     verify(queue, times(0)).put(call);
     verify(queue, times(0)).add(call);
+  }
+
+  @Test
+  public void testParseReservedShares() {
+    String ns = "ns";
+    // No reserved shares
+    Map<String, Double> reservedShares =
+        CallQueueManager.parseReservedShares("", conf);
+    assertTrue(reservedShares == null || reservedShares.isEmpty());
+
+    // Three reserved shares
+    conf.set(ns + "." + CommonConfigurationKeys.
+        IPC_SCHEDULER_RESERVED_SHARE_PREFIX + ".user1", "0.2");
+    conf.set(ns + "." + CommonConfigurationKeys.
+        IPC_SCHEDULER_RESERVED_SHARE_PREFIX + ".user2", "0.3");
+    conf.set(ns + "." + CommonConfigurationKeys.
+        IPC_SCHEDULER_RESERVED_SHARE_PREFIX + ".user3", "0.1");
+    reservedShares = CallQueueManager.parseReservedShares(ns, conf);
+    assertEquals(3, reservedShares.size());
+    assertEquals(0.2, reservedShares.get("user1"), 0.000000001);
+    assertEquals(0.3, reservedShares.get("user2"), 0.000000001);
+    assertEquals(0.1, reservedShares.get("user3"), 0.000000001);
+
+    // Empty username, should throw out exception
+    conf = new Configuration();
+    conf.set(ns + "." + CommonConfigurationKeys.
+        IPC_SCHEDULER_RESERVED_SHARE_PREFIX + ".", "0.2");
+    try {
+      CallQueueManager.parseReservedShares(ns, conf);
+      fail("didn't fail");
+    } catch (Exception ex) {
+      assertTrue(ex instanceof IllegalArgumentException);
+      assertTrue(
+          ex.getMessage().contains("Empty username found in config fields"));
+    }
+
+    // The share is either <=0 or >= 1.0
+    double[] invalidShares = new double[]{-0.1, 0.0, 1.0, 1.2};
+    for (double invalidShare : invalidShares) {
+      conf = new Configuration();
+      conf.set(ns + "." +
+          CommonConfigurationKeys.IPC_SCHEDULER_RESERVED_SHARE_PREFIX +
+          ".user1", String.valueOf(invalidShare));
+      try {
+        CallQueueManager.parseReservedShares(ns, conf);
+        fail("didn't fail");
+      } catch (Exception ex) {
+        assertTrue(ex instanceof IllegalArgumentException);
+        assertTrue(ex.getMessage().contains("Reserved share " + invalidShare +
+            " for user user1 is invalid."));
+      }
+    }
+
+    // Aggregated reserved share is >= 1.0
+    conf = new Configuration();
+    conf.set(ns + "." + CommonConfigurationKeys.
+        IPC_SCHEDULER_RESERVED_SHARE_PREFIX + ".user1", "0.4");
+    conf.set(ns + "." + CommonConfigurationKeys.
+        IPC_SCHEDULER_RESERVED_SHARE_PREFIX + ".user2", "0.5");
+    conf.set(ns + "." + CommonConfigurationKeys.
+        IPC_SCHEDULER_RESERVED_SHARE_PREFIX + ".user3", "0.6");
+    try {
+      CallQueueManager.parseReservedShares(ns, conf);
+      fail("didn't fail");
+    } catch (Exception ex) {
+      assertTrue(ex instanceof IllegalArgumentException);
+      assertTrue(ex.getMessage(), ex.getMessage().contains("The sum of reserved shares should be " +
+          "less than 100%. Current value is 150%."));
+    }
   }
 }
