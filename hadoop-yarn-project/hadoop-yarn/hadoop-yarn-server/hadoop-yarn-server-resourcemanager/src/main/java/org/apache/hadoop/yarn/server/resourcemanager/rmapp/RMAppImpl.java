@@ -148,6 +148,7 @@ public class RMAppImpl implements RMApp, Recoverable {
   private final Set<RMNode> updatedNodes = new HashSet<RMNode>();
   private final String applicationType;
   private final Set<String> applicationTags;
+  private Map<String, String> applicationSchedulingEnvs = new HashMap<>();
 
   private final long attemptFailuresValidityInterval;
   private boolean amBlacklistingEnabled = false;
@@ -483,6 +484,15 @@ public class RMAppImpl implements RMApp, Recoverable {
     this.stateMachine = stateMachineFactory.make(this);
 
     this.callerContext = CallerContext.getCurrent();
+
+    // If applications are not explicitly specifying envs, try to pull from
+    // AM container environment lists.
+    if(submissionContext.getAMContainerSpec() != null) {
+      applicationSchedulingEnvs
+          .putAll(submissionContext.getAMContainerSpec().getEnvironment());
+    }
+    applicationSchedulingEnvs
+        .putAll(submissionContext.getApplicationSchedulingPropertiesMap());
 
     long localLogAggregationStatusTimeout =
         conf.getLong(YarnConfiguration.LOG_AGGREGATION_STATUS_TIME_OUT_MS,
@@ -2018,7 +2028,6 @@ public class RMAppImpl implements RMApp, Recoverable {
 
   /**
      * Clear Unused fields to free memory.
-     * @param app
      */
   private void clearUnusedFields() {
     this.submissionContext.setAMContainerSpec(null);
@@ -2033,5 +2042,10 @@ public class RMAppImpl implements RMApp, Recoverable {
   protected void onInvalidStateTransition(RMAppEventType rmAppEventType,
               RMAppState state){
       /* TODO fail the application on the failed transition */
+  }
+
+  @Override
+    public Map<String, String> getApplicationSchedulingEnvs() {
+      return this.applicationSchedulingEnvs;
   }
 }

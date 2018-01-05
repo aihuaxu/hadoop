@@ -301,4 +301,10 @@ public interface RMApp extends EventHandler<RMAppEvent> {
    * @return True/False to confirm whether app is in final states
    */
   boolean isAppInCompletedStates();
+
+  /**
+   * Get the application scheduling environment variables.
+   * @return Map of envs related to application scheduling preferences.
+   */
+  Map<String, String> getApplicationSchedulingEnvs();
 }
