@@ -60,13 +60,16 @@ import org.apache.hadoop.yarn.security.ContainerTokenIdentifier;
 import org.apache.hadoop.yarn.server.api.protocolrecords.NMContainerStatus;
 import org.apache.hadoop.yarn.server.nodemanager.ContainerExecutor.ExitCode;
 import org.apache.hadoop.yarn.server.nodemanager.Context;
+import org.apache.hadoop.yarn.server.nodemanager.DeletionService;
 import org.apache.hadoop.yarn.server.nodemanager.NMAuditLogger;
 import org.apache.hadoop.yarn.server.nodemanager.NMAuditLogger.AuditConstants;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.AuxServicesEvent;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.AuxServicesEventType;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.application.ApplicationContainerFinishedEvent;
+import org.apache.hadoop.yarn.server.nodemanager.containermanager.deletion.task.DockerContainerDeletionTask;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.launcher.ContainersLauncherEvent;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.launcher.ContainersLauncherEventType;
+import org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.runtime.DockerLinuxContainerRuntime;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.LocalResourceRequest;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.ResourceSet;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.event.ContainerLocalizationCleanupEvent;
@@ -1517,6 +1520,11 @@ public class ContainerImpl implements Container {
     	
       // TODO: Add containerWorkDir to the deletion service.
 
+      if (DockerLinuxContainerRuntime.isDockerContainerRequested(
+          container.getLaunchContext().getEnvironment())) {
+        removeDockerContainer(container);
+      }
+
       if (clCleanupRequired) {
         container.dispatcher.getEventHandler().handle(
             new ContainersLauncherEvent(container,
@@ -1551,6 +1559,11 @@ public class ContainerImpl implements Container {
 
       // TODO: Add containerWorkDir to the deletion service.
       // TODO: Add containerOuputDir to the deletion service.
+
+      if (DockerLinuxContainerRuntime.isDockerContainerRequested(
+          container.getLaunchContext().getEnvironment())) {
+        removeDockerContainer(container);
+      }
 
       if (clCleanupRequired) {
         container.dispatcher.getEventHandler().handle(
@@ -1844,6 +1857,11 @@ public class ContainerImpl implements Container {
 
       if (exitEvent.getDiagnosticInfo() != null) {
         container.addDiagnostics(exitEvent.getDiagnosticInfo() + "\n");
+      }
+
+      if (DockerLinuxContainerRuntime.isDockerContainerRequested(
+          container.getLaunchContext().getEnvironment())) {
+        removeDockerContainer(container);
       }
 
       // The process/process-grp is killed. Decrement reference counts and
@@ -2171,5 +2189,13 @@ public class ContainerImpl implements Container {
 
   public Priority getPriority() {
     return containerTokenIdentifier.getPriority();
+  }
+
+  private static void removeDockerContainer(ContainerImpl container) {
+    DeletionService deletionService = container.context.getDeletionService();
+    DockerContainerDeletionTask deletionTask =
+        new DockerContainerDeletionTask(deletionService, container.user,
+            container.getContainerId().toString());
+    deletionService.delete(deletionTask);
   }
 }

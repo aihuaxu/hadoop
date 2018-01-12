@@ -63,6 +63,7 @@ import org.apache.hadoop.yarn.server.nodemanager.executor.ContainerSignalContext
 import org.apache.hadoop.yarn.server.nodemanager.executor.ContainerStartContext;
 import org.apache.hadoop.yarn.server.nodemanager.executor.DeletionAsUserContext;
 import org.apache.hadoop.yarn.server.nodemanager.executor.LocalizerStartContext;
+import org.apache.hadoop.yarn.server.nodemanager.executor.ContainerReapContext;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
@@ -428,6 +429,11 @@ public class DockerContainerExecutor extends ContainerExecutor {
       throw e;
     }
     return true;
+  }
+
+  @Override
+  public boolean reapContainer(ContainerReapContext ctx) throws IOException {
+    return false;
   }
 
   @Override

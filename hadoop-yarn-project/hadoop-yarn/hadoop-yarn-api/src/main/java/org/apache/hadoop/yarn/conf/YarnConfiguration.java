@@ -1700,6 +1700,44 @@ public class YarnConfiguration extends Configuration {
   public static final String DEFAULT_NM_DOCKER_DEFAULT_CONTAINER_NETWORK =
       "host";
 
+  /**
+   * Whether or not users are allowed to request that Docker containers honor
+   * the debug deletion delay. This is useful for troubleshooting Docker
+   * container related launch failures.
+   */
+  public static final String NM_DOCKER_ALLOW_DELAYED_REMOVAL =
+      DOCKER_CONTAINER_RUNTIME_PREFIX + "delayed-removal.allowed";
+
+  /**
+   * The default value on whether or not a user can request that Docker
+   * containers honor the debug deletion delay.
+   */
+  public static final boolean DEFAULT_NM_DOCKER_ALLOW_DELAYED_REMOVAL = false;
+
+  /** The mode in which the Java Container Sandbox should run detailed by
+   *  the JavaSandboxLinuxContainerRuntime. */
+  public static final String YARN_CONTAINER_SANDBOX =
+      LINUX_CONTAINER_RUNTIME_PREFIX + "sandbox-mode";
+  public static final String DEFAULT_YARN_CONTAINER_SANDBOX = "disabled";
+
+  /** Permissions for application local directories.*/
+  public static final String YARN_CONTAINER_SANDBOX_FILE_PERMISSIONS =
+      YARN_CONTAINER_SANDBOX + ".local-dirs.permissions";
+  public static final String DEFAULT_YARN_CONTAINER_SANDBOX_FILE_PERMISSIONS =
+      "read";
+
+  /** Location for non-default java policy file.*/
+  public static final String YARN_CONTAINER_SANDBOX_POLICY =
+      YARN_CONTAINER_SANDBOX + ".policy";
+
+  /** Prefix for group to policy file mapping.*/
+  public static final String YARN_CONTAINER_SANDBOX_POLICY_GROUP_PREFIX =
+      YARN_CONTAINER_SANDBOX_POLICY + ".group.";
+
+  /** The group which will run by default without the java security manager.*/
+  public static final String YARN_CONTAINER_SANDBOX_WHITELIST_GROUP =
+      YARN_CONTAINER_SANDBOX + ".whitelist-group";
+
   /** The path to the Linux container executor.*/
   public static final String NM_LINUX_CONTAINER_EXECUTOR_PATH =
     NM_PREFIX + "linux-container-executor.path";

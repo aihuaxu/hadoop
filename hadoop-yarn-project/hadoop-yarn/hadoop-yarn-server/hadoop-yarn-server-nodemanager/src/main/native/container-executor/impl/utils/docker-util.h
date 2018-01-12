@@ -30,6 +30,8 @@
 #define DOCKER_RM_COMMAND "rm"
 #define DOCKER_RUN_COMMAND "run"
 #define DOCKER_STOP_COMMAND "stop"
+#define DOCKER_KILL_COMMAND "kill"
+#define DOCKER_VOLUME_COMMAND "volume"
 
 
 enum docker_error_codes {
@@ -49,7 +51,11 @@ enum docker_error_codes {
     INVALID_DOCKER_RW_MOUNT,
     MOUNT_ACCESS_ERROR,
     INVALID_DOCKER_DEVICE,
-    INVALID_DOCKER_STOP_COMMAND
+    INVALID_DOCKER_STOP_COMMAND,
+    INVALID_DOCKER_KILL_COMMAND,
+    INVALID_DOCKER_VOLUME_DRIVER,
+    INVALID_DOCKER_VOLUME_NAME,
+    INVALID_DOCKER_VOLUME_COMMAND
 };
 
 /**
@@ -129,6 +135,28 @@ int get_docker_run_command(const char* command_file, const struct configuration*
  * @return Return code with 0 indicating success and non-zero codes indicating error
  */
 int get_docker_stop_command(const char* command_file, const struct configuration* conf, char *out, const size_t outlen);
+
+/**
+ * Get the Docker kill command line string. The function will verify that the params file is meant for the kill command.
+ * @param command_file File containing the params for the Docker kill command
+ * @param conf Configuration struct containing the container-executor.cfg details
+ * @param out Buffer to fill with the kill command
+ * @param outlen Size of the output buffer
+ * @return Return code with 0 indicating success and non-zero codes indicating error
+ */
+int get_docker_kill_command(const char* command_file, const struct configuration* conf, char *out, const size_t outlen);
+
+/**
+ * Get the Docker volume command line string. The function will verify that the
+ * params file is meant for the volume command.
+ * @param command_file File containing the params for the Docker volume command
+ * @param conf Configuration struct containing the container-executor.cfg details
+ * @param out Buffer to fill with the volume command
+ * @param outlen Size of the output buffer
+ * @return Return code with 0 indicating success and non-zero codes indicating error
+ */
+int get_docker_volume_command(const char *command_file, const struct configuration *conf, char *out,
+                               const size_t outlen);
 
 /**
  * Give an error message for the supplied error code

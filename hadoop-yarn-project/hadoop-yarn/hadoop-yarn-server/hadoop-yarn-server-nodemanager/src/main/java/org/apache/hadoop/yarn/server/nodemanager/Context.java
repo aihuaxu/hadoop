@@ -122,4 +122,11 @@ public interface Context {
   void setNMTimelinePublisher(NMTimelinePublisher nmMetricsPublisher);
 
   NMTimelinePublisher getNMTimelinePublisher();
+
+  /**
+   * Get the {@code DeletionService} associated with the NM.
+   *
+   * @return the NM {@code DeletionService}.
+   */
+  DeletionService getDeletionService();
 }

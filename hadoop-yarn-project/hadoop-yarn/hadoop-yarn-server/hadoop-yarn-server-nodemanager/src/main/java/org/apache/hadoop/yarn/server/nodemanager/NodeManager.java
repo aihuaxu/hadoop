@@ -398,6 +398,7 @@ public class NodeManager extends CompositeService
 
 
     ((NMContext)context).setContainerExecutor(exec);
+    ((NMContext)context).setDeletionService(del);
 
     nodeLabelsProvider = createNodeLabelsProvider(conf);
 
@@ -607,6 +608,7 @@ public class NodeManager extends CompositeService
         logAggregationReportForApps;
     private NodeStatusUpdater nodeStatusUpdater;
     private final boolean isDistSchedulingEnabled;
+    private DeletionService deletionService;
 
     private OpportunisticContainerAllocator containerAllocator;
 
@@ -815,6 +817,24 @@ public class NodeManager extends CompositeService
     @Override
     public NMTimelinePublisher getNMTimelinePublisher() {
       return nmTimelinePublisher;
+    }
+
+    /**
+     * Return the NM's {@link DeletionService}.
+     *
+     * @return the NM's {@link DeletionService}.
+     */
+    public DeletionService getDeletionService() {
+      return this.deletionService;
+    }
+
+    /**
+     * Set the NM's {@link DeletionService}.
+     *
+     * @param deletionService the {@link DeletionService} to add to the Context.
+     */
+    public void setDeletionService(DeletionService deletionService) {
+      this.deletionService = deletionService;
     }
   }
 
