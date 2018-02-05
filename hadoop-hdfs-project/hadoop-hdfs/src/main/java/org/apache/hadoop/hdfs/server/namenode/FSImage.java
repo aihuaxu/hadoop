@@ -863,19 +863,31 @@ public class FSImage implements Closeable {
    */
   public long loadEdits(Iterable<EditLogInputStream> editStreams,
       FSNamesystem target) throws IOException {
-    return loadEdits(editStreams, target, null, null);
+    return loadEdits(editStreams, target, null, null, false);
+  }
+
+  public long loadEdits(Iterable<EditLogInputStream> editStreams,
+      FSNamesystem target, boolean isObserver) throws IOException {
+    return loadEdits(editStreams, target, null, null, isObserver);
   }
 
   private long loadEdits(Iterable<EditLogInputStream> editStreams,
-      FSNamesystem target, StartupOption startOpt, MetaRecoveryContext recovery)
-      throws IOException {
+      FSNamesystem target, StartupOption startOpt,
+      MetaRecoveryContext recovery) throws IOException {
+    return loadEdits(editStreams, target, startOpt, recovery, false);
+  }
+
+  private long loadEdits(Iterable<EditLogInputStream> editStreams,
+      FSNamesystem target, StartupOption startOpt,
+      MetaRecoveryContext recovery, boolean isObserver) throws IOException {
     LOG.debug("About to load edits:\n  " + Joiner.on("\n  ").join(editStreams));
     StartupProgress prog = NameNode.getStartupProgress();
     prog.beginPhase(Phase.LOADING_EDITS);
     
     long prevLastAppliedTxId = lastAppliedTxId;  
     try {    
-      FSEditLogLoader loader = new FSEditLogLoader(target, lastAppliedTxId);
+      FSEditLogLoader loader = new FSEditLogLoader(
+          target, lastAppliedTxId, isObserver);
       
       // Load latest edits
       for (EditLogInputStream editIn : editStreams) {
