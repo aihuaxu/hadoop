@@ -27,12 +27,12 @@ import java.net.InetSocketAddress;
 import java.net.NoRouteToHostException;
 import java.net.URI;
 import java.net.UnknownHostException;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.DFSUtilClient;
@@ -66,7 +66,7 @@ public class ObserverReadProxyProvider<T> extends ConfiguredFailoverProxyProvide
   private static final Logger LOG = LoggerFactory.getLogger(ObserverReadProxyProvider.class);
 
   /** Proxies for the observer namenodes */
-  private LinkedList<AddressRpcProxyPair<T>> observerProxies;
+  private final List<AddressRpcProxyPair<T>> observerProxies;
 
   /**
    * Whether reading from observer has been enabled. If this is false, all read
@@ -91,7 +91,7 @@ public class ObserverReadProxyProvider<T> extends ConfiguredFailoverProxyProvide
           "namenode address for URI " + uri);
     }
 
-    observerProxies = new LinkedList<>();
+    observerProxies = new ArrayList<>();
     Collection<InetSocketAddress> addressesOfNns = addressesInNN.values();
     for (InetSocketAddress address : addressesOfNns) {
       observerProxies.add(new AddressRpcProxyPair<T>(address));
@@ -116,7 +116,7 @@ public class ObserverReadProxyProvider<T> extends ConfiguredFailoverProxyProvide
   @Override
   public synchronized ProxyInfo<T> getProxy() {
     // We just create a wrapped proxy containing all the proxies
-    List<ProxyInfo<T>> observerProxies = new LinkedList<>();
+    List<ProxyInfo<T>> observerProxies = new ArrayList<>();
     StringBuilder combinedInfo = new StringBuilder("[");
 
     for (int i = 0; i < this.observerProxies.size(); i++) {
@@ -211,9 +211,14 @@ public class ObserverReadProxyProvider<T> extends ConfiguredFailoverProxyProvide
     final List<ProxyInfo<T>> observerProxies;
     final ProxyInfo<T> activeProxy;
 
+    // Index for the first working proxy in the list. We increment this
+    // when the current proxy is unavailable.
+    private final AtomicInteger usableProxyIndex;
+
     ObserverReadInvocationHandler(List<ProxyInfo<T>> observerProxies) {
       this.observerProxies = observerProxies;
       this.activeProxy = ObserverReadProxyProvider.super.getProxy();
+      this.usableProxyIndex = new AtomicInteger(0);
     }
 
     void handleInvokeException(Map<String, Exception> badResults,
@@ -234,36 +239,33 @@ public class ObserverReadProxyProvider<T> extends ConfiguredFailoverProxyProvide
         throws Throwable {
       Map<String, Exception> badResults = new HashMap<>();
       lastProxy = null;
+      Object retVal;
+
       if (observerReadEnabled && isRead(method)) {
-        List<ProxyInfo<T>> failedProxies = new LinkedList<>();
-        Object retVal = null;
-        boolean success = false;
-        Iterator<ProxyInfo<T>> it = observerProxies.iterator();
-        while (it.hasNext()) {
-          ProxyInfo<T> current = it.next();
+        int start = usableProxyIndex.get();
+
+        // Loop through all the proxies, starting from the current index.
+        for (int i = 0; i < observerProxies.size(); i++, start++) {
+          ProxyInfo<T> current =
+              observerProxies.get(start % observerProxies.size());
           try {
             retVal = method.invoke(current.proxy, args);
             lastProxy = current;
-            success = true;
-            break;
+            if (i != 0) {
+              usableProxyIndex.set(start % observerProxies.size());
+            }
+            return retVal;
           } catch (Exception e) {
             if (!shouldRetry(e)) {
               throw e;
             }
-            it.remove();
-            failedProxies.add(current);
             handleInvokeException(badResults, e, current.proxyInfo);
           }
-        }
-        observerProxies.addAll(failedProxies);
-        if (success) {
-          return retVal;
         }
       }
 
       // If we get here, it means all observer NNs have failed, or that it is a
       // write request. At this point we'll try to fail over to the active NN.
-      Object retVal;
       try {
         if (observerReadEnabled && isRead(method)) {
           LOG.warn("All ONNs have failed for read request " + method.getName() + ". "
