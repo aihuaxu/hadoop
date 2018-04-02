@@ -307,6 +307,8 @@ public class NameNodeHttpServer {
         FileChecksumServlets.RedirectServlet.class, false);
     httpServer.addInternalServlet("contentSummary", "/contentSummary/*",
         ContentSummaryServlet.class, false);
+    httpServer.addInternalServlet("health", "/isactive", HealthServlet.class,
+        false);
   }
 
   static FSImage getFsImageFromContext(ServletContext context) {
