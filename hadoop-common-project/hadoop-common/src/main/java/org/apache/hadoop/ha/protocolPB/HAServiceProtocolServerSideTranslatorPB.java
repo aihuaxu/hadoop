@@ -37,6 +37,8 @@ import org.apache.hadoop.ha.proto.HAServiceProtocolProtos.TransitionToActiveRequ
 import org.apache.hadoop.ha.proto.HAServiceProtocolProtos.TransitionToActiveResponseProto;
 import org.apache.hadoop.ha.proto.HAServiceProtocolProtos.TransitionToStandbyRequestProto;
 import org.apache.hadoop.ha.proto.HAServiceProtocolProtos.TransitionToStandbyResponseProto;
+import org.apache.hadoop.ha.proto.HAServiceProtocolProtos.TransitionToObserverRequestProto;
+import org.apache.hadoop.ha.proto.HAServiceProtocolProtos.TransitionToObserverResponseProto;
 import org.apache.hadoop.ipc.ProtocolSignature;
 import org.apache.hadoop.ipc.RPC;
 
@@ -63,7 +65,10 @@ public class HAServiceProtocolServerSideTranslatorPB implements
       TransitionToStandbyResponseProto.newBuilder().build();
   private static final Log LOG = LogFactory.getLog(
       HAServiceProtocolServerSideTranslatorPB.class);
-  
+  private static final TransitionToObserverResponseProto
+      TRANSITION_TO_OBSERVER_RESP =
+      TransitionToObserverResponseProto.newBuilder().build();
+
   public HAServiceProtocolServerSideTranslatorPB(HAServiceProtocol server) {
     this.server = server;
   }
@@ -124,6 +129,18 @@ public class HAServiceProtocolServerSideTranslatorPB implements
   }
 
   @Override
+  public TransitionToObserverResponseProto transitionToObserver(
+      RpcController controller, TransitionToObserverRequestProto request)
+      throws ServiceException {
+    try {
+      server.transitionToObserver(convert(request.getReqInfo()));
+      return TRANSITION_TO_OBSERVER_RESP;
+    } catch (IOException e) {
+      throw new ServiceException(e);
+    }
+  }
+
+  @Override
   public GetServiceStatusResponseProto getServiceStatus(RpcController controller,
       GetServiceStatusRequestProto request) throws ServiceException {
     HAServiceStatus s;
@@ -140,6 +157,9 @@ public class HAServiceProtocolServerSideTranslatorPB implements
       break;
     case STANDBY:
       retState = HAServiceStateProto.STANDBY;
+      break;
+    case OBSERVER:
+      retState = HAServiceStateProto.OBSERVER;
       break;
     case INITIALIZING:
     default:

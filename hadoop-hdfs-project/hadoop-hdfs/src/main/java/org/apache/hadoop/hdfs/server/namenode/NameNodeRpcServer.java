@@ -1663,6 +1663,14 @@ public class NameNodeRpcServer implements NamenodeProtocols {
   }
 
   @Override // HAServiceProtocol
+  public synchronized void transitionToObserver(StateChangeRequestInfo req)
+      throws ServiceFailedException, AccessControlException, IOException {
+    checkNNStartup();
+    nn.checkHaStateChange(req);
+    nn.transitionToObserver();
+  }
+
+  @Override // HAServiceProtocol
   public synchronized HAServiceStatus getServiceStatus() 
       throws AccessControlException, ServiceFailedException, IOException {
     checkNNStartup();

@@ -725,6 +725,8 @@ public class PBHelper {
       return HAServiceState.ACTIVE;
     case STANDBY:
       return HAServiceState.STANDBY;
+    case OBSERVER:
+      return HAServiceState.OBSERVER;
     default:
       throw new IllegalArgumentException("Unexpected HAServiceStateProto:"
           + s);
@@ -740,6 +742,8 @@ public class PBHelper {
       return NNHAStatusHeartbeatProto.State.ACTIVE;
     case STANDBY:
       return NNHAStatusHeartbeatProto.State.STANDBY;
+    case OBSERVER:
+      return NNHAStatusHeartbeatProto.State.OBSERVER;
     default:
       throw new IllegalArgumentException("Unexpected HAServiceState:"
           + s);
