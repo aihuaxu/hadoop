@@ -1154,4 +1154,10 @@ public class Journal implements Closeable {
   public Long getJournalCTime() throws IOException {
     return storage.getJournalManager().getJournalCTime();
   }
+
+  @VisibleForTesting
+  JournaledEditsCache getJournaledEditsCache() {
+    return cache;
+  }
+
 }

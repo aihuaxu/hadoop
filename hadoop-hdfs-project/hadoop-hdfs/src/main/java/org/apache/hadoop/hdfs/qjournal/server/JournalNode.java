@@ -347,4 +347,9 @@ public class JournalNode implements Tool, Configurable, JournalNodeMXBean {
   public Long getJournalCTime(String journalId) throws IOException {
     return getOrCreateJournal(journalId).getJournalCTime();
   }
+
+  @VisibleForTesting
+  public Journal getJournal(String  jid) {
+    return journalsById.get(jid);
+  }
 }
