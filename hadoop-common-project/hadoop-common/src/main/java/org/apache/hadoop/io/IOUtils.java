@@ -290,7 +290,19 @@ public class IOUtils {
   public static void closeStream(java.io.Closeable stream) {
     cleanup(null, stream);
   }
-  
+
+  /**
+   * Closes the streams ignoring {@link Throwable}.
+   * Must only be called in cleaning up from exception handlers.
+   *
+   * @param streams the Streams to close
+   */
+  public static void closeStreams(java.io.Closeable... streams) {
+    if (streams != null) {
+      cleanupWithLogger(null, streams);
+    }
+  }
+
   /**
    * Closes the socket ignoring {@link IOException}
    *

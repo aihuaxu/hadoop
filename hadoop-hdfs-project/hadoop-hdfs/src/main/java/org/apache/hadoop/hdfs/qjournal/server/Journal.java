@@ -267,8 +267,8 @@ public class Journal implements Closeable {
     checkFormatted();
     return lastWriterEpoch.get();
   }
-  
-  synchronized long getCommittedTxnIdForTests() throws IOException {
+
+  synchronized long getCommittedTxnId() throws IOException {
     return committedTxnId.get();
   }
 
@@ -372,6 +372,12 @@ public class Journal implements Closeable {
       int numTxns, byte[] records) throws IOException {
     checkFormatted();
     checkWriteRequest(reqInfo);
+
+    // If numTxns is 0, it's actually a fake send which aims at updating
+    // committedTxId only. So we can return early.
+    if (numTxns == 0) {
+      return;
+    }
 
     checkSync(curSegment != null,
         "Can't write, no segment open");
@@ -694,12 +700,12 @@ public class Journal implements Closeable {
         }
       }
       if (log != null && log.isInProgress()) {
-        logs.add(new RemoteEditLog(log.getStartTxId(), getHighestWrittenTxId(),
-            true));
+        logs.add(new RemoteEditLog(log.getStartTxId(),
+            getHighestWrittenTxId(), true));
       }
     }
-    
-    return new RemoteEditLogManifest(logs);
+
+    return new RemoteEditLogManifest(logs, getCommittedTxnId());
   }
 
   /**
