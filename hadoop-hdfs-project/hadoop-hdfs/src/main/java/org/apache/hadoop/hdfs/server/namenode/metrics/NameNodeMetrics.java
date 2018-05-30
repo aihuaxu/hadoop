@@ -125,6 +125,15 @@ public class NameNodeMetrics {
   @Metric("Time loading FS Image at startup in msec")
   MutableGaugeInt fsImageLoadTime;
 
+  @Metric("Time loading edit logs in msec")
+  MutableQuantiles[] editLogLoadTime;
+  @Metric("Time fetching remote edit stream in msec")
+  MutableQuantiles[] editLogFetchTime;
+  @Metric("Number of edits loaded")
+  MutableQuantiles[] numEditLogLoaded;
+  @Metric("Time between edit log loading in msec")
+  MutableQuantiles[] editLogLoadInterval;
+
   @Metric("GetImageServlet getEdit")
   MutableRate getEdit;
   @Metric("GetImageServlet getImage")
@@ -145,6 +154,10 @@ public class NameNodeMetrics {
     cacheReportQuantiles = new MutableQuantiles[len];
     generateEDEKTimeQuantiles = new MutableQuantiles[len];
     warmUpEDEKTimeQuantiles = new MutableQuantiles[len];
+    editLogLoadTime = new MutableQuantiles[len];
+    editLogFetchTime = new MutableQuantiles[len];
+    numEditLogLoaded = new MutableQuantiles[len];
+    editLogLoadInterval = new MutableQuantiles[len];
     
     for (int i = 0; i < len; i++) {
       int interval = intervals[i];
@@ -163,6 +176,18 @@ public class NameNodeMetrics {
       warmUpEDEKTimeQuantiles[i] = registry.newQuantiles(
           "warmupEDEKTime" + interval + "s",
           "Warm up EDEK time", "ops", "latency", interval);
+      editLogLoadTime[i] = registry.newQuantiles(
+          "editLogLoadTime" + interval + "s",
+          "Edit log load time", "ops", "time", interval);
+      editLogFetchTime[i] = registry.newQuantiles(
+          "editLogFetchTime" + interval + "s",
+          "Edit log fetch time", "ops", "time", interval);
+      numEditLogLoaded[i] = registry.newQuantiles(
+          "numEditLogLoaded" + interval + "s",
+          "Number of edits loaded", "ops", "num", interval);
+      editLogLoadInterval[i] = registry.newQuantiles(
+          "editLogLoadTime" + interval + "s",
+          "Edit log load interval", "ops", "time", interval);
     }
   }
 
@@ -308,6 +333,30 @@ public class NameNodeMetrics {
 
   public void setFsImageLoadTime(long elapsed) {
     fsImageLoadTime.set((int) elapsed);
+  }
+
+  public void addEditLogLoadTime(long elapsed) {
+    for (MutableQuantiles q : editLogLoadTime) {
+      q.add(elapsed);
+    }
+  }
+
+  public void addEditLogFetchTime(long elapsed) {
+    for (MutableQuantiles q : editLogFetchTime) {
+      q.add(elapsed);
+    }
+  }
+
+  public void addNumEditLogLoaded(long loaded) {
+    for (MutableQuantiles q : numEditLogLoaded) {
+      q.add(loaded);
+    }
+  }
+
+  public void addEditLogLoadInterval(long elapsed) {
+    for (MutableQuantiles q : editLogLoadInterval) {
+      q.add(elapsed);
+    }
   }
 
   public void addBlockReport(long latency) {
