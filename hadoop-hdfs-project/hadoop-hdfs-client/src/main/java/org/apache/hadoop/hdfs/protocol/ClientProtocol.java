@@ -44,6 +44,7 @@ import org.apache.hadoop.hdfs.protocol.HdfsConstants.RollingUpgradeAction;
 import org.apache.hadoop.hdfs.security.token.block.DataEncryptionKey;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenSelector;
+import org.apache.hadoop.hdfs.server.namenode.ha.ReadOnly;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeStorageReport;
 import org.apache.hadoop.io.EnumSetWritable;
 import org.apache.hadoop.io.Text;
@@ -124,6 +125,7 @@ public interface ClientProtocol {
    * @throws IOException If an I/O error occurred
    */
   @Idempotent
+  @ReadOnly(atimeAffected = true)
   LocatedBlocks getBlockLocations(String src, long offset, long length)
       throws IOException;
 
@@ -133,6 +135,7 @@ public interface ClientProtocol {
    * @throws IOException
    */
   @Idempotent
+  @ReadOnly
   FsServerDefaults getServerDefaults() throws IOException;
 
   /**
@@ -265,6 +268,7 @@ public interface ClientProtocol {
    * @return All the in-use block storage policies currently.
    */
   @Idempotent
+  @ReadOnly
   BlockStoragePolicy[] getStoragePolicies() throws IOException;
 
   /**
@@ -307,6 +311,7 @@ public interface ClientProtocol {
    *           If file/dir <code>src</code> is not found
    */
   @Idempotent
+  @ReadOnly
   BlockStoragePolicy getStoragePolicy(String path) throws IOException;
 
   /**
@@ -671,6 +676,7 @@ public interface ClientProtocol {
    * @throws IOException If an I/O error occurred
    */
   @Idempotent
+  @ReadOnly
   DirectoryListing getListing(String src, byte[] startAfter,
       boolean needLocation) throws IOException;
 
@@ -681,6 +687,7 @@ public interface ClientProtocol {
    * @throws IOException If an I/O error occurred
    */
   @Idempotent
+  @ReadOnly
   SnapshottableDirectoryStatus[] getSnapshottableDirListing()
       throws IOException;
 
@@ -752,6 +759,7 @@ public interface ClientProtocol {
    * actual numbers to index into the array.
    */
   @Idempotent
+  @ReadOnly
   long[] getStats() throws IOException;
 
   /**
@@ -761,6 +769,7 @@ public interface ClientProtocol {
    * otherwise all datanodes if type is ALL.
    */
   @Idempotent
+  @ReadOnly
   DatanodeInfo[] getDatanodeReport(HdfsConstants.DatanodeReportType type)
       throws IOException;
 
@@ -768,6 +777,7 @@ public interface ClientProtocol {
    * Get a report on the current datanode storages.
    */
   @Idempotent
+  @ReadOnly
   DatanodeStorageReport[] getDatanodeStorageReport(
       HdfsConstants.DatanodeReportType type) throws IOException;
 
@@ -780,6 +790,7 @@ public interface ClientProtocol {
    *           a symlink.
    */
   @Idempotent
+  @ReadOnly
   long getPreferredBlockSize(String filename)
       throws IOException;
 
@@ -931,6 +942,7 @@ public interface ClientProtocol {
    * cookie returned from the previous call.
    */
   @Idempotent
+  @ReadOnly
   CorruptFileBlocks listCorruptFileBlocks(String path, String cookie)
       throws IOException;
 
@@ -966,6 +978,7 @@ public interface ClientProtocol {
    * @throws IOException If an I/O error occurred
    */
   @Idempotent
+  @ReadOnly
   HdfsFileStatus getFileInfo(String src) throws IOException;
 
   /**
@@ -980,6 +993,7 @@ public interface ClientProtocol {
    * @throws IOException If an I/O error occurred
    */
   @Idempotent
+  @ReadOnly
   boolean isFileClosed(String src) throws IOException;
 
   /**
@@ -996,6 +1010,7 @@ public interface ClientProtocol {
    * @throws IOException If an I/O error occurred
    */
   @Idempotent
+  @ReadOnly
   HdfsFileStatus getFileLinkInfo(String src) throws IOException;
 
   /**
@@ -1009,6 +1024,7 @@ public interface ClientProtocol {
    * @throws IOException If an I/O error occurred
    */
   @Idempotent
+  @ReadOnly
   ContentSummary getContentSummary(String path) throws IOException;
 
   /**
@@ -1121,6 +1137,7 @@ public interface ClientProtocol {
    *           or an I/O error occurred
    */
   @Idempotent
+  @ReadOnly
   String getLinkTarget(String path) throws IOException;
 
   /**
@@ -1191,6 +1208,7 @@ public interface ClientProtocol {
    * @throws IOException
    */
   @Idempotent
+  @ReadOnly
   DataEncryptionKey getDataEncryptionKey() throws IOException;
 
   /**
@@ -1259,6 +1277,7 @@ public interface ClientProtocol {
    * @throws IOException on error
    */
   @Idempotent
+  @ReadOnly
   SnapshotDiffReport getSnapshotDiffReport(String snapshotRoot,
       String fromSnapshot, String toSnapshot) throws IOException;
 
@@ -1304,6 +1323,7 @@ public interface ClientProtocol {
    * @return A batch of CacheDirectiveEntry objects.
    */
   @Idempotent
+  @ReadOnly
   BatchedEntries<CacheDirectiveEntry> listCacheDirectives(
       long prevId, CacheDirectiveInfo filter) throws IOException;
 
@@ -1345,6 +1365,7 @@ public interface ClientProtocol {
    * @return A batch of CachePoolEntry objects.
    */
   @Idempotent
+  @ReadOnly
   BatchedEntries<CachePoolEntry> listCachePools(String prevPool)
       throws IOException;
 
@@ -1391,6 +1412,7 @@ public interface ClientProtocol {
    * Gets the ACLs of files and directories.
    */
   @Idempotent
+  @ReadOnly
   AclStatus getAclStatus(String src) throws IOException;
 
   /**
@@ -1404,6 +1426,7 @@ public interface ClientProtocol {
    * Get the encryption zone for a path.
    */
   @Idempotent
+  @ReadOnly
   EncryptionZone getEZForPath(String src)
     throws IOException;
 
@@ -1415,6 +1438,7 @@ public interface ClientProtocol {
    * @return Batch of encryption zones.
    */
   @Idempotent
+  @ReadOnly
   BatchedEntries<EncryptionZone> listEncryptionZones(
       long prevId) throws IOException;
 
@@ -1448,6 +1472,7 @@ public interface ClientProtocol {
    * @throws IOException
    */
   @Idempotent
+  @ReadOnly
   List<XAttr> getXAttrs(String src, List<XAttr> xAttrs)
       throws IOException;
 
@@ -1463,6 +1488,7 @@ public interface ClientProtocol {
    * @throws IOException
    */
   @Idempotent
+  @ReadOnly
   List<XAttr> listXAttrs(String src)
       throws IOException;
 
@@ -1497,6 +1523,7 @@ public interface ClientProtocol {
    * @throws IOException see specific implementation
    */
   @Idempotent
+  @ReadOnly
   void checkAccess(String path, FsAction mode) throws IOException;
 
   /**
@@ -1505,6 +1532,7 @@ public interface ClientProtocol {
    * the starting point for the inotify event stream.
    */
   @Idempotent
+  @ReadOnly
   long getCurrentEditLogTxid() throws IOException;
 
   /**
@@ -1512,10 +1540,16 @@ public interface ClientProtocol {
    * transactions for txids equal to or greater than txid.
    */
   @Idempotent
+  @ReadOnly
   EventBatchList getEditsFromTxid(long txid) throws IOException;
 
   /**
    * Get {@link QuotaUsage} rooted at the specified directory.
+   *
+   * Note: due to HDFS-6763, standby/observer doesn't keep up-to-date info
+   * about quota usage, and thus even though this is ReadOnly, it can only be
+   * directed to the active namenode.
+   *
    * @param path The string representation of the path
    *
    * @throws AccessControlException permission denied
@@ -1525,6 +1559,7 @@ public interface ClientProtocol {
    * @throws IOException If an I/O error occurred
    */
   @Idempotent
+  @ReadOnly(activeOnly = true)
   QuotaUsage getQuotaUsage(String path) throws IOException;
 
   /**
@@ -1537,5 +1572,6 @@ public interface ClientProtocol {
    * @throws IOException
    */
   @Idempotent
+  @ReadOnly
   BatchedEntries<OpenFileEntry> listOpenFiles(long prevId) throws IOException;
 }
