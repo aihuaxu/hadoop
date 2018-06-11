@@ -41,7 +41,7 @@ public class TestHdfsConfigFields extends TestConfigurationFieldsBase {
   public void initializeMemberVariables() {
     xmlFilename = new String("hdfs-default.xml");
     configurationClasses = new Class[] { HdfsClientConfigKeys.class,
-        DFSConfigKeys.class};
+        HdfsClientConfigKeys.Failover.class, DFSConfigKeys.class};
 
     // Set error modes
     errorIfMissingConfigProps = true;
