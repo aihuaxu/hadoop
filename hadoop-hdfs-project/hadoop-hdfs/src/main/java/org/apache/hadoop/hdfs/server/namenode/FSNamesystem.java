@@ -7778,6 +7778,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
         };
 
     private volatile boolean isCallerContextEnabled;
+    private boolean isLogEnabledForLockTime;
     private int callerContextMaxLen;
     private int callerSignatureMaxLen;
 
@@ -7818,6 +7819,9 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       logTokenTrackingId = conf.getBoolean(
           DFSConfigKeys.DFS_NAMENODE_AUDIT_LOG_TOKEN_TRACKING_ID_KEY,
           DFSConfigKeys.DFS_NAMENODE_AUDIT_LOG_TOKEN_TRACKING_ID_DEFAULT);
+      isLogEnabledForLockTime = conf.getBoolean(
+              DFSConfigKeys.DFS_NAMENODE_AUDIT_LOG_LOCK_TIME_KEY,
+              DFSConfigKeys.DFS_NAMENODE_AUDIT_LOG_LOCK_TIME_DEFAULT);
 
       debugCmdSet.addAll(Arrays.asList(conf.getTrimmedStrings(
           DFSConfigKeys.DFS_NAMENODE_AUDIT_LOG_DEBUG_CMDLIST)));
@@ -7884,6 +7888,12 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
             sb.append(new String(callerContext.getSignature(),
                 CallerContext.SIGNATURE_ENCODING));
           }
+        }
+        if (isLogEnabledForLockTime) {
+          sb.append("\t").append("lockType=")
+                  .append(FSNamesystemLock.isReadLock() ? "READ" : "WRITE");
+          sb.append("\t").append("lockTime=")
+                  .append(FSNamesystemLock.getLockIntervalInMs());
         }
         logAuditMessage(sb.toString());
       }
