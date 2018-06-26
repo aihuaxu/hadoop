@@ -7893,7 +7893,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
           sb.append("\t").append("lockType=")
                   .append(FSNamesystemLock.isReadLock() ? "READ" : "WRITE");
           sb.append("\t").append("lockTime=")
-                  .append(FSNamesystemLock.getLockIntervalInMs());
+                  .append(FSNamesystemLock.getLockIntervalInNs());
         }
         logAuditMessage(sb.toString());
       }
