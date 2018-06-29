@@ -21,15 +21,14 @@ package org.apache.hadoop.ipc;
 import static org.junit.Assert.assertEquals;
 import org.junit.Test;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ipc.WeightedRoundRobinMultiplexer.IPC_CALLQUEUE_WRRMUX_WEIGHTS_KEY;
 
 public class TestWeightedRoundRobinMultiplexer {
-  public static final Logger LOG =
-      LoggerFactory.getLogger(TestWeightedRoundRobinMultiplexer.class);
+  public static final Log LOG = LogFactory.getLog(TestWeightedRoundRobinMultiplexer.class);
 
   private WeightedRoundRobinMultiplexer mux;
 
@@ -43,11 +42,16 @@ public class TestWeightedRoundRobinMultiplexer {
     mux = new WeightedRoundRobinMultiplexer(0, "", new Configuration());
   }
 
+  @Test
+  public void testInstantiateZeroReservation() {
+    mux = new WeightedRoundRobinMultiplexer(1, null, "", new Configuration());
+  }
+
   @Test(expected=IllegalArgumentException.class)
   public void testInstantiateIllegalMux() {
     Configuration conf = new Configuration();
     conf.setStrings("namespace." + IPC_CALLQUEUE_WRRMUX_WEIGHTS_KEY,
-      "1", "2", "3");
+            "1", "2", "3");
 
     // ask for 3 weights with 2 queues
     mux = new WeightedRoundRobinMultiplexer(2, "namespace", conf);
@@ -57,7 +61,7 @@ public class TestWeightedRoundRobinMultiplexer {
   public void testLegalInstantiation() {
     Configuration conf = new Configuration();
     conf.setStrings("namespace." + IPC_CALLQUEUE_WRRMUX_WEIGHTS_KEY,
-      "1", "2", "3");
+            "1", "2", "3");
 
     // ask for 3 weights with 3 queues
     mux = new WeightedRoundRobinMultiplexer(3, "namespace.", conf);
@@ -73,42 +77,32 @@ public class TestWeightedRoundRobinMultiplexer {
 
     // Mux of size 2: 0 0 1 0 0 1 0 0 1, etc
     mux = new WeightedRoundRobinMultiplexer(2, "", new Configuration());
-    assertEquals(mux.getAndAdvanceCurrentIndex(), 0);
-    assertEquals(mux.getAndAdvanceCurrentIndex(), 0);
-    assertEquals(mux.getAndAdvanceCurrentIndex(), 1);
-    assertEquals(mux.getAndAdvanceCurrentIndex(), 0);
-    assertEquals(mux.getAndAdvanceCurrentIndex(), 0);
-    assertEquals(mux.getAndAdvanceCurrentIndex(), 1);
+    for (int i = 0; i < 5; i++) {
+      verifyCurrentIndices(new int[]{2, 1});
+    }
 
     // Size 3: 4x0 2x1 1x2, etc
     mux = new WeightedRoundRobinMultiplexer(3, "", new Configuration());
-    assertEquals(mux.getAndAdvanceCurrentIndex(), 0);
-    assertEquals(mux.getAndAdvanceCurrentIndex(), 0);
-    assertEquals(mux.getAndAdvanceCurrentIndex(), 0);
-    assertEquals(mux.getAndAdvanceCurrentIndex(), 0);
-    assertEquals(mux.getAndAdvanceCurrentIndex(), 1);
-    assertEquals(mux.getAndAdvanceCurrentIndex(), 1);
-    assertEquals(mux.getAndAdvanceCurrentIndex(), 2);
-    assertEquals(mux.getAndAdvanceCurrentIndex(), 0);
+    for (int i = 0; i < 5; i++) {
+      verifyCurrentIndices(new int[]{4, 2, 1});
+    }
 
     // Size 4: 8x0 4x1 2x2 1x3
     mux = new WeightedRoundRobinMultiplexer(4, "", new Configuration());
-    assertEquals(mux.getAndAdvanceCurrentIndex(), 0);
-    assertEquals(mux.getAndAdvanceCurrentIndex(), 0);
-    assertEquals(mux.getAndAdvanceCurrentIndex(), 0);
-    assertEquals(mux.getAndAdvanceCurrentIndex(), 0);
-    assertEquals(mux.getAndAdvanceCurrentIndex(), 0);
-    assertEquals(mux.getAndAdvanceCurrentIndex(), 0);
-    assertEquals(mux.getAndAdvanceCurrentIndex(), 0);
-    assertEquals(mux.getAndAdvanceCurrentIndex(), 0);
-    assertEquals(mux.getAndAdvanceCurrentIndex(), 1);
-    assertEquals(mux.getAndAdvanceCurrentIndex(), 1);
-    assertEquals(mux.getAndAdvanceCurrentIndex(), 1);
-    assertEquals(mux.getAndAdvanceCurrentIndex(), 1);
-    assertEquals(mux.getAndAdvanceCurrentIndex(), 2);
-    assertEquals(mux.getAndAdvanceCurrentIndex(), 2);
-    assertEquals(mux.getAndAdvanceCurrentIndex(), 3);
-    assertEquals(mux.getAndAdvanceCurrentIndex(), 0);
+    for (int i = 0; i < 5; i++) {
+      verifyCurrentIndices(new int[]{8, 4, 2, 1});
+    }
+  }
+
+  @Test
+  public void testDefaultPatternWithReservationShares() {
+    // Shared queues: 4x0 2x1 1x2
+    // Reserved queues: 20%x3 10%x4
+    mux = new WeightedRoundRobinMultiplexer(3, new double[]{0.2, 0.1},
+            "", new Configuration());
+    for (int i = 0; i < 5; i++) {
+      verifyCurrentIndices(new int[]{4, 2, 1, 2, 1});
+    }
   }
 
   @Test
@@ -116,7 +110,7 @@ public class TestWeightedRoundRobinMultiplexer {
     // 1x0 1x1
     Configuration conf = new Configuration();
     conf.setStrings("test.custom." + IPC_CALLQUEUE_WRRMUX_WEIGHTS_KEY,
-      "1", "1");
+            "1", "1");
 
     mux = new WeightedRoundRobinMultiplexer(2, "test.custom", conf);
     assertEquals(mux.getAndAdvanceCurrentIndex(), 0);
@@ -126,7 +120,7 @@ public class TestWeightedRoundRobinMultiplexer {
 
     // 1x0 3x1 2x2
     conf.setStrings("test.custom." + IPC_CALLQUEUE_WRRMUX_WEIGHTS_KEY,
-      "1", "3", "2");
+            "1", "3", "2");
 
     mux = new WeightedRoundRobinMultiplexer(3, "test.custom", conf);
 
@@ -138,6 +132,39 @@ public class TestWeightedRoundRobinMultiplexer {
       assertEquals(mux.getAndAdvanceCurrentIndex(), 2);
       assertEquals(mux.getAndAdvanceCurrentIndex(), 2);
     } // Ensure pattern repeats
+  }
 
+  @Test
+  public void testCustomPatternWithReservedShares() {
+    // Shared queues: 1x0 1x1
+    // Reserved Queues: 25%x2 25%x3
+    Configuration conf = new Configuration();
+    conf.setStrings("test.custom." + IPC_CALLQUEUE_WRRMUX_WEIGHTS_KEY,
+            "1", "1");
+
+    mux = new WeightedRoundRobinMultiplexer(
+            2, new double[]{0.25, 0.25}, "test.custom", conf);
+    for (int i = 0; i < 5; i++) {
+      verifyCurrentIndices(new int[]{1, 1, 1, 1});
+    }
+
+    // Shared queues: 1x0 3x1 2x2
+    // Reserved queues: 20%x3 10%x4 10%x5
+    conf.setStrings("test.custom." + IPC_CALLQUEUE_WRRMUX_WEIGHTS_KEY,
+            "1", "3", "2");
+
+    mux = new WeightedRoundRobinMultiplexer(
+            3, new double[]{0.2, 0.1, 0.1}, "test.custom", conf);
+    for(int i = 0; i < 5; i++) {
+      verifyCurrentIndices(new int[]{1, 3, 2, 2, 1, 1});
+    }
+  }
+
+  private void verifyCurrentIndices(int[] weights) {
+    for (int i = 0; i < weights.length; i++) {
+      for (int j = 0; j < weights[i]; j++) {
+        assertEquals(mux.getAndAdvanceCurrentIndex(), i);
+      }
+    }
   }
 }
