@@ -985,16 +985,6 @@ public class CapacityScheduler extends
       return EMPTY_ALLOCATION;
     }
 
-    for (ResourceRequest resReq : ask) {
-      LOG.info("requestedResource" +
-              " applicationAttempt=" + applicationAttemptId +
-              " queue=" + application.getQueueName() +
-              " askNumContainers=" + resReq.getNumContainers() +
-              " askVcores=" + resReq.getCapability().getVirtualCores() +
-              " askMemory=" + resReq.getCapability().getMemory() +
-              " startTime=" + getClock().getTime());
-    }
-
     // Handle all container updates
     handleContainerUpdates(application, updateRequests);
 
@@ -1049,11 +1039,10 @@ public class CapacityScheduler extends
       updateDemandForQueue.getOrderingPolicy().demandUpdated(application);
     }
 
-    LOG.info("grantedResource" +
-            " applicationAttempt=" + applicationAttemptId.getApplicationId() +
-            " queue=" + application.getQueueName() +
-            " numContainers=" + allocation.getContainers().size() +
-            " endTime=" + getClock().getTime());
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Allocation for application " + applicationAttemptId + " : "
+              + allocation + " with cluster resource : " + getClusterResource());
+    }
 
     return allocation;
   }
@@ -1318,10 +1307,17 @@ public class CapacityScheduler extends
   private CSAssignment allocateContainerOnSingleNode(
       CandidateNodeSet<FiCaSchedulerNode> candidates, FiCaSchedulerNode node,
       boolean withNodeHeartbeat) {
+    if (LOG.isDebugEnabled()) {
+      LOG.debug(
+          "Trying to schedule on node: " + node.getNodeName() + ", available: "
+              + node.getUnallocatedResource());
+    }
+
     // Backward compatible way to make sure previous behavior which allocation
     // driven by node heartbeat works.
     if (getNode(node.getNodeID()) != node) {
-      LOG.error("Trying to schedule on a removed node, please double check.");
+      LOG.error("Trying to schedule on a removed node, please double check, "
+          + "nodeId=" + node.getNodeID());
       return null;
     }
 
@@ -1343,14 +1339,19 @@ public class CapacityScheduler extends
       FiCaSchedulerApp reservedApplication = getCurrentAttemptForContainer(
           reservedContainer.getContainerId());
       if (reservedApplication == null) {
-        LOG.error("Trying to schedule for a finished app, please double check.");
+        LOG.error(
+            "Trying to schedule for a finished app, please double check. nodeId="
+                + node.getNodeID() + " container=" + reservedContainer
+                .getContainerId());
         return null;
       }
 
       // Try to fulfill the reservation
-      LOG.info(
-          "Trying to fulfill reservation for application " + reservedApplication
-              .getApplicationId() + " on node: " + node.getNodeID());
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Trying to fulfill reservation for application "
+            + reservedApplication.getApplicationId() + " on node: " + node
+            .getNodeID());
+      }
 
       LeafQueue queue = ((LeafQueue) reservedApplication.getQueue());
       assignment = queue.assignContainers(getClusterResource(), candidates,
@@ -1412,12 +1413,6 @@ public class CapacityScheduler extends
             + "killable resource");
       }
       return null;
-    }
-
-    if (LOG.isDebugEnabled()) {
-      LOG.debug(
-          "Trying to schedule on node: " + node.getNodeName() + ", available: "
-              + node.getUnallocatedResource());
     }
 
     return allocateOrReserveNewContainers(candidates, withNodeHeartbeat);
@@ -2660,6 +2655,7 @@ public class CapacityScheduler extends
       LOG.debug("Try to commit allocation proposal=" + request);
     }
 
+    boolean isSuccess = false;
     if (attemptId != null) {
       FiCaSchedulerApp app = getApplicationAttempt(attemptId);
       // Required sanity check for attemptId - when async-scheduling enabled,
@@ -2668,8 +2664,14 @@ public class CapacityScheduler extends
       if (app != null && attemptId.equals(app.getApplicationAttemptId())) {
         if (app.accept(cluster, request) && app.apply(cluster, request)) {
           LOG.info("Allocation proposal accepted");
+          isSuccess = true;
         } else{
           LOG.info("Failed to accept allocation proposal");
+        }
+
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Allocation proposal accepted=" + isSuccess + ", proposal="
+              + request);
         }
 
         // Update unconfirmed allocated resource.

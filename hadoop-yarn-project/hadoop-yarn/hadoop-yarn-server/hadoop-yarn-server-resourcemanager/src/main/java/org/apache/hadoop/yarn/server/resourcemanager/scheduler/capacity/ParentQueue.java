@@ -85,6 +85,8 @@ public class ParentQueue extends AbstractCSQueue {
 
   private QueueOrderingPolicy queueOrderingPolicy;
 
+  private long lastSkipQueueDebugLoggingTimestamp = -1;
+
   public ParentQueue(CapacitySchedulerContext cs,
       String queueName, CSQueue parent, CSQueue old) throws IOException {
     super(cs, queueName, parent, old);
@@ -487,9 +489,14 @@ public class ParentQueue extends AbstractCSQueue {
     if (schedulingMode == SchedulingMode.RESPECT_PARTITION_EXCLUSIVITY
         && !accessibleToPartition(candidates.getPartition())) {
       if (LOG.isDebugEnabled()) {
-        LOG.debug("Skip this queue=" + getQueuePath()
-            + ", because it is not able to access partition=" + candidates
-            .getPartition());
+        long now = System.currentTimeMillis();
+        // Do logging every 1 sec to avoid excessive logging.
+        if (now - this.lastSkipQueueDebugLoggingTimestamp > 1000) {
+          LOG.debug("Skip this queue=" + getQueuePath()
+              + ", because it is not able to access partition=" + candidates
+              .getPartition());
+          this.lastSkipQueueDebugLoggingTimestamp = now;
+        }
       }
 
       ActivitiesLogger.QUEUE.recordQueueActivity(activitiesManager, node,
@@ -509,10 +516,15 @@ public class ParentQueue extends AbstractCSQueue {
     if (!super.hasPendingResourceRequest(candidates.getPartition(),
         clusterResource, schedulingMode)) {
       if (LOG.isDebugEnabled()) {
-        LOG.debug("Skip this queue=" + getQueuePath()
-            + ", because it doesn't need more resource, schedulingMode="
-            + schedulingMode.name() + " node-partition=" + candidates
-            .getPartition());
+        long now = System.currentTimeMillis();
+        // Do logging every 1 sec to avoid excessive logging.
+        if (now - this.lastSkipQueueDebugLoggingTimestamp > 1000) {
+          LOG.debug("Skip this queue=" + getQueuePath()
+              + ", because it doesn't need more resource, schedulingMode="
+              + schedulingMode.name() + " node-partition=" + candidates
+              .getPartition());
+          this.lastSkipQueueDebugLoggingTimestamp = now;
+        }
       }
 
       ActivitiesLogger.QUEUE.recordQueueActivity(activitiesManager, node,
@@ -614,12 +626,12 @@ public class ParentQueue extends AbstractCSQueue {
         assignment.setIncreasedAllocation(
             assignedToChild.isIncreasedAllocation());
 
-        LOG.info("assignedContainer" + " queue=" + getQueueName()
-            + " usedCapacity=" + getUsedCapacity() + " absoluteUsedCapacity="
-            + getAbsoluteUsedCapacity() + " used=" + queueUsage.getUsed()
-            + " cluster=" + clusterResource);
-
         if (LOG.isDebugEnabled()) {
+          LOG.debug("assignedContainer reserved=" + isReserved + " queue="
+              + getQueueName() + " usedCapacity=" + getUsedCapacity()
+              + " absoluteUsedCapacity=" + getAbsoluteUsedCapacity() + " used="
+              + queueUsage.getUsed() + " cluster=" + clusterResource);
+
           LOG.debug(
               "ParentQ=" + getQueueName() + " assignedSoFarInThisIteration="
                   + assignment.getResource() + " usedCapacity="
