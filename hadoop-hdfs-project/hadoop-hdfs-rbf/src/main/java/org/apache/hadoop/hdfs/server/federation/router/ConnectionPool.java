@@ -41,6 +41,7 @@ import org.apache.hadoop.hdfs.protocolPB.ClientNamenodeProtocolTranslatorPB;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.io.retry.RetryUtils;
+import org.apache.hadoop.ipc.Client;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.net.NetUtils;
@@ -89,6 +90,8 @@ public class ConnectionPool {
   /** The last time a connection was active. */
   private volatile long lastActiveTime = 0;
 
+  /** Increasing number to differentiate different connections. */
+  private AtomicInteger index = new AtomicInteger(0);
 
   protected ConnectionPool(Configuration config, String address,
       UserGroupInformation user, int minPoolSize, int maxPoolSize)
@@ -287,7 +290,8 @@ public class ConnectionPool {
    * @throws IOException
    */
   public ConnectionContext newConnection() throws IOException {
-    return newConnection(this.conf, this.namenodeAddress, this.ugi);
+    return newConnection(this.conf, this.namenodeAddress,
+      this.ugi, this.index.getAndIncrement());
   }
 
   /**
@@ -299,12 +303,13 @@ public class ConnectionPool {
    * @param conf Configuration for the connection.
    * @param nnAddress Address of server supporting the ClientProtocol.
    * @param ugi User context.
+   * @param index Index of the new connection.
    * @return Proxy for the target ClientProtocol that contains the user's
    *         security context.
    * @throws IOException If it cannot be created.
    */
   protected static ConnectionContext newConnection(Configuration conf,
-      String nnAddress, UserGroupInformation ugi)
+      String nnAddress, UserGroupInformation ugi, int index)
           throws IOException {
     RPC.setProtocolEngine(
         conf, ClientNamenodeProtocolPB.class, ProtobufRpcEngine.class);
@@ -323,9 +328,12 @@ public class ConnectionPool {
     }
     InetSocketAddress socket = NetUtils.createSocketAddr(nnAddress);
     final long version = RPC.getProtocolVersion(ClientNamenodeProtocolPB.class);
+    final int timeout = Client.getRpcTimeout(conf);
+    FederationConnectionId connId = new FederationConnectionId(socket,
+            ClientNamenodeProtocolPB.class, ugi, timeout, defaultPolicy, conf,
+            index);
     ClientNamenodeProtocolPB proxy = RPC.getProtocolProxy(
-        ClientNamenodeProtocolPB.class, version, socket, ugi, conf,
-        factory, RPC.getRpcTimeout(conf), defaultPolicy, null).getProxy();
+            ClientNamenodeProtocolPB.class, version, connId, conf, factory).getProxy();
     ClientProtocol client = new ClientNamenodeProtocolTranslatorPB(proxy);
     Text dtService = SecurityUtil.buildTokenService(socket);
 
