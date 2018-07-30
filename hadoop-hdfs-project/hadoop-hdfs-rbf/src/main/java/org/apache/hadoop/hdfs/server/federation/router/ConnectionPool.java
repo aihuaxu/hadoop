@@ -158,7 +158,7 @@ public class ConnectionPool {
     ConnectionContext conn = null;
     List<ConnectionContext> tmpConnections = this.connections;
     int size = tmpConnections.size();
-    int threadIndex = this.clientIndex.getAndIncrement();
+    int threadIndex = this.clientIndex.getAndIncrement() & 0x7FFFFFFF;
     for (int i=0; i<size; i++) {
       int index = (threadIndex + i) % size;
       conn = tmpConnections.get(index);
