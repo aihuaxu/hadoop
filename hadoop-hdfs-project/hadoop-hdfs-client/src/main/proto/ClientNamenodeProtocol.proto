@@ -774,6 +774,12 @@ message ListOpenFilesResponseProto {
   required bool hasMore = 2;
 }
 
+message MsyncRequestProto {
+}
+
+message MsyncResponseProto {
+}
+
 service ClientNamenodeProtocol {
   rpc getBlockLocations(GetBlockLocationsRequestProto)
       returns(GetBlockLocationsResponseProto);
@@ -930,4 +936,8 @@ service ClientNamenodeProtocol {
       returns(ListOpenFilesResponseProto);
   rpc blackListUser(BlackListUserRequestProto)
       returns(BlackListUserResponseProto);
+  rpc msync(MsyncRequestProto)
+      returns(MsyncResponseProto);
+  rpc satisfyStoragePolicy(SatisfyStoragePolicyRequestProto)
+      returns(SatisfyStoragePolicyResponseProto);
 }
