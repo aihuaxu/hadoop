@@ -193,6 +193,11 @@ public class FederationRPCPerformanceMonitor implements RouterRpcMonitor {
     metrics.addConnectionCreationTime(timeToCreate);
   }
 
+  @Override
+  public void connectionCreationFatalError() {
+    metrics.incrConnectionFatalError();
+  }
+
   /**
    * Get current time.
    * @return Current time in nanoseconds.

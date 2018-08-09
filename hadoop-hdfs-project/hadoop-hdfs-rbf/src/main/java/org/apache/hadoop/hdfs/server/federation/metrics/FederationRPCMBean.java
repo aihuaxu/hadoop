@@ -97,4 +97,11 @@ public interface FederationRPCMBean {
    * @return Average time needed to create connection by async connection creator thread.
    */
   double getRpcClientConnectionCreationAvg();
+
+  /**
+   * Get the number of fatal errors caught by connection creator thread.
+   * @return Number of fatal errors caught by connection creator thread.
+   */
+  long getConnectionFatalError();
+
 }

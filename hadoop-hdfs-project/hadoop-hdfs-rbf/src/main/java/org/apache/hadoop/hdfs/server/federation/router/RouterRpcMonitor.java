@@ -97,6 +97,11 @@ public interface RouterRpcMonitor {
   void connectionCreationTime(int timeToCreate);
 
   /**
+   * Number of times connection creator task encountered fatal errors.
+   */
+  void connectionCreationFatalError();
+
+  /**
    * If the Router cannot contact the State Store in an operation.
    */
   void routerFailureStateStore();

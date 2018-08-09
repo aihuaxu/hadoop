@@ -71,6 +71,8 @@ public class FederationRPCMetrics implements FederationRPCMBean {
   private MutableCounterLong routerFailureSafemode;
   @Metric("Time for the async router to NN connection creation")
   private MutableRate connectionCreation;
+  @Metric("Number of fatal errors caught by connection creator thread")
+  private MutableCounterLong connectionCreationFatalError;
 
   public FederationRPCMetrics(Configuration conf, RouterRpcServer rpcServer) {
     this.rpcServer = rpcServer;
@@ -273,4 +275,14 @@ public class FederationRPCMetrics implements FederationRPCMBean {
   public double getRpcClientConnectionCreationAvg() {
     return toMs(connectionCreation.lastStat().mean());
   }
+
+  public void incrConnectionFatalError() {
+    connectionCreationFatalError.incr();
+  }
+
+  @Override
+  public long getConnectionFatalError() {
+    return connectionCreationFatalError.value();
+  }
+
 }
