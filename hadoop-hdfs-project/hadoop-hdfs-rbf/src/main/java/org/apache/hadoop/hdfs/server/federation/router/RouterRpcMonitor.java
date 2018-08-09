@@ -87,6 +87,16 @@ public interface RouterRpcMonitor {
   void proxyOpRetries();
 
   /**
+   * Trying to use connection already in use
+   */
+  void proxyOpUnusableConnection();
+
+  /**
+   * Time taken by connection creator thread to create connection.
+   */
+  void connectionCreationTime(int timeToCreate);
+
+  /**
    * If the Router cannot contact the State Store in an operation.
    */
   void routerFailureStateStore();

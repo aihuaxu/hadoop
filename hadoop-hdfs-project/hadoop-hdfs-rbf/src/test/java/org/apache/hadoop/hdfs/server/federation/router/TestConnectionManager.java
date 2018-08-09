@@ -49,7 +49,7 @@ public class TestConnectionManager {
   @Before
   public void setup() throws Exception {
     conf = new Configuration();
-    connManager = new ConnectionManager(conf);
+    connManager = new ConnectionManager(conf, null);
     NetUtils.addStaticResolution("nn1", "localhost");
     NetUtils.createSocketAddrForHost("nn1", 8080);
     connManager.start();

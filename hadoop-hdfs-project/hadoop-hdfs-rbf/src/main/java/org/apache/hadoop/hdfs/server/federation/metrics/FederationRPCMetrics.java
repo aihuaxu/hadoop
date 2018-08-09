@@ -58,6 +58,8 @@ public class FederationRPCMetrics implements FederationRPCMBean {
   private MutableCounterLong proxyOpNotImplemented;
   @Metric("Number of operation retries")
   private MutableCounterLong proxyOpRetries;
+  @Metric("Number of unusable connections")
+  private MutableCounterLong proxyOpUnuableConnection;
 
   @Metric("Failed requests due to State Store unavailable")
   private MutableCounterLong routerFailureStateStore;
@@ -67,6 +69,8 @@ public class FederationRPCMetrics implements FederationRPCMBean {
   private MutableCounterLong routerFailureLocked;
   @Metric("Failed requests due to safe mode")
   private MutableCounterLong routerFailureSafemode;
+  @Metric("Time for the async router to NN connection creation")
+  private MutableRate connectionCreation;
 
   public FederationRPCMetrics(Configuration conf, RouterRpcServer rpcServer) {
     this.rpcServer = rpcServer;
@@ -132,9 +136,18 @@ public class FederationRPCMetrics implements FederationRPCMBean {
     proxyOpRetries.incr();
   }
 
+  public void incrProxyOpUnusableConnection() {
+    proxyOpUnuableConnection.incr();
+  }
+
   @Override
   public long getProxyOpRetries() {
     return proxyOpRetries.value();
+  }
+
+  @Override
+  public long getProxyOpUnusableConnection() {
+    return proxyOpUnuableConnection.value();
   }
 
   public void incrRouterFailureStateStore() {
@@ -246,5 +259,18 @@ public class FederationRPCMetrics implements FederationRPCMBean {
   @Override
   public long getProcessingOps() {
     return processingOp.value();
+  }
+
+  /**
+   * Add the time to create a new connection from router to namenode for a specific pool.
+   * @param time Process time of an operation in nanoseconds.
+   */
+  public void addConnectionCreationTime(long time) {
+    connectionCreation.add(time);
+  }
+
+  @Override
+  public double getRpcClientConnectionCreationAvg() {
+    return toMs(connectionCreation.lastStat().mean());
   }
 }

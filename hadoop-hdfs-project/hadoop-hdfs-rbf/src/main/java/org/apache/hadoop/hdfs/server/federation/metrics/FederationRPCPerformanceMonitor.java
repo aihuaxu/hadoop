@@ -164,6 +164,11 @@ public class FederationRPCPerformanceMonitor implements RouterRpcMonitor {
   }
 
   @Override
+  public void proxyOpUnusableConnection() {
+    metrics.incrProxyOpUnusableConnection();
+  }
+
+  @Override
   public void routerFailureStateStore() {
     metrics.incrRouterFailureStateStore();
   }
@@ -181,6 +186,11 @@ public class FederationRPCPerformanceMonitor implements RouterRpcMonitor {
   @Override
   public void routerFailureLocked() {
     metrics.incrRouterFailureLocked();
+  }
+
+  @Override
+  public void connectionCreationTime(int timeToCreate) {
+    metrics.addConnectionCreationTime(timeToCreate);
   }
 
   /**

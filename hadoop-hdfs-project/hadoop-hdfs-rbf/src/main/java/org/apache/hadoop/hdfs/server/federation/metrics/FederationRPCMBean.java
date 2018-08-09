@@ -44,6 +44,8 @@ public interface FederationRPCMBean {
 
   long getProxyOpRetries();
 
+  long getProxyOpUnusableConnection();
+
   long getRouterFailureStateStoreOps();
 
   long getRouterFailureReadOnlyOps();
@@ -89,4 +91,10 @@ public interface FederationRPCMBean {
    * @return JSON string representation.
    */
   String getRpcClientConnections();
+
+  /**
+   * Get the average time (in ms) needed to create connection by async connection creator thread.
+   * @return Average time needed to create connection by async connection creator thread.
+   */
+  double getRpcClientConnectionCreationAvg();
 }

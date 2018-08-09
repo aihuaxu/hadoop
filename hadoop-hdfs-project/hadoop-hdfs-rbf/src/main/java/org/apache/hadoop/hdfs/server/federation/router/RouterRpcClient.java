@@ -121,7 +121,7 @@ public class RouterRpcClient {
 
     this.namenodeResolver = resolver;
 
-    this.connectionManager = new ConnectionManager(conf);
+    this.connectionManager = new ConnectionManager(conf, monitor);
     this.connectionManager.start();
 
     int numThreads = conf.getInt(
@@ -345,6 +345,9 @@ public class RouterRpcClient {
         String nsId = namenode.getNameserviceId();
         String rpcAddress = namenode.getRpcAddress();
         connection = this.getConnection(ugi, nsId, rpcAddress);
+        if (this.rpcMonitor != null && !connection.isUsable()) {
+          this.rpcMonitor.proxyOpUnusableConnection();
+        }
         ProxyAndInfo<ClientProtocol> client = connection.getClient();
         ClientProtocol proxy = client.getProxy();
         ret = invoke(nsId, 0, method, proxy, params);
@@ -439,6 +442,8 @@ public class RouterRpcClient {
       return null;
     } catch (InvocationTargetException e) {
       Throwable cause = e.getCause();
+      LOG.error("{} retry#{} invoke exception {}",
+              Thread.currentThread().getName(), retryCount, cause.toString());
       if (cause instanceof IOException) {
         IOException ioe = (IOException) cause;
 
