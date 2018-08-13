@@ -938,6 +938,4 @@ service ClientNamenodeProtocol {
       returns(BlackListUserResponseProto);
   rpc msync(MsyncRequestProto)
       returns(MsyncResponseProto);
-  rpc satisfyStoragePolicy(SatisfyStoragePolicyRequestProto)
-      returns(SatisfyStoragePolicyResponseProto);
 }
