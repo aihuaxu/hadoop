@@ -73,6 +73,20 @@ public class FederationRPCMetrics implements FederationRPCMBean {
   private MutableRate connectionCreation;
   @Metric("Number of fatal errors caught by connection creator thread")
   private MutableCounterLong connectionCreationFatalError;
+  @Metric("Time taken to pre process before remote invoke method")
+  private MutableRate preInvokeTime;
+  @Metric("Time taken to complete invoke method")
+  private MutableRate invokeTime;
+  @Metric("Time taken to update cache store during failover")
+  private MutableRate failoverUpdateTime;
+  @Metric("Number of sync invokeConcurrent calls")
+  private MutableCounterLong invokeConcurrentSyncCount;
+  @Metric("Number of async invokeConcurrent calls")
+  private MutableCounterLong invokeConcurrentAsyncCount;
+  @Metric("Submitted callables size for async processing")
+  private MutableRate callableSize;
+  @Metric("Time taken to wait and collect result of all callables")
+  private MutableRate futuresCollectionTime;
 
   public FederationRPCMetrics(Configuration conf, RouterRpcServer rpcServer) {
     this.rpcServer = rpcServer;
@@ -285,4 +299,67 @@ public class FederationRPCMetrics implements FederationRPCMBean {
     return connectionCreationFatalError.value();
   }
 
+
+  public void addPreInvokeTime(long time) {
+    preInvokeTime.add(time);
+  }
+
+  public void addInvokeTime(long time) {
+    invokeTime.add(time);
+  }
+
+  public void addFailoverUpdateTime(long time) {
+    failoverUpdateTime.add(time);
+  }
+
+  public void incrInvokeConcurrentSyncCount() {
+    invokeConcurrentSyncCount.incr();
+  }
+
+  public void incrInvokeConcurrentAsyncCount() {
+    invokeConcurrentAsyncCount.incr();
+  }
+
+  public void addCallablesSize(long size) {
+    callableSize.add(size);
+  }
+
+  public void addFuturesCollectionTime(long time) {
+    futuresCollectionTime.add(time);
+  }
+
+  @Override
+  public double getPreInvokeTimeAvg() {
+    return toMs(preInvokeTime.lastStat().mean());
+  }
+
+  @Override
+  public double getInvokeTimeAvg() {
+    return toMs(invokeTime.lastStat().mean());
+  }
+
+  @Override
+  public double getFailoverUpdateTimeAvg() {
+    return toMs(failoverUpdateTime.lastStat().mean());
+  }
+
+  @Override
+  public double getInvokeConcurrentSyncCount() {
+    return invokeConcurrentSyncCount.value();
+  }
+
+  @Override
+  public double getInvokeConcurrentAsyncCount() {
+    return invokeConcurrentAsyncCount.value();
+  }
+
+  @Override
+  public double getCallablesSize() {
+    return callableSize.lastStat().mean();
+  }
+
+  @Override
+  public double getFuturesCollectionTimeAvg() {
+    return toMs(futuresCollectionTime.lastStat().mean());
+  }
 }

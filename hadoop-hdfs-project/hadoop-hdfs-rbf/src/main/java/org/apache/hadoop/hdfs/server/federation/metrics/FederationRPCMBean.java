@@ -104,4 +104,45 @@ public interface FederationRPCMBean {
    */
   long getConnectionFatalError();
 
+  /**
+   * Get the avg time (in ms) needed for pre processing in invokeMethod.
+   * @return Avg time (in ms) needed for pre processing in invokeMethod.
+   */
+  double getPreInvokeTimeAvg();
+
+  /**
+   * Get the avg time (in ms) needed for invoke in invokeMethod.
+   * @return Avg time (in ms) needed for invoke in invokeMethod.
+   */
+  double getInvokeTimeAvg();
+
+  /**
+   * Get the avg time (in ms) needed for failover update in local cache.
+   * @return Avg time (in ms) needed for failover update in local cache.
+   */
+  double getFailoverUpdateTimeAvg();
+
+  /**
+   * Get the count of calls that gets processed synchronously.
+   * @return Count of calls that gets processed synchronously.
+   */
+  double getInvokeConcurrentSyncCount();
+
+  /**
+   * Get the count of calls that gets processed asynchronously.
+   * @return Count of calls that gets processed asynchronously.
+   */
+  double getInvokeConcurrentAsyncCount();
+
+  /**
+   * Get the count of submitted callables for async processing.
+   * @return Count of submitted callables for async processing.
+   */
+  double getCallablesSize();
+
+  /**
+   * Get the avg time (in ms) needed to collect all async results.
+   * @return Avg time (in ms) needed to collect all async results.
+   */
+  double getFuturesCollectionTimeAvg();
 }

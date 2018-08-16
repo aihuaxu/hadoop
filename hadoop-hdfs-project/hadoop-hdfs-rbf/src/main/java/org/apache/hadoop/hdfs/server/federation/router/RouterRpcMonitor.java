@@ -120,4 +120,40 @@ public interface RouterRpcMonitor {
    * If a path is in a read only mount point.
    */
   void routerFailureReadOnly();
+  
+  /**
+   * Time taken to pre process in invokeMethod before final invoke
+   */
+  void preInvokeTime(int preInvokeTime);
+
+  /**
+   * Time taken for remote method invoke to downstream namenode.
+   */
+  void invokeTime(int invokeTime);
+
+  /**
+   * Time taken for failover update in local cache.
+   */
+  void failoverUpdateTime(int failoverUpdateTime);
+
+  /**
+   * Count of invokeConcurrent sync mechanism.
+   */
+  void invokeConcurrentSyncCount();
+
+  /**
+   * Count of invokeConcurrent async mechanism.
+   */
+  void invokeConcurrentAsyncCount();
+
+  /**
+   * Count of callables submitted for async processing.
+   */
+  void callablesSize(int sizeOfCallables);
+
+  /**
+   * Time taken to collect all futures by parent thread.
+   */
+  void futuresCollectionTime(int futuresCollectionTime);
+
 }

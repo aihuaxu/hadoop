@@ -60,6 +60,7 @@ import org.apache.hadoop.io.retry.RetryPolicy.RetryAction.RetryDecision;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.ipc.StandbyException;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -328,6 +329,7 @@ public class RouterRpcClient {
       final List<? extends FederationNamenodeContext> namenodes,
       final Method method, final Object... params) throws IOException {
 
+    long startTime = Time.monotonicNow();
     if (namenodes == null || namenodes.isEmpty()) {
       throw new IOException("No namenodes to invoke " + method.getName() +
           " with params " + Arrays.toString(params) + " from " + this.routerId);
@@ -350,11 +352,25 @@ public class RouterRpcClient {
         }
         ProxyAndInfo<ClientProtocol> client = connection.getClient();
         ClientProtocol proxy = client.getProxy();
+        int preInvokeTime = (int) (Time.monotonicNow() - startTime);
+        if (rpcMonitor != null) {
+          rpcMonitor.preInvokeTime(preInvokeTime);
+        }
+        startTime = Time.monotonicNow();
         ret = invoke(nsId, 0, method, proxy, params);
+        int invokeTime = (int) (Time.monotonicNow() - startTime);
+        if (rpcMonitor != null) {
+          rpcMonitor.invokeTime(invokeTime);
+        }
         if (failover) {
           // Success on alternate server, update
+          long failoverStartTime = Time.monotonicNow();
           InetSocketAddress address = client.getAddress();
           namenodeResolver.updateActiveNamenode(nsId, address);
+          int failoverUpdateTime = (int) (Time.monotonicNow() - failoverStartTime);
+          if (rpcMonitor != null) {
+            rpcMonitor.failoverUpdateTime(failoverUpdateTime);
+          }
         }
         if (this.rpcMonitor != null) {
           this.rpcMonitor.proxyOpComplete(true);
@@ -914,6 +930,9 @@ public class RouterRpcClient {
     final Method m = method.getMethod();
 
     if (locations.size() == 1) {
+      if (rpcMonitor != null) {
+        rpcMonitor.invokeConcurrentSyncCount();
+      }
       // Shortcut, just one call
       T location = locations.iterator().next();
       String ns = location.getNameserviceId();
@@ -923,7 +942,9 @@ public class RouterRpcClient {
       Object result = invokeMethod(ugi, namenodes, m, paramList);
       return Collections.singletonMap(location, clazz.cast(result));
     }
-
+    if (rpcMonitor != null) {
+      rpcMonitor.invokeConcurrentAsyncCount();
+    }
     List<T> orderedLocations = new LinkedList<>();
     Set<Callable<Object>> callables = new HashSet<>();
     for (final T location : locations) {
@@ -961,6 +982,7 @@ public class RouterRpcClient {
 
     if (rpcMonitor != null) {
       rpcMonitor.proxyOp();
+      rpcMonitor.callablesSize(callables.size());
     }
 
     try {
@@ -973,6 +995,7 @@ public class RouterRpcClient {
       }
       Map<T, R> results = new TreeMap<>();
       Map<T, IOException> exceptions = new TreeMap<>();
+      long startFuturesCollectTime = Time.monotonicNow();
       for (int i=0; i<futures.size(); i++) {
         T location = orderedLocations.get(i);
         try {
@@ -1007,6 +1030,10 @@ public class RouterRpcClient {
 
           // Store the exceptions
           exceptions.put(location, ioe);
+        }
+        int futuresCollectTime = (int) (Time.monotonicNow() - startFuturesCollectTime);
+        if (rpcMonitor != null) {
+          rpcMonitor.futuresCollectionTime(futuresCollectTime);
         }
       }
 

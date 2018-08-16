@@ -198,6 +198,41 @@ public class FederationRPCPerformanceMonitor implements RouterRpcMonitor {
     metrics.incrConnectionFatalError();
   }
 
+  @Override
+  public void preInvokeTime(int preInvokeTime) {
+    metrics.addPreInvokeTime(preInvokeTime);
+  }
+
+  @Override
+  public void invokeTime(int invokeTime) {
+    metrics.addInvokeTime(invokeTime);
+  }
+
+  @Override
+  public void failoverUpdateTime(int failoverUpdateTime) {
+    metrics.addFailoverUpdateTime(failoverUpdateTime);
+  }
+
+  @Override
+  public void invokeConcurrentSyncCount() {
+    metrics.incrInvokeConcurrentSyncCount();
+  }
+
+  @Override
+  public void invokeConcurrentAsyncCount() {
+    metrics.incrInvokeConcurrentAsyncCount();
+  }
+
+  @Override
+  public void callablesSize(int sizeOfCallables) {
+    metrics.addCallablesSize(sizeOfCallables);
+  }
+
+  @Override
+  public void futuresCollectionTime(int futuresCollectionTime) {
+    metrics.addFuturesCollectionTime(futuresCollectionTime);
+  }
+
   /**
    * Get current time.
    * @return Current time in nanoseconds.
