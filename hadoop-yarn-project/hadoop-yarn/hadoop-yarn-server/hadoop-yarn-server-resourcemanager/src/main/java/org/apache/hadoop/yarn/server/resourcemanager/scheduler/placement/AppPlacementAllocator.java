@@ -19,6 +19,7 @@
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.placement;
 
 import org.apache.hadoop.yarn.api.records.ResourceRequest;
+import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.AppSchedulingInfo;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.NodeType;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerNode;
@@ -49,13 +50,17 @@ import java.util.Map;
  * requests.
  * </p>
  */
-public interface AppPlacementAllocator<N extends SchedulerNode> {
+public abstract class AppPlacementAllocator<N extends SchedulerNode> {
+  protected AppSchedulingInfo appSchedulingInfo;
+  protected SchedulerRequestKey schedulerRequestKey;
+  protected RMContext rmContext;
+
   /**
    * Get iterator of preferred node depends on requirement and/or availability
    * @param candidateNodeSet input CandidateNodeSet
    * @return iterator of preferred node
    */
-  Iterator<N> getPreferredNodeIterator(CandidateNodeSet<N> candidateNodeSet);
+  public abstract Iterator<N> getPreferredNodeIterator(CandidateNodeSet<N> candidateNodeSet);
 
   /**
    * Replace existing ResourceRequest by the new requests
@@ -65,7 +70,7 @@ public interface AppPlacementAllocator<N extends SchedulerNode> {
    * requests for preempted container
    * @return true if total pending resource changed
    */
-  ResourceRequestUpdateResult updateResourceRequests(
+  public abstract ResourceRequestUpdateResult updateResourceRequests(
       Collection<ResourceRequest> requests,
       boolean recoverPreemptedRequestForAContainer);
 
@@ -73,7 +78,7 @@ public interface AppPlacementAllocator<N extends SchedulerNode> {
    * Get pending ResourceRequests by given schedulerRequestKey
    * @return Map of resourceName to ResourceRequest
    */
-  Map<String, ResourceRequest> getResourceRequests();
+  public abstract Map<String, ResourceRequest> getResourceRequests();
 
   /**
    * Get pending ask for given resourceName. If there's no such pendingAsk,
@@ -82,7 +87,7 @@ public interface AppPlacementAllocator<N extends SchedulerNode> {
    * @param resourceName resourceName
    * @return PendingAsk
    */
-  PendingAsk getPendingAsk(String resourceName);
+  public abstract PendingAsk getPendingAsk(String resourceName);
 
   /**
    * Get #pending-allocations for given resourceName. If there's no such
@@ -91,7 +96,7 @@ public interface AppPlacementAllocator<N extends SchedulerNode> {
    * @param resourceName resourceName
    * @return #pending-allocations
    */
-  int getOutstandingAsksCount(String resourceName);
+  public abstract int getOutstandingAsksCount(String resourceName);
 
   /**
    * Notify container allocated.
@@ -100,14 +105,14 @@ public interface AppPlacementAllocator<N extends SchedulerNode> {
    * @param node Which node this container allocated on
    * @return list of ResourceRequests deducted
    */
-  List<ResourceRequest> allocate(SchedulerRequestKey schedulerKey,
+  public abstract List<ResourceRequest> allocate(SchedulerRequestKey schedulerKey,
       NodeType type, SchedulerNode node);
 
   /**
    * Returns list of accepted resourceNames.
    * @return Iterator of accepted resourceNames
    */
-  Iterator<String> getAcceptedResouceNames();
+  public abstract Iterator<String> getAcceptedResouceNames();
 
   /**
    * We can still have pending requirement for a given NodeType and node
@@ -115,7 +120,7 @@ public interface AppPlacementAllocator<N extends SchedulerNode> {
    * @param node which node we will allocate on
    * @return true if we has pending requirement
    */
-  boolean canAllocate(NodeType type, SchedulerNode node);
+  public abstract boolean canAllocate(NodeType type, SchedulerNode node);
 
   /**
    * Can delay to give locality?
@@ -126,7 +131,7 @@ public interface AppPlacementAllocator<N extends SchedulerNode> {
    * @param resourceName resourceName
    * @return can/cannot
    */
-  boolean canDelayTo(String resourceName);
+  public abstract boolean canDelayTo(String resourceName);
 
   /**
    * Does this {@link AppPlacementAllocator} accept resources on nodePartition?
@@ -135,7 +140,7 @@ public interface AppPlacementAllocator<N extends SchedulerNode> {
    * @param schedulingMode schedulingMode
    * @return accepted/not
    */
-  boolean acceptNodePartition(String nodePartition,
+  public abstract boolean acceptNodePartition(String nodePartition,
       SchedulingMode schedulingMode);
 
   /**
@@ -145,7 +150,7 @@ public interface AppPlacementAllocator<N extends SchedulerNode> {
    *
    * @return primary requested node partition
    */
-  String getPrimaryRequestedNodePartition();
+  public abstract String getPrimaryRequestedNodePartition();
 
   /**
    * @return number of unique location asks with #pending greater than 0,
@@ -155,18 +160,24 @@ public interface AppPlacementAllocator<N extends SchedulerNode> {
    * and should belong to specific delay scheduling policy impl.
    * See YARN-7457 for more details.
    */
-  int getUniqueLocationAsks();
+  public abstract int getUniqueLocationAsks();
 
   /**
    * Print human-readable requests to LOG debug.
    */
-  void showRequests();
+  public abstract void showRequests();
 
   /**
-   * Set app scheduling info.
+   * Initialize this allocator, this will be called by Factory automatically.
    *
-   * @param appSchedulingInfo
-   *          app info object.
+   * @param appSchedulingInfo appSchedulingInfo
+   * @param schedulerRequestKey schedulerRequestKey
+   * @param rmContext rmContext
    */
-  void setAppSchedulingInfo(AppSchedulingInfo appSchedulingInfo);
+  public void initialize(AppSchedulingInfo appSchedulingInfo,
+                         SchedulerRequestKey schedulerRequestKey, RMContext rmContext) {
+    this.appSchedulingInfo = appSchedulingInfo;
+    this.rmContext = rmContext;
+    this.schedulerRequestKey = schedulerRequestKey;
+  }
 }

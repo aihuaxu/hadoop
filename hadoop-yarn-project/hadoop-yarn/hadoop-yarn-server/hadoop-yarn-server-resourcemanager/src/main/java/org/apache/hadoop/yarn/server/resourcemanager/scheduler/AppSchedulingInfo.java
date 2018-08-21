@@ -41,6 +41,7 @@ import org.apache.hadoop.yarn.api.records.Container;
 import org.apache.hadoop.yarn.api.records.ExecutionType;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.api.records.ResourceRequest;
+import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
 import org.apache.hadoop.yarn.server.resourcemanager.ResourceManager;
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer;
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerState;
@@ -89,12 +90,14 @@ public class AppSchedulingInfo {
   private final ReentrantReadWriteLock.WriteLock writeLock;
 
   public final ContainerUpdateContext updateContext;
-  public final Map<String, String> applicationSchedulingEnvs = new HashMap<>();
+  private final Map<String, String> applicationSchedulingEnvs = new HashMap<>();
+  private final RMContext rmContext;
+
 
   public AppSchedulingInfo(ApplicationAttemptId appAttemptId, String user,
       Queue queue, AbstractUsersManager abstractUsersManager, long epoch,
       ResourceUsage appResourceUsage,
-      Map<String, String> applicationSchedulingEnvs) {
+      Map<String, String> applicationSchedulingEnvs, RMContext rmContext) {
     this.applicationAttemptId = appAttemptId;
     this.applicationId = appAttemptId.getApplicationId();
     this.queue = queue;
@@ -104,6 +107,7 @@ public class AppSchedulingInfo {
         epoch << ResourceManager.EPOCH_BIT_SHIFT);
     this.appResourceUsage = appResourceUsage;
     this.applicationSchedulingEnvs.putAll(applicationSchedulingEnvs);
+    this.rmContext = rmContext;
 
     ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
     updateContext = new ContainerUpdateContext(this);
@@ -221,8 +225,8 @@ public class AppSchedulingInfo {
           .containsKey(schedulerRequestKey)) {
         AppPlacementAllocator<SchedulerNode> placementAllocatorInstance = ApplicationPlacementFactory
             .getAppPlacementAllocator(applicationSchedulingEnvs
-                .get(ApplicationSchedulingConfig.ENV_APPLICATION_PLACEMENT_TYPE_CLASS));
-        placementAllocatorInstance.setAppSchedulingInfo(this);
+                .get(ApplicationSchedulingConfig.ENV_APPLICATION_PLACEMENT_TYPE_CLASS),
+                    this, schedulerRequestKey, rmContext);
 
         schedulerKeyToAppPlacementAllocator.put(schedulerRequestKey,
             placementAllocatorInstance);
@@ -669,5 +673,14 @@ public class AppSchedulingInfo {
     } finally {
       this.readLock.unlock();
     }
+  }
+
+  /**
+   * Get scheduling envs configured for this application.
+   *
+   * @return a map of applicationSchedulingEnvs
+   */
+  public Map<String, String> getApplicationSchedulingEnvs() {
+    return applicationSchedulingEnvs;
   }
 }

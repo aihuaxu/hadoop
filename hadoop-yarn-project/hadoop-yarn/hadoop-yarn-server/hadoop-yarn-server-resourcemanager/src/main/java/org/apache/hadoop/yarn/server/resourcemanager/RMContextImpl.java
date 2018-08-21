@@ -49,7 +49,9 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.ContainerAlloca
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ResourceScheduler;
 
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerNode;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.distributed.QueueLimitCalculator;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.placement.MultiNodeSortingManager;
 import org.apache.hadoop.yarn.server.resourcemanager.security.AMRMTokenSecretManager;
 import org.apache.hadoop.yarn.server.resourcemanager.security.ClientToAMTokenSecretManagerInRM;
 import org.apache.hadoop.yarn.server.resourcemanager.security.DelegationTokenRenewer;
@@ -532,6 +534,17 @@ public class RMContextImpl implements RMContext {
       RMDelegatedNodeLabelsUpdater delegatedNodeLabelsUpdater) {
     activeServiceContext.setRMDelegatedNodeLabelsUpdater(
         delegatedNodeLabelsUpdater);
+  }
+
+  @Override
+  public MultiNodeSortingManager<SchedulerNode> getMultiNodeSortingManager() {
+    return activeServiceContext.getMultiNodeSortingManager();
+  }
+
+  @Override
+  public void setMultiNodeSortingManager(
+      MultiNodeSortingManager<SchedulerNode> multiNodeSortingManager) {
+    activeServiceContext.setMultiNodeSortingManager(multiNodeSortingManager);
   }
 
   public void setSchedulerRecoveryStartAndWaitTime(long waitTime) {

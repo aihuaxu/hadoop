@@ -89,7 +89,8 @@ public abstract class AbstractCSQueue implements CSQueue {
   Set<String> accessibleLabels;
   final RMNodeLabelsManager labelManager;
   String defaultLabelExpression;
-  
+  private String multiNodeSortingPolicyName = null;
+
   Map<AccessType, AccessControlList> acls = 
       new HashMap<AccessType, AccessControlList>();
   volatile boolean reservationsContinueLooking;
@@ -348,6 +349,9 @@ public abstract class AbstractCSQueue implements CSQueue {
       this.priority = csContext.getConfiguration().getQueuePriority(
           getQueuePath());
 
+      // Update multi-node sorting algorithm for scheduling as configured.
+      setMultiNodeSortingPolicyName(
+          csContext.getConfiguration().getMultiNodesSortingAlgorithmPolicy(getQueuePath()));
       this.userWeights = getUserWeightsFromHierarchy();
     } finally {
       writeLock.unlock();
@@ -1060,5 +1064,14 @@ public abstract class AbstractCSQueue implements CSQueue {
     } finally {
       this.writeLock.unlock();
     }
+  }
+
+  @Override
+  public String getMultiNodeSortingPolicyName() {
+    return this.multiNodeSortingPolicyName;
+  }
+
+  public void setMultiNodeSortingPolicyName(String policyName) {
+    this.multiNodeSortingPolicyName = policyName;
   }
 }

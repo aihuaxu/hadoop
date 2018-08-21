@@ -52,14 +52,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer;
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerEventType;
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerState;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.AbstractUsersManager;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ResourceLimits;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ResourceUsage;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplication;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplicationAttempt;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplicationAttempt.AMState;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerHealth;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerUtils;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.*;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.activities.ActivitiesLogger;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.activities.ActivityDiagnosticConstant;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.activities.ActivityState;
@@ -74,6 +67,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.placement.Candida
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.placement.CandidateNodeSetUtils;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.policy.FifoOrderingPolicyForPendingApps;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.policy.OrderingPolicy;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplicationAttempt.AMState;
 import org.apache.hadoop.yarn.server.utils.Lock;
 import org.apache.hadoop.yarn.server.utils.Lock.NoLock;
 import org.apache.hadoop.yarn.util.SystemClock;
@@ -83,9 +77,6 @@ import java.io.IOException;
 import java.util.*;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
 
 @Private
 @Unstable
@@ -993,36 +984,29 @@ public class LeafQueue extends AbstractCSQueue {
   private CSAssignment allocateFromReservedContainer(Resource clusterResource,
       CandidateNodeSet<FiCaSchedulerNode> candidates,
       ResourceLimits currentResourceLimits, SchedulingMode schedulingMode) {
-    FiCaSchedulerNode node = CandidateNodeSetUtils.getSingleNode(candidates);
-    if (null == node) {
-      return null;
-    }
+    // Considering multi-node scheduling, its better to iterate through
+    // all candidates and stop once we get atleast one good node to allocate
+    // where reservation was made earlier. In normal case, there is only one
+    // node and hence there wont be any impact after this change.
+    for (FiCaSchedulerNode node : candidates.getAllNodes().values()) {
+      RMContainer reservedContainer = node.getReservedContainer();
+      if (reservedContainer != null) {
+        FiCaSchedulerApp application = getApplication(
+                reservedContainer.getApplicationAttemptId());
 
-    RMContainer reservedContainer = node.getReservedContainer();
-    if (reservedContainer != null) {
-      FiCaSchedulerApp application = getApplication(
-          reservedContainer.getApplicationAttemptId());
-
-      if (null != application) {
-        ActivitiesLogger.APP.startAppAllocationRecording(activitiesManager,
-            node.getNodeID(), SystemClock.getInstance().getTime(), application);
-        CSAssignment assignment = application.assignContainers(clusterResource,
-            candidates, currentResourceLimits, schedulingMode,
-            reservedContainer);
-        return assignment;
+        if (null != application) {
+          ActivitiesLogger.APP.startAppAllocationRecording(activitiesManager,
+                  node, SystemClock.getInstance().getTime(), application);
+          CSAssignment assignment = application.assignContainers(clusterResource,
+                  candidates, currentResourceLimits, schedulingMode,
+                  reservedContainer);
+          return assignment;
+        }
       }
-
-      LOG.info("Reserved container " +
-              " application attempt=" + application.getApplicationAttemptId() +
-              " container=" + reservedContainer +
-              " queue=" + this.toString() +
-              " usedCapacity=" + getUsedCapacity() +
-              " absoluteUsedCapacity=" + getAbsoluteUsedCapacity() +
-              " cluster=" + clusterResource);
     }
 
-        return null;
-    }
+    return null;
+  }
 
   @Override
   public CSAssignment assignContainers(Resource clusterResource,
@@ -1078,29 +1062,30 @@ public class LeafQueue extends AbstractCSQueue {
              assignmentIterator.hasNext(); ) {
             FiCaSchedulerApp application = assignmentIterator.next();
 
-            ActivitiesLogger.APP.startAppAllocationRecording(activitiesManager,
-                    node.getNodeID(), SystemClock.getInstance().getTime(), application);
+      ActivitiesLogger.APP.startAppAllocationRecording(activitiesManager,
+          node, SystemClock.getInstance().getTime(), application);
 
-            // Check queue max-capacity limit
-            Resource appReserved = application.getCurrentReservation();
-            if (needAssignToQueueCheck) {
-                if (!super.canAssignToThisQueue(clusterResource, node.getPartition(),
-                        currentResourceLimits, appReserved, schedulingMode)) {
-                    ActivitiesLogger.APP.recordRejectedAppActivityFromLeafQueue(
-                            activitiesManager, node, application, application.getPriority(),
-                            ActivityDiagnosticConstant.QUEUE_MAX_CAPACITY_LIMIT);
-                    ActivitiesLogger.QUEUE.recordQueueActivity(activitiesManager, node,
-                            getParent().getQueueName(), getQueueName(), ActivityState.SKIPPED,
-                            ActivityDiagnosticConstant.EMPTY);
-                    return CSAssignment.NULL_ASSIGNMENT;
-                }
-                // If there was no reservation and canAssignToThisQueue returned
-                // true, there is no reason to check further.
-                if (!this.reservationsContinueLooking
-                        || appReserved.equals(Resources.none())) {
-                    needAssignToQueueCheck = false;
-                }
-            }
+      // Check queue max-capacity limit
+      Resource appReserved = application.getCurrentReservation();
+      if (needAssignToQueueCheck) {
+        if (!super.canAssignToThisQueue(clusterResource,
+            candidates.getPartition(), currentResourceLimits, appReserved,
+            schedulingMode)) {
+          ActivitiesLogger.APP.recordRejectedAppActivityFromLeafQueue(
+              activitiesManager, node, application, application.getPriority(),
+              ActivityDiagnosticConstant.QUEUE_MAX_CAPACITY_LIMIT);
+          ActivitiesLogger.QUEUE.recordQueueActivity(activitiesManager, node,
+              getParent().getQueueName(), getQueueName(), ActivityState.SKIPPED,
+              ActivityDiagnosticConstant.EMPTY);
+          return CSAssignment.NULL_ASSIGNMENT;
+        }
+        // If there was no reservation and canAssignToThisQueue returned
+        // true, there is no reason to check further.
+        if (!this.reservationsContinueLooking
+            || appReserved.equals(Resources.none())) {
+          needAssignToQueueCheck = false;
+        }
+      }
 
       CachedUserLimit cul = userLimits.get(application.getUser());
       Resource cachedUserLimit = null;
@@ -1120,7 +1105,8 @@ public class LeafQueue extends AbstractCSQueue {
         userAssignable = false;
       } else {
         userAssignable = canAssignToUser(clusterResource, application.getUser(),
-            userLimit, application, node.getPartition(), currentResourceLimits);
+            userLimit, application, candidates.getPartition(),
+            currentResourceLimits);
         if (!userAssignable && Resources.fitsIn(cul.reservation, appReserved)) {
           cul.canAssign = false;
           cul.reservation = appReserved;
