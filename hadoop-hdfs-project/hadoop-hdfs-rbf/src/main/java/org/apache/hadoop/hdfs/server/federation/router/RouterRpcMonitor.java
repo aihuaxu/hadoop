@@ -126,10 +126,19 @@ public interface RouterRpcMonitor {
    */
   void preInvokeTime(int preInvokeTime);
 
+  void usableConnectionPreInvokeTime(int preInvokeTime);
+
+  void unusableConnectionPreInvokeTime(int preInvokeTime);
+
   /**
    * Time taken for remote method invoke to downstream namenode.
    */
   void invokeTime(int invokeTime);
+
+  void usableConnectionInvokeTime(int invokeTime);
+
+  void unusableConnectionInvokeTime(int invokeTime);
+
 
   /**
    * Time taken for failover update in local cache.

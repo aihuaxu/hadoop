@@ -209,6 +209,26 @@ public class FederationRPCPerformanceMonitor implements RouterRpcMonitor {
   }
 
   @Override
+  public void usableConnectionPreInvokeTime(int preInvokeTime) {
+    metrics.addUsableConnectionPreInvokeTime(preInvokeTime);
+  }
+
+  @Override
+  public void usableConnectionInvokeTime(int invokeTime) {
+    metrics.addUsableConnectionInvokeTime(invokeTime);
+  }
+
+  @Override
+  public void unusableConnectionPreInvokeTime(int preInvokeTime) {
+    metrics.addUnusableConnectionPreInvokeTime(preInvokeTime);
+  }
+
+  @Override
+  public void unusableConnectionInvokeTime(int invokeTime) {
+    metrics.addUnusableConnectionInvokeTime(invokeTime);
+  }
+
+  @Override
   public void failoverUpdateTime(int failoverUpdateTime) {
     metrics.addFailoverUpdateTime(failoverUpdateTime);
   }

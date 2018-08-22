@@ -77,6 +77,14 @@ public class FederationRPCMetrics implements FederationRPCMBean {
   private MutableRate preInvokeTime;
   @Metric("Time taken to complete invoke method")
   private MutableRate invokeTime;
+  @Metric("Time taken to complete usable connection preinvoke method")
+  private MutableRate usableConnectionPreInvokeTime;
+  @Metric("Time taken to complete usable connection invoke method")
+  private MutableRate usableConnectionInvokeTime;
+  @Metric("Time taken to complete unusable connection preinvoke method")
+  private MutableRate unusableConnectionPreInvokeTime;
+  @Metric("Time taken to complete unusable connection invoke method")
+  private MutableRate unusableConnectionInvokeTime;
   @Metric("Time taken to update cache store during failover")
   private MutableRate failoverUpdateTime;
   @Metric("Number of sync invokeConcurrent calls")
@@ -299,9 +307,64 @@ public class FederationRPCMetrics implements FederationRPCMBean {
     return connectionCreationFatalError.value();
   }
 
-
   public void addPreInvokeTime(long time) {
     preInvokeTime.add(time);
+  }
+
+  public void addUsableConnectionPreInvokeTime(long time) {
+    usableConnectionPreInvokeTime.add(time);
+  }
+
+  public void addUsableConnectionInvokeTime(long time) {
+    usableConnectionInvokeTime.add(time);
+  }
+
+  public void addUnusableConnectionPreInvokeTime(long time) {
+    unusableConnectionPreInvokeTime.add(time);
+  }
+
+  public void addUnusableConnectionInvokeTime(long time) {
+    unusableConnectionInvokeTime.add(time);
+  }
+
+  @Override
+  public double getUsableConnectionPreInvokeTimeMax() {
+    return usableConnectionPreInvokeTime.lastStat().max();
+  }
+
+  @Override
+  public double getUsableConnectionPreInvokeTimeAvg() {
+    return usableConnectionPreInvokeTime.lastStat().mean();
+  }
+
+  @Override
+  public double getUnusableConnectionPreInvokeTimeMax() {
+    return unusableConnectionPreInvokeTime.lastStat().max();
+  }
+
+  @Override
+  public double getUnusableConnectionPreInvokeTimeAvg() {
+    return unusableConnectionPreInvokeTime.lastStat().mean();
+  }
+
+  @Override
+  public double getUsableConnectionInvokeTimeMax() {
+    return usableConnectionInvokeTime.lastStat().max();
+  }
+
+  @Override
+  public double getUsableConnectionInvokeTimeAvg() {
+    return usableConnectionInvokeTime.lastStat().mean();
+  }
+
+  @Override
+  public double getUnusableConnectionInvokeTimeMax() {
+    return unusableConnectionInvokeTime.lastStat().max();
+  }
+
+  @Override
+  public double getUnusableConnectionInvokeTimeAvg() {
+    return unusableConnectionInvokeTime.lastStat().mean();
   }
 
   public void addInvokeTime(long time) {
@@ -330,17 +393,32 @@ public class FederationRPCMetrics implements FederationRPCMBean {
 
   @Override
   public double getPreInvokeTimeAvg() {
-    return toMs(preInvokeTime.lastStat().mean());
+    return preInvokeTime.lastStat().mean();
   }
 
   @Override
   public double getInvokeTimeAvg() {
-    return toMs(invokeTime.lastStat().mean());
+    return invokeTime.lastStat().mean();
+  }
+
+  @Override
+  public double getPreInvokeTimeMax() {
+    return preInvokeTime.lastStat().max();
+  }
+
+  @Override
+  public double getInvokeTimeMax() {
+    return invokeTime.lastStat().max();
   }
 
   @Override
   public double getFailoverUpdateTimeAvg() {
-    return toMs(failoverUpdateTime.lastStat().mean());
+    return failoverUpdateTime.lastStat().mean();
+  }
+
+  @Override
+  public double getFailoverUpdateTimeMax() {
+    return failoverUpdateTime.lastStat().max();
   }
 
   @Override
@@ -360,6 +438,11 @@ public class FederationRPCMetrics implements FederationRPCMBean {
 
   @Override
   public double getFuturesCollectionTimeAvg() {
-    return toMs(futuresCollectionTime.lastStat().mean());
+    return futuresCollectionTime.lastStat().mean();
+  }
+
+  @Override
+  public double getFuturesCollectionTimeMax() {
+    return futuresCollectionTime.lastStat().max();
   }
 }

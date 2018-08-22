@@ -347,20 +347,34 @@ public class RouterRpcClient {
         String nsId = namenode.getNameserviceId();
         String rpcAddress = namenode.getRpcAddress();
         connection = this.getConnection(ugi, nsId, rpcAddress);
+        boolean connectionStatus = true;
         if (this.rpcMonitor != null && !connection.isUsable()) {
           this.rpcMonitor.proxyOpUnusableConnection();
+          connectionStatus = false;
         }
         ProxyAndInfo<ClientProtocol> client = connection.getClient();
         ClientProtocol proxy = client.getProxy();
         int preInvokeTime = (int) (Time.monotonicNow() - startTime);
         if (rpcMonitor != null) {
           rpcMonitor.preInvokeTime(preInvokeTime);
+          if(connectionStatus) {
+            rpcMonitor.usableConnectionPreInvokeTime(preInvokeTime);
+          }
+          else {
+            rpcMonitor.unusableConnectionPreInvokeTime(preInvokeTime);
+          }
         }
         startTime = Time.monotonicNow();
         ret = invoke(nsId, 0, method, proxy, params);
         int invokeTime = (int) (Time.monotonicNow() - startTime);
         if (rpcMonitor != null) {
           rpcMonitor.invokeTime(invokeTime);
+          if(connectionStatus) {
+            rpcMonitor.usableConnectionInvokeTime(invokeTime);
+          }
+          else {
+            rpcMonitor.unusableConnectionInvokeTime(invokeTime);
+          }
         }
         if (failover) {
           // Success on alternate server, update

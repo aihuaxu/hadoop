@@ -117,10 +117,28 @@ public interface FederationRPCMBean {
   double getInvokeTimeAvg();
 
   /**
+   * Get the max time (in ms) needed for pre processing in invokeMethod.
+   * @return Max time (in ms) needed for pre processing in invokeMethod.
+   */
+  double getPreInvokeTimeMax();
+
+  /**
+   * Get the max time (in ms) needed for invoke in invokeMethod.
+   * @return Max time (in ms) needed for invoke in invokeMethod.
+   */
+  double getInvokeTimeMax();
+
+  /**
    * Get the avg time (in ms) needed for failover update in local cache.
    * @return Avg time (in ms) needed for failover update in local cache.
    */
   double getFailoverUpdateTimeAvg();
+
+  /**
+   * Get the max time (in ms) needed for failover update in local cache.
+   * @return Max time (in ms) needed for failover update in local cache.
+   */
+  double getFailoverUpdateTimeMax();
 
   /**
    * Get the count of calls that gets processed synchronously.
@@ -145,4 +163,28 @@ public interface FederationRPCMBean {
    * @return Avg time (in ms) needed to collect all async results.
    */
   double getFuturesCollectionTimeAvg();
+
+  /**
+   * Get the max time (in ms) needed to collect all async results.
+   * @return Max time (in ms) needed to collect all async results.
+   */
+  double getFuturesCollectionTimeMax();
+
+
+  double getUsableConnectionPreInvokeTimeMax();
+
+  double getUsableConnectionPreInvokeTimeAvg();
+
+  double getUnusableConnectionPreInvokeTimeMax();
+
+  double getUnusableConnectionPreInvokeTimeAvg();
+
+  double getUsableConnectionInvokeTimeMax();
+
+  double getUsableConnectionInvokeTimeAvg();
+
+  double getUnusableConnectionInvokeTimeMax();
+
+  double getUnusableConnectionInvokeTimeAvg();
+
 }
