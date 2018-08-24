@@ -200,7 +200,7 @@ public class JournalNodeRpcServer implements QJournalProtocol {
 
   @Override
   public GetJournaledEditsResponseProto getJournaledEdits(String jid,
-      String nameServiceId, long sinceTxId, int maxTxns) throws IOException {
+      long sinceTxId, int maxTxns) throws IOException {
     return jn.getOrCreateJournal(jid).getJournaledEdits(sinceTxId, maxTxns);
   }
 
