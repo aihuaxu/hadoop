@@ -99,11 +99,6 @@ public class TestStateAlignmentContextWithHA {
 
       AC_LIST.add(alignmentContext);
     }
-
-    @Override // AbstractNNFailoverProxyProvider
-    public synchronized ClientGSIContext getAlignmentContext() {
-      return this.alignmentContext;
-    }
   }
 
   static class SpyConfiguredContextProxyProvider<T>
