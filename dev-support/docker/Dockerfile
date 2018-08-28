@@ -153,6 +153,7 @@ RUN apt-get -q update && apt-get -q install -y bats
 ####
 # Install pylint (always want latest)
 ####
+RUN pip2 install --upgrade pip
 RUN pip2 install pylint
 
 ####
