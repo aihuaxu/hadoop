@@ -21,6 +21,7 @@ import java.io.EOFException;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.net.ConnectException;
@@ -39,7 +40,11 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.DFSUtilClient;
 import org.apache.hadoop.hdfs.HAUtilClient;
 import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
+import org.apache.hadoop.io.retry.AtMostOnce;
+import org.apache.hadoop.io.retry.Idempotent;
 import org.apache.hadoop.io.retry.MultiException;
+import org.apache.hadoop.io.retry.RetryPolicies;
+import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.ipc.StandbyException;
 
@@ -47,6 +52,8 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.net.ConnectTimeoutException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.hadoop.io.retry.RetryPolicy.RetryAction;
 
 /**
  * A {@link org.apache.hadoop.io.retry.FailoverProxyProvider} implementation
@@ -70,6 +77,9 @@ public class ObserverReadProxyProvider<T> extends ConfiguredFailoverProxyProvide
 
   /** Proxies for the observer namenodes */
   private final List<AddressRpcProxyPair<T>> observerProxies;
+
+  /** The policy used to determine if an exception is fatal or retriable. */
+  private final RetryPolicy observerRetryPolicy;
 
   /**
    * Whether reading from observer has been enabled. If this is false, all read
@@ -99,6 +109,12 @@ public class ObserverReadProxyProvider<T> extends ConfiguredFailoverProxyProvide
     for (InetSocketAddress address : addressesOfNns) {
       observerProxies.add(new AddressRpcProxyPair<T>(address));
     }
+
+    // Don't bother configuring the number of retries and such on the retry
+    // policy since it is mainly only used for determining whether or not an
+    // exception is retriable or fatal
+    observerRetryPolicy = RetryPolicies.failoverOnNetworkException(
+        RetryPolicies.TRY_ONCE_THEN_FAIL, 1);
 
     observerReadEnabled = conf.getBoolean(
         HdfsClientConfigKeys.DFS_CLIENT_OBSERVER_READS_ENABLED,
@@ -178,23 +194,6 @@ public class ObserverReadProxyProvider<T> extends ConfiguredFailoverProxyProvide
       cause = cause.getCause();
     }
     return null;
-  }
-
-  /**
-   * After getting exception 'ex', whether we should retry the current request
-   * on a different observer.
-   * TODO: make sure this fully covers all possible exceptions
-   * TODO: perhaps we can leverage RetryPolicies.
-   */
-  private boolean shouldRetry(Exception ex) {
-    Throwable e = ex.getCause();
-    return (e instanceof ConnectException ||
-        e instanceof EOFException ||
-        e instanceof NoRouteToHostException ||
-        e instanceof UnknownHostException ||
-        e instanceof StandbyException ||
-        e instanceof ConnectTimeoutException ||
-        unwrapStandbyException(ex) != null);
   }
 
   // Check if the exception 'ex' wraps a FileNotFoundException.
@@ -286,17 +285,25 @@ public class ObserverReadProxyProvider<T> extends ConfiguredFailoverProxyProvide
               break;
             }
             return retVal;
-          } catch (Exception e) {
+          } catch (InvocationTargetException ite) {
+            if (!(ite.getCause() instanceof Exception)) {
+              throw ite.getCause();
+            }
             // If received remote FNF exception from server side (e.g., open),
             // also break from the loop and try active.
-            if (isFNFException(e)) {
+            if (isFNFException(ite)) {
               isFNFError = true;
               break;
             }
-            if (!shouldRetry(e)) {
+
+            Exception e = (Exception) ite.getCause();
+            RetryAction retryInfo = observerRetryPolicy.shouldRetry(e, 0, 0,
+                method.isAnnotationPresent(Idempotent.class)
+                    || method.isAnnotationPresent(AtMostOnce.class));
+            if (retryInfo.action == RetryAction.RetryDecision.FAIL) {
               throw e;
             }
-            handleInvokeException(badResults, e, current.proxyInfo);
+            handleInvokeException(badResults, ite, current.proxyInfo);
           }
         }
       }
