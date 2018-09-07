@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 
 import java.io.File;
@@ -32,6 +33,7 @@ import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenSecretManager;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockManager;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockManagerTestUtil;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor;
 import org.apache.hadoop.hdfs.server.common.Storage.StorageDirectory;
@@ -212,6 +214,12 @@ public class NameNodeAdapter {
     return fsnSpy;
   }
 
+  public static BlockManager spyOnBlockManager(NameNode nn) {
+    BlockManager bmSpy = Mockito.spy(nn.getNamesystem().getBlockManager());
+    nn.getNamesystem().setBlockManagerForTesting(bmSpy);
+    return bmSpy;
+  }
+
   public static ReentrantReadWriteLock spyOnFsLock(FSNamesystem fsn) {
     ReentrantReadWriteLock spy = Mockito.spy(fsn.getFsLockForTests());
     fsn.setFsLockForTests(spy);
@@ -241,7 +249,7 @@ public class NameNodeAdapter {
     editLog.setJournalSetForTesting(js);
     return js;
   }
-  
+
   public static String getMkdirOpPath(FSEditLogOp op) {
     if (op.opCode == FSEditLogOpCodes.OP_MKDIR) {
       return ((MkdirOp) op).path;

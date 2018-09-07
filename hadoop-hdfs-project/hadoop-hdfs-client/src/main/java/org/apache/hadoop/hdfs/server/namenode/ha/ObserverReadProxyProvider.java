@@ -17,18 +17,14 @@
  */
 package org.apache.hadoop.hdfs.server.namenode.ha;
 
-import java.io.EOFException;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
-import java.net.ConnectException;
 import java.net.InetSocketAddress;
-import java.net.NoRouteToHostException;
 import java.net.URI;
-import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -49,7 +45,6 @@ import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.ipc.StandbyException;
 
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.net.ConnectTimeoutException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
