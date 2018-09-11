@@ -41,6 +41,7 @@ import org.apache.hadoop.io.retry.Idempotent;
 import org.apache.hadoop.io.retry.MultiException;
 import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
+import org.apache.hadoop.ipc.Client;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.ipc.StandbyException;
 
@@ -219,6 +220,14 @@ public class ObserverReadProxyProvider<T> extends ConfiguredFailoverProxyProvide
     return method.isAnnotationPresent(ReadOnly.class);
   }
 
+  /**
+   * Whether we should direct the method being invoked to observer.
+   */
+  private boolean useObserver(final Method method) {
+    return this.observerReadEnabled && Client.getObserverRead()
+        && isRead(method);
+  }
+
   @VisibleForTesting
   public ProxyInfo getLastProxy() {
     return lastProxy;
@@ -259,7 +268,7 @@ public class ObserverReadProxyProvider<T> extends ConfiguredFailoverProxyProvide
       boolean isFNFError = false;
       Object retVal;
 
-      if (observerReadEnabled && isRead(method)) {
+      if (useObserver(method)) {
         int start = usableProxyIndex.get();
 
         // Loop through all the proxies, starting from the current index.
@@ -306,7 +315,7 @@ public class ObserverReadProxyProvider<T> extends ConfiguredFailoverProxyProvide
       // If we get here, it means all observer NNs have failed, or that it is a
       // write request. At this point we'll try to fail over to the active NN.
       try {
-        if (!isFNFError && observerReadEnabled && isRead(method)) {
+        if (!isFNFError && useObserver(method)) {
           LOG.warn("All ONNs have failed for read request " + method.getName() + ". "
               + "Fall back on active NN: " + activeProxy);
         }
