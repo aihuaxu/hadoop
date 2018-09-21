@@ -78,6 +78,8 @@ public class TestObserverReadProxyProvider {
     namenodeAnswers = new NameNodeAnswer[namenodeCount];
     ClientProtocol[] proxies = new ClientProtocol[namenodeCount];
     final Map<String, ClientProtocol> proxyMap = new HashMap<>();
+    HAServiceProtocol[] serviceProxies = new HAServiceProtocol[namenodeCount];
+    Map<String, HAServiceProtocol> serviceProxyMap = new HashMap<>();
     for (int i  = 0; i < namenodeCount; i++) {
       namenodeIDs[i] = "nn" + i;
       namenodeAddrs[i] = "namenode" + i + ".test:8020";
@@ -89,9 +91,11 @@ public class TestObserverReadProxyProvider {
           .when(proxies[i]));
       doRead(Mockito.doAnswer(namenodeAnswers[i].clientAnswer)
           .when(proxies[i]));
-      Mockito.doAnswer(namenodeAnswers[i].clientAnswer)
-          .when(proxies[i]).getHAServiceState();
+      serviceProxies[i] = mock(HAServiceProtocol.class);
+      Mockito.doAnswer(namenodeAnswers[i].serviceAnswer)
+          .when(serviceProxies[i]).getServiceStatus();
       proxyMap.put(namenodeAddrs[i], proxies[i]);
+      serviceProxyMap.put(namenodeAddrs[i], serviceProxies[i]);
     }
     conf.set(HdfsClientConfigKeys.DFS_HA_NAMENODES_KEY_PREFIX + "." + ns,
         Joiner.on(",").join(namenodeIDs));

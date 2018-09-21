@@ -19,14 +19,23 @@ package org.apache.hadoop.hdfs.server.namenode.ha;
 
 import com.google.common.base.Supplier;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
+import org.apache.hadoop.hdfs.protocol.Block;
+import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
+import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
+import org.apache.hadoop.hdfs.protocol.LocatedBlock;
+import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.qjournal.MiniQJMHACluster;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockManager;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
+import org.apache.hadoop.hdfs.server.namenode.NameNodeAdapter;
 import org.apache.hadoop.io.retry.FailoverProxyProvider;
 import org.apache.hadoop.io.retry.RetryInvocationHandler;
 import org.apache.hadoop.test.GenericTestUtils;
@@ -34,14 +43,20 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
+import org.mockito.Matchers;
+import org.mockito.invocation.InvocationOnMock;
+import org.mockito.stubbing.Answer;
 
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Proxy;
 import java.net.URI;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.TimeUnit;
 
+import static org.apache.hadoop.hdfs.protocol.HdfsConstants.SafeModeAction;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_HA_LOGROLL_PERIOD_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_HA_TAILEDITS_PERIOD_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_HA_TAILEDITS_INPROGRESS_KEY;
@@ -49,6 +64,13 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.anyBoolean;
+import static org.mockito.Matchers.anyLong;
+import static org.mockito.Matchers.anyShort;
+import static org.mockito.Matchers.anyString;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doNothing;
 
 // Main unit tests for ObserverNode
 public class TestObserverNode {
@@ -298,6 +320,60 @@ public class TestObserverNode {
         dfsCluster.getConfiguration(2)
     );
     assertEquals(0, rc);
+  }
+
+  /**
+   * Test the case where Observer should throw RetriableException, just like
+   * active NN, for certain open() calls where block locations are not
+   * available. See HDFS-13898 for details.
+   */
+  @Test
+  public void testObserverNodeSafeModeWithBlockLocations() throws Exception {
+    setUpCluster(1);
+    setObserverRead(true);
+
+    // Avoid starting DNs for the mini cluster.
+    BlockManager bmSpy = NameNodeAdapter.spyOnBlockManager(namenodes[0]);
+    doNothing().when(bmSpy)
+        .verifyReplication(anyString(), anyShort(), anyString());
+
+    // Create a new file - the request should go to active.
+    dfs.createNewFile(testPath);
+    assertSentTo(0);
+
+    rollEditLogAndTail(0);
+    dfs.open(testPath);
+    assertSentTo(2);
+
+    // Set observer to safe mode.
+    dfsCluster.getFileSystem(2).setSafeMode(SafeModeAction.SAFEMODE_ENTER);
+
+    // Mock block manager for observer to generate some fake blocks which
+    // will trigger the (retriable) safe mode exception.
+    final DatanodeInfo[] empty = {};
+    bmSpy = NameNodeAdapter.spyOnBlockManager(namenodes[2]);
+    doAnswer(new Answer() {
+      @Override
+      public LocatedBlocks answer(InvocationOnMock invocationOnMock) throws Throwable {
+        ExtendedBlock b = new ExtendedBlock("fake-pool", new Block(12345L));
+        LocatedBlock fakeBlock = new LocatedBlock(b, empty);
+        List<LocatedBlock> fakeBlocks = new ArrayList<>();
+        fakeBlocks.add(fakeBlock);
+        return new LocatedBlocks(0, false, fakeBlocks, null, true, null);
+      }
+    }).when(bmSpy).createLocatedBlocks(Matchers.<BlockInfo[]>any(),
+        anyLong(), anyBoolean(), anyLong(), anyLong(), anyBoolean(), anyBoolean(),
+        Matchers.<FileEncryptionInfo>any());
+
+    // Open the file again - it should throw retriable exception and then
+    // failover to active.
+    dfs.open(testPath);
+    assertSentTo(0);
+
+    // Remove safe mode on observer, request should still go to it.
+    dfsCluster.getFileSystem(2).setSafeMode(SafeModeAction.SAFEMODE_LEAVE);
+    dfs.open(testPath);
+    assertSentTo(2);
   }
 
   // TODO this does not currently work because fetching the service state from
