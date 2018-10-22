@@ -2146,6 +2146,18 @@ public class TestRMContainerAllocator {
   }
 
   @Test
+  public void testIfApplicationPriorityIsNotSet() {
+    Job mockJob = mock(Job.class);
+    RMCommunicator communicator = mock(RMCommunicator.class);
+    ClientService service = mock(ClientService.class);
+    AppContext context = mock(AppContext.class);
+    when(communicator.getJob()).thenReturn(mockJob);
+    RMContainerAllocator allocator = new RMContainerAllocator(service, context);
+    AllocateResponse response = Records.newRecord(AllocateResponse.class);
+    allocator.handleJobPriorityChange(response);
+  }
+
+  @Test
   public void testReduceScheduling() throws Exception {
     int totalMaps = 10;
     int succeededMaps = 1;
