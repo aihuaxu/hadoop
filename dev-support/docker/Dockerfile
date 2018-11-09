@@ -141,6 +141,7 @@ ENV MAVEN_OPTS -Xms256m -Xmx1536m
 RUN apt-get -y install nodejs && \
     ln -s /usr/bin/nodejs /usr/bin/node && \
     apt-get -y install npm && \
+    npm config set registry https://unpm.uberinternal.com/ \
     npm install -g bower && \
     npm install -g ember-cli
 
