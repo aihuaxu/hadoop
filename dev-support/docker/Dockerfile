@@ -73,8 +73,9 @@ RUN mkdir -p /opt/maven && \
          http://www-us.apache.org/dist/maven/maven-3/3.3.9/binaries/apache-maven-3.3.9-bin.tar.gz \
          -o /opt/maven.tar.gz && \
     tar xzf /opt/maven.tar.gz --strip-components 1 -C /opt/maven
-ENV MAVEN_HOME /opt/maven
 
+ENV M2_HOME /opt/maven
+ENV JAVA_HOME /usr/lib/jvm/open-jdk
 
 #######
 # Java OpenJDK
