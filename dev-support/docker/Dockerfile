@@ -75,7 +75,7 @@ RUN mkdir -p /opt/maven && \
     tar xzf /opt/maven.tar.gz --strip-components 1 -C /opt/maven
 
 ENV M2_HOME /opt/maven
-ENV JAVA_HOME /usr/lib/jvm/open-jdk
+ENV JAVA_HOME /usr/lib/jvm/java-1.7.0-openjdk-amd64
 
 #######
 # Java OpenJDK
