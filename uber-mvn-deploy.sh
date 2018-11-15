@@ -93,6 +93,7 @@ deploy-pom hadoop-mapreduce-project hadoop-mapreduce
 deploy-pom hadoop-mapreduce-project/hadoop-mapreduce-client hadoop-mapreduce-client
 deploy-pom hadoop-yarn-project hadoop-yarn-project
 deploy-pom hadoop-yarn-project/hadoop-yarn hadoop-yarn
+deploy-pom hadoop-yarn-project/hadoop-yarn/hadoop-yarn-server hadoop-yarn-server
 
 ### Deploy all the jar files individually
 
