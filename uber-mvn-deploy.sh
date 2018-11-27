@@ -82,7 +82,7 @@ function deploy-classifier {
       -Dpackaging=jar \
       -DrepositoryId=central \
       -Durl=$URL \
-      -Dfile=target/$1-${VERSION}.jar
+      -Dfile=target/$1-${VERSION}-$2.jar
 }
 
 function deploy-pom {
