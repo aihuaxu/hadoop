@@ -57,16 +57,18 @@ docker run --rm=true -i \
 
 VERSION=2.8.2
 WORKDIR=$PWD
+URL=http://artifactory.uber.internal:4587/artifactory/libs-release-local
 
 function deploy {
   mvn deploy:deploy-file \
       -DgroupId=org.apache.hadoop \
       -DartifactId=$1 \
       -Dversion=${VERSION} \
+      -Dclassifier=$2 \
       -DgeneratePom=false \
       -Dpackaging=jar \
       -DrepositoryId=central \
-      -Durl=http://artifactory.uber.internal:4587/artifactory/libs-release-local \
+      -Durl=$URL \
       -DpomFile=pom.xml \
       -Dfile=target/$1-${VERSION}.jar
 }
@@ -78,7 +80,7 @@ function deploy-pom {
       -DartifactId=$2 \
       -Dversion=${VERSION} \
       -DrepositoryId=central \
-      -Durl=http://artifactory.uber.internal:4587/artifactory/libs-release-local \
+      -Durl=$URL \
       -DpomFile=pom.xml \
       -Dfile=pom.xml
 }
@@ -105,6 +107,10 @@ for d in $(find . -name 'target' -type d); do
     cd $WORKDIR/$d/..
     if [[ -f pom.xml && $(basename $PWD) != 'bkjournal' ]]; then
       deploy $(basename $PWD)
+
+      if [[ $(basename $PWD) == *tests ]]; then
+         deploy $(basename $PWD) tests
+      fi
     fi
   fi
 done
