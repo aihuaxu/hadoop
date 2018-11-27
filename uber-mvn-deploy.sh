@@ -64,12 +64,24 @@ function deploy {
       -DgroupId=org.apache.hadoop \
       -DartifactId=$1 \
       -Dversion=${VERSION} \
-      -Dclassifier=$2 \
       -DgeneratePom=false \
       -Dpackaging=jar \
       -DrepositoryId=central \
       -Durl=$URL \
       -DpomFile=pom.xml \
+      -Dfile=target/$1-${VERSION}.jar
+}
+
+function deploy-classifier {
+  mvn deploy:deploy-file \
+      -DgroupId=org.apache.hadoop \
+      -DartifactId=$1 \
+      -Dversion=${VERSION} \
+      -Dclassifier=$2 \
+      -DgeneratePom=false \
+      -Dpackaging=jar \
+      -DrepositoryId=central \
+      -Durl=$URL \
       -Dfile=target/$1-${VERSION}.jar
 }
 
@@ -109,7 +121,7 @@ for d in $(find . -name 'target' -type d); do
       deploy $(basename $PWD)
 
       if [[ $(basename $PWD) == *tests ]]; then
-         deploy $(basename $PWD) tests
+         deploy-classifier $(basename $PWD) tests
       fi
     fi
   fi
