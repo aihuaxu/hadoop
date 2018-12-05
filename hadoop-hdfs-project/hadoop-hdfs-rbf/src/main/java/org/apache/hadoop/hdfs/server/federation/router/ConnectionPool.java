@@ -86,6 +86,8 @@ public class ConnectionPool {
   private final int minSize;
   /** Max number of connections per user. */
   private final int maxSize;
+  /** Min ratio of active connections per user. */
+  private final float minActiveRatio;
 
   /** The last time a connection was active. */
   private volatile long lastActiveTime = 0;
@@ -94,8 +96,8 @@ public class ConnectionPool {
   private AtomicInteger index = new AtomicInteger(0);
 
   protected ConnectionPool(Configuration config, String address,
-      UserGroupInformation user, int minPoolSize, int maxPoolSize)
-          throws IOException {
+      UserGroupInformation user, int minPoolSize, int maxPoolSize,
+      float minActiveRatio) throws IOException {
 
     this.conf = config;
 
@@ -108,6 +110,7 @@ public class ConnectionPool {
     // Set configuration parameters for the pool
     this.minSize = minPoolSize;
     this.maxSize = maxPoolSize;
+    this.minActiveRatio = minActiveRatio;
 
     // Add minimum connections to the pool
     for (int i=0; i<this.minSize; i++) {
@@ -134,6 +137,15 @@ public class ConnectionPool {
    */
   protected int getMinSize() {
     return this.minSize;
+  }
+
+  /**
+   * Get the minimum ratio of active connections in this pool.
+   *
+   * @return Minimum ratio of active connections.
+   */
+  protected float getMinActiveRatio() {
+    return this.minActiveRatio;
   }
 
   /**
