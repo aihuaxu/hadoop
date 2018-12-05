@@ -51,14 +51,7 @@ public class ConnectionManager {
   private static final Logger LOG =
           LoggerFactory.getLogger(ConnectionManager.class);
 
-  /**
-   * Minimum amount of active connections: 50%.
-   */
-  protected static final float MIN_ACTIVE_RATIO = 0.5f;
-
-  /**
-   * Configuration for the connection manager, pool and sockets.
-   */
+  /** Configuration for the connection manager, pool and sockets. */
   private final Configuration conf;
 
   /**
@@ -69,6 +62,8 @@ public class ConnectionManager {
    * Max number of connections per user + nn.
    */
   private final int maxSize;
+  /** Min ratio of active connections per user + nn. */
+  private final float minActiveRatio;
 
   /**
    * How often we close a pool for a particular user + nn.
@@ -126,11 +121,14 @@ public class ConnectionManager {
    */
   public ConnectionManager(Configuration config, RouterRpcMonitor monitor) {
     this.conf = config;
-    this.rpcMonitor = monitor;
-    // Configure minimum and maximum connection pools
+
+    // Configure minimum, maximum and active connection pools
     this.maxSize = this.conf.getInt(
-            RBFConfigKeys.DFS_ROUTER_NAMENODE_CONNECTION_POOL_SIZE,
-            RBFConfigKeys.DFS_ROUTER_NAMENODE_CONNECTION_POOL_SIZE_DEFAULT);
+        RBFConfigKeys.DFS_ROUTER_NAMENODE_CONNECTION_POOL_SIZE,
+        RBFConfigKeys.DFS_ROUTER_NAMENODE_CONNECTION_POOL_SIZE_DEFAULT);
+    this.minActiveRatio = this.conf.getFloat(
+        RBFConfigKeys.DFS_ROUTER_NAMENODE_CONNECTION_MIN_ACTIVE_RATIO,
+        RBFConfigKeys.DFS_ROUTER_NAMENODE_CONNECTION_MIN_ACTIVE_RATIO_DEFAULT);
 
     // Map with the connections indexed by UGI and Namenode
     this.pools = new HashMap<>();
@@ -230,7 +228,8 @@ public class ConnectionManager {
         pool = this.pools.get(connectionId);
         if (pool == null) {
           pool = new ConnectionPool(
-                  this.conf, nnAddress, ugi, this.minSize, this.maxSize);
+              this.conf, nnAddress, ugi, this.minSize, this.maxSize,
+              this.minActiveRatio, protocol);
           this.pools.put(connectionId, pool);
         }
       } finally {
@@ -389,12 +388,13 @@ public class ConnectionManager {
       // Check if the pool hasn't been active in a while or not 50% are used
       long timeSinceLastActive = Time.now() - pool.getLastActiveTime();
       int total = pool.getNumConnections();
-      int activeRecently = pool.getNumActiveConnectionsRecently();
+      int active = pool.getNumActiveConnections();
+      float poolMinActiveRatio = pool.getMinActiveRatio();
       if (timeSinceLastActive > connectionCleanupPeriodMs ||
-          activeRecently < MIN_ACTIVE_RATIO * total) {
+          activeRecently < poolMinActiveRatio * total) {
         // Be greedy here to close as many connections as possible in one shot
         int targetConnectionsCount =
-            (int)(MIN_ACTIVE_RATIO * total) - activeRecently;
+            (int)(poolMinActiveRatio * total) - activeRecently;
         List<ConnectionContext> conns =
             pool.removeConnections(targetConnectionsCount);
         for (ConnectionContext conn : conns) {
@@ -491,9 +491,9 @@ public class ConnectionManager {
           try {
             int total = pool.getNumConnections();
             int active = pool.getNumActiveConnectionsRecently();
+            float poolMinActiveRatio = pool.getMinActiveRatio();
             if (pool.getNumConnections() < pool.getMaxSize() &&
-                    active >= MIN_ACTIVE_RATIO * total) {
-              long startTime = Time.now();
+                active >= poolMinActiveRatio * total) {
               ConnectionContext conn = pool.newConnection();
               pool.addConnection(conn);
               int connectionCreationTime = (int) (Time.now() - startTime);

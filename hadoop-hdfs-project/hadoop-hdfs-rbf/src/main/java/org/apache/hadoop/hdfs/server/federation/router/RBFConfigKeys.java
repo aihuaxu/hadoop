@@ -103,10 +103,16 @@ public class RBFConfigKeys extends CommonConfigurationKeysPublic {
       TimeUnit.SECONDS.toMillis(5);
 
   // HDFS Router NN client
-  public static final String DFS_ROUTER_NAMENODE_CONNECTION_CREATOR_QUEUE_SIZE =
-          FEDERATION_ROUTER_PREFIX + "connection.creator.queue-size";
-  public static final int DFS_ROUTER_NAMENODE_CONNECTION_CREATOR_QUEUE_SIZE_DEFAULT =
-          1000;
+  public static final String
+      DFS_ROUTER_NAMENODE_CONNECTION_CREATOR_QUEUE_SIZE =
+      FEDERATION_ROUTER_PREFIX + "connection.creator.queue-size";
+  public static final int
+      DFS_ROUTER_NAMENODE_CONNECTION_CREATOR_QUEUE_SIZE_DEFAULT = 1000;
+  public static final String
+      DFS_ROUTER_NAMENODE_CONNECTION_MIN_ACTIVE_RATIO =
+      FEDERATION_ROUTER_PREFIX + "connection.min-active-ratio";
+  public static final float
+      DFS_ROUTER_NAMENODE_CONNECTION_MIN_ACTIVE_RATIO_DEFAULT = 0.5f;
   public static final String DFS_ROUTER_NAMENODE_CONNECTION_POOL_SIZE =
       FEDERATION_ROUTER_PREFIX + "connection.pool-size";
   public static final int DFS_ROUTER_NAMENODE_CONNECTION_POOL_SIZE_DEFAULT =
