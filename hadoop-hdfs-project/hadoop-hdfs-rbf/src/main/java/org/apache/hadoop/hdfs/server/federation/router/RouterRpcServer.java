@@ -2542,4 +2542,14 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol {
       throw ioe;
     }
   }
+
+  /**
+   * Get the config of the rpc server.
+   *
+   * @return rpc server config.
+   */
+  @VisibleForTesting
+  public Configuration getConf() {
+    return conf;
+  }
 }
