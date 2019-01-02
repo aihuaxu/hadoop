@@ -1,0 +1,5 @@
+{
+    "project_id": "hadoop-common",
+    "conduit_uri": "https://code.uberinternal.com/",
+    "git.default-relative-commit": "origin/apache-hadoop-uber-release-2.8.2"
+}
