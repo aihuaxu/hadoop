@@ -30,6 +30,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.server.federation.resolver.ActiveNamenodeResolver;
 import org.apache.hadoop.hdfs.server.federation.resolver.FileSubclusterResolver;
 import org.apache.hadoop.hdfs.server.federation.store.StateStoreService;
+import org.apache.hadoop.security.token.delegation.AbstractDelegationTokenSecretManager;
 import org.apache.hadoop.util.VersionInfo;
 import org.codehaus.jettison.json.JSONArray;
 import org.codehaus.jettison.json.JSONException;
@@ -153,6 +154,32 @@ public final class FederationUtil {
       LOG.error("Could not instantiate: {}", clazz.getSimpleName(), e);
       return null;
     }
+  }
+
+  /**
+   * Creates an instance of a SecretManager from the configuration.
+   *
+   * @param conf Configuration that defines the secret manager class.
+   * @return New secret manager.
+   */
+  public static AbstractDelegationTokenSecretManager newSecretManager(
+          Configuration conf) {
+    Class<? extends AbstractDelegationTokenSecretManager> clazz = conf.getClass(
+            RBFConfigKeys.DFS_ROUTER_DELEGATION_TOKEN_DRIVER_CLASS,
+            RBFConfigKeys.DFS_ROUTER_DELEGATION_TOKEN_DRIVER_CLASS_DEFAULT,
+            AbstractDelegationTokenSecretManager.class);
+    AbstractDelegationTokenSecretManager secretManager = null;
+    try {
+      Constructor constructor =
+              clazz.getConstructor(Configuration.class);
+      secretManager = (AbstractDelegationTokenSecretManager) constructor.newInstance(conf);
+      LOG.info("Secret manager instance created");
+    }
+    catch (ReflectiveOperationException e) {
+      LOG.error("Could not instantiate: {}", clazz.getSimpleName(), e);
+      return null;
+    }
+    return secretManager;
   }
 
   /**

@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdfs.server.federation.router;
 
+import static org.apache.hadoop.hdfs.server.federation.router.FederationUtil.newSecretManager;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION;
 import static org.apache.hadoop.hdfs.server.federation.router.RBFConfigKeys.DFS_ROUTER_HANDLER_COUNT_DEFAULT;
 import static org.apache.hadoop.hdfs.server.federation.router.RBFConfigKeys.DFS_ROUTER_HANDLER_COUNT_KEY;
@@ -107,6 +108,7 @@ import org.apache.hadoop.hdfs.protocolPB.ClientNamenodeProtocolPB;
 import org.apache.hadoop.hdfs.protocolPB.ClientNamenodeProtocolServerSideTranslatorPB;
 import org.apache.hadoop.hdfs.security.token.block.DataEncryptionKey;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
+import org.apache.hadoop.hdfs.server.federation.router.security.RouterSecurityManager;
 import org.apache.hadoop.hdfs.server.federation.metrics.FederationRPCMetrics;
 import org.apache.hadoop.hdfs.server.federation.resolver.ActiveNamenodeResolver;
 import org.apache.hadoop.hdfs.server.federation.resolver.FederationNamespaceInfo;
@@ -130,7 +132,9 @@ import org.apache.hadoop.ipc.StandbyException;
 import org.apache.hadoop.net.NodeBase;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.token.SecretManager;
 import org.apache.hadoop.security.token.Token;
+import org.apache.hadoop.security.token.delegation.AbstractDelegationTokenSecretManager;
 import org.apache.hadoop.service.AbstractService;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.slf4j.Logger;
@@ -178,6 +182,8 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol {
   /** If we use authentication for the connections. */
   private final boolean serviceAuthEnabled;
 
+  /** Router security manager to handle token operations. */
+  private RouterSecurityManager securityManager = null;
 
   /** Interface to identify the active NN for a nameservice or blockpool ID. */
   private final ActiveNamenodeResolver namenodeResolver;
@@ -256,6 +262,9 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol {
     LOG.info("RPC server binding to {} with {} handlers for Router {}",
         confRpcAddress, handlerCount, this.router.getRouterId());
 
+    // Create security manager monitor
+    this.securityManager = new RouterSecurityManager(this.conf);
+
     this.rpcServer = new RPC.Builder(this.conf)
         .setProtocol(ClientNamenodeProtocolPB.class)
         .setInstance(clientNNPbService)
@@ -265,6 +274,7 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol {
         .setnumReaders(readerCount)
         .setQueueSizePerHandler(handlerQueueSize)
         .setVerbose(false)
+        .setSecretManager(this.securityManager.getSecretManager())
         .build();
 
     // Set service-level authorization security policy
@@ -336,8 +346,12 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol {
     if (rpcMonitor != null) {
       this.rpcMonitor.close();
     }
+    if (securityManager != null) {
+      this.securityManager.stop();
+    }
     super.serviceStop();
   }
+
 
   /**
    * Get the RPC client to the Namenode.
@@ -463,8 +477,8 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol {
   @Override // ClientProtocol
   public Token<DelegationTokenIdentifier> getDelegationToken(Text renewer)
       throws IOException {
-    checkOperation(OperationCategory.WRITE, false);
-    return null;
+    checkOperation(OperationCategory.WRITE, true);
+    return this.securityManager.getDelegationToken(renewer);
   }
 
   /**
@@ -482,14 +496,16 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol {
   @Override // ClientProtocol
   public long renewDelegationToken(Token<DelegationTokenIdentifier> token)
       throws IOException {
-    checkOperation(OperationCategory.WRITE, false);
-    return 0;
+    checkOperation(OperationCategory.WRITE, true);
+    return this.securityManager.renewDelegationToken(token);
   }
 
   @Override // ClientProtocol
   public void cancelDelegationToken(Token<DelegationTokenIdentifier> token)
       throws IOException {
     checkOperation(OperationCategory.WRITE, false);
+    this.securityManager.cancelDelegationToken(token);
+    return;
   }
 
   @Override // ClientProtocol
@@ -2331,7 +2347,7 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol {
    * @return Remote user group information.
    * @throws IOException If we cannot get the user information.
    */
-  static UserGroupInformation getRemoteUser() throws IOException {
+  public static UserGroupInformation getRemoteUser() throws IOException {
     UserGroupInformation ugi = Server.getRemoteUser();
     return (ugi != null) ? ugi : UserGroupInformation.getCurrentUser();
   }
