@@ -18,27 +18,34 @@
 
 package org.apache.hadoop.yarn.security.client;
 
+import java.io.ByteArrayInputStream;
 import java.io.DataInput;
 import java.io.DataInputStream;
 import java.io.DataOutput;
 import java.io.IOException;
 
+import com.google.protobuf.InvalidProtocolBufferException;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Evolving;
+import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
+import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.impl.pb.ApplicationAttemptIdPBImpl;
+import org.apache.hadoop.yarn.proto.YarnSecurityTokenProtos;
 import org.apache.hadoop.yarn.proto.YarnSecurityTokenProtos.ClientToAMTokenIdentifierProto;
 
 import com.google.protobuf.TextFormat;
-
 
 @Public
 @Evolving
 public class ClientToAMTokenIdentifier extends TokenIdentifier {
 
+  private static final Log LOG = LogFactory.getLog(ClientToAMTokenIdentifier.class);
   public static final Text KIND_NAME = new Text("YARN_CLIENT_TOKEN");
 
   private ClientToAMTokenIdentifierProto proto;
@@ -78,12 +85,45 @@ public class ClientToAMTokenIdentifier extends TokenIdentifier {
   
   @Override
   public void write(DataOutput out) throws IOException {
-    out.write(proto.toByteArray());
+    // out.write(proto.toByteArray());
+    writeInOldFormat(out);
+  }
+
+  private void writeInOldFormat(DataOutput out) throws IOException {
+    ApplicationAttemptId attemptId = this.getApplicationAttemptID();
+    out.writeLong(attemptId.getApplicationId()
+            .getClusterTimestamp());
+    out.writeInt(attemptId.getApplicationId().getId());
+    out.writeInt(attemptId.getAttemptId());
+    new Text(this.getClientName()).write(out);
   }
 
   @Override
   public void readFields(DataInput in) throws IOException {
-    proto = ClientToAMTokenIdentifierProto.parseFrom((DataInputStream)in);
+    byte[] data = IOUtils.readFullyToByteArray(in);
+    try {
+      proto = ClientToAMTokenIdentifierProto.parseFrom(data);
+    } catch (InvalidProtocolBufferException e) {
+      LOG.warn("Recovering old formatted token");
+      readFieldsInOldFormat(
+              new DataInputStream(new ByteArrayInputStream(data)));
+    }
+  }
+
+  private void readFieldsInOldFormat(DataInput in) throws IOException {
+    YarnSecurityTokenProtos.ClientToAMTokenIdentifierProto.Builder builder =
+            YarnSecurityTokenProtos.ClientToAMTokenIdentifierProto.newBuilder();
+
+    ApplicationId appId =
+            ApplicationId.newInstance(in.readLong(), in.readInt());
+    ApplicationAttemptId attemptId =
+            ApplicationAttemptId.newInstance(appId, in.readInt());
+    builder.setAppAttemptId(((ApplicationAttemptIdPBImpl)attemptId).getProto());
+
+    Text clientName = new Text();
+    clientName.readFields(in);
+    builder.setClientName(clientName.toString());
+    proto = builder.build();
   }
 
   @Override

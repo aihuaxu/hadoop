@@ -252,7 +252,28 @@ public class ContainerTokenIdentifier extends TokenIdentifier {
   @Override
   public void write(DataOutput out) throws IOException {
     LOG.debug("Writing ContainerTokenIdentifier to RPC layer: " + this);
-    out.write(proto.toByteArray());
+    // out.write(proto.toByteArray());
+    writeInOldFormat(out);
+  }
+
+  private void writeInOldFormat(DataOutput out) throws IOException {
+    LOG.debug("Writing ContainerTokenIdentifier to RPC layer: " + this);
+    ApplicationAttemptId applicationAttemptId = this.getContainerID()
+            .getApplicationAttemptId();
+    ApplicationId applicationId = applicationAttemptId.getApplicationId();
+    out.writeLong(applicationId.getClusterTimestamp());
+    out.writeInt(applicationId.getId());
+    out.writeInt(applicationAttemptId.getAttemptId());
+    out.writeLong(this.getContainerID().getContainerId());
+    out.writeUTF(this.getNmHostAddress());
+    out.writeUTF(this.getApplicationSubmitter());
+    out.writeInt(this.getResource().getMemory());
+    out.writeInt(this.getResource().getVirtualCores());
+    out.writeLong(this.getExpiryTimeStamp());
+    out.writeInt(this.getMasterKeyId());
+    out.writeLong(this.getRMIdentifier());
+    out.writeInt(this.getPriority().getPriority());
+    out.writeLong(this.getCreationTime());
   }
 
   @Override

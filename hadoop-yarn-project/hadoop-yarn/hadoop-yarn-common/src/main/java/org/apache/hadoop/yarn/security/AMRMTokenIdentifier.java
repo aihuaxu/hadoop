@@ -81,7 +81,16 @@ public class AMRMTokenIdentifier extends TokenIdentifier {
 
   @Override
   public void write(DataOutput out) throws IOException {
-    out.write(proto.toByteArray());
+    // out.write(proto.toByteArray());
+    writeInOldFormat(out);
+  }
+
+  private void writeInOldFormat(DataOutput out) throws IOException {
+    ApplicationId appId = this.getApplicationAttemptId().getApplicationId();
+    out.writeLong(appId.getClusterTimestamp());
+    out.writeInt(appId.getId());
+    out.writeInt(this.getApplicationAttemptId().getAttemptId());
+    out.writeInt(this.getKeyId());
   }
 
   @Override

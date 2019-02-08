@@ -98,7 +98,19 @@ public class NMTokenIdentifier extends TokenIdentifier {
   @Override
   public void write(DataOutput out) throws IOException {
     LOG.debug("Writing NMTokenIdentifier to RPC layer: " + this);
-    out.write(proto.toByteArray());
+    // out.write(proto.toByteArray());
+    writeInOldFormat(out);
+  }
+
+  private void writeInOldFormat(DataOutput out) throws IOException {
+    ApplicationAttemptId appAttemptId = getApplicationAttemptId();
+    ApplicationId applicationId = appAttemptId.getApplicationId();
+    out.writeLong(applicationId.getClusterTimestamp());
+    out.writeInt(applicationId.getId());
+    out.writeInt(appAttemptId.getAttemptId());
+    out.writeUTF(this.getNodeId().toString());
+    out.writeUTF(this.getApplicationSubmitter());
+    out.writeInt(this.getKeyId());
   }
 
   @Override
