@@ -2114,48 +2114,66 @@ public class BlockManager implements BlockStatsMXBean {
       final DatanodeStorageInfo storageInfo,
       final BlockListAsLongs report,
       BlockReportContext context) throws IOException {
-    // Normal case:
-    // Modify the (block-->datanode) map, according to the difference
-    // between the old and new block report.
-    //
+
     Collection<BlockInfo> toAdd = new LinkedList<BlockInfo>();
     Collection<Block> toRemove = new TreeSet<Block>();
     Collection<Block> toInvalidate = new LinkedList<Block>();
     Collection<BlockToMarkCorrupt> toCorrupt = new LinkedList<BlockToMarkCorrupt>();
     Collection<StatefulBlockInfo> toUC = new LinkedList<StatefulBlockInfo>();
-    reportDiff(storageInfo, report,
-        toAdd, toRemove, toInvalidate, toCorrupt, toUC);
 
-    String strBlockReportId = "";
-    if (context != null) {
-      strBlockReportId = Long.toHexString(context.getReportId());
-    }
-   
-    DatanodeDescriptor node = storageInfo.getDatanodeDescriptor();
-    // Process the blocks on each queue
-    for (StatefulBlockInfo b : toUC) { 
-      addStoredBlockUnderConstruction(b, storageInfo);
-    }
-    for (Block b : toRemove) {
-      removeStoredBlock(b, node);
-    }
-    int numBlocksLogged = 0;
-    for (BlockInfo b : toAdd) {
-      addStoredBlock(b, storageInfo, null, numBlocksLogged < maxNumBlocksToLog);
-      numBlocksLogged++;
-    }
-    if (numBlocksLogged > maxNumBlocksToLog) {
-      blockLog.info("BLOCK* processReport 0x{}: logged info for {} of {} " +
-          "reported.", strBlockReportId, maxNumBlocksToLog, numBlocksLogged);
-    }
-    for (Block b : toInvalidate) {
-      addToInvalidates(b, node);
-    }
-    for (BlockToMarkCorrupt b : toCorrupt) {
-      markBlockAsCorrupt(b, storageInfo, node);
-    }
+    try {
+      // Normal case:
+      // Modify the (block-->datanode) map, according to the difference
+      // between the old and new block report.
+      //
+      reportDiff(storageInfo, report,
+          toAdd, toRemove, toInvalidate, toCorrupt, toUC);
 
-    return toInvalidate;
+      String strBlockReportId = "";
+      if (context != null) {
+        strBlockReportId = Long.toHexString(context.getReportId());
+      }
+
+      DatanodeDescriptor node = storageInfo.getDatanodeDescriptor();
+      // Process the blocks on each queue
+      for (StatefulBlockInfo b : toUC) {
+        addStoredBlockUnderConstruction(b, storageInfo);
+      }
+      for (Block b : toRemove) {
+        removeStoredBlock(b, node);
+      }
+      int numBlocksLogged = 0;
+      for (BlockInfo b : toAdd) {
+        addStoredBlock(b, storageInfo, null, numBlocksLogged < maxNumBlocksToLog);
+        numBlocksLogged++;
+      }
+      if (numBlocksLogged > maxNumBlocksToLog) {
+        blockLog.info("BLOCK* processReport 0x{}: logged info for {} of {} " +
+            "reported.", strBlockReportId, maxNumBlocksToLog, numBlocksLogged);
+      }
+      for (Block b : toInvalidate) {
+        addToInvalidates(b, node);
+      }
+      for (BlockToMarkCorrupt b : toCorrupt) {
+        markBlockAsCorrupt(b, storageInfo, node);
+      }
+
+      return toInvalidate;
+    } catch (Throwable e) {
+      LOG.info("Caught exception when processing block report from " + storageInfo);
+      LOG.info("Blocks to add: " + toAdd.size());
+      LOG.info("Blocks to remove: " + toRemove.size());
+      LOG.info("Blocks to invalidate: " + toInvalidate.size());
+      LOG.info("Blocks to corrupt: " + toCorrupt.size());
+      LOG.info("Blocks to uc: " + toUC.size());
+
+      LOG.info("------------- STACKTRACE BEGIN --------------");
+      for (StackTraceElement ste : e.getStackTrace()) {
+        LOG.info(ste.toString());
+      }
+      LOG.info("------------- STACKTRACE END --------------");
+      throw e;
+    }
   }
 
   /**
@@ -2291,11 +2309,11 @@ public class BlockManager implements BlockStatsMXBean {
       Collection<BlockToMarkCorrupt> toCorrupt, // add to corrupt replicas list
       Collection<StatefulBlockInfo> toUC) { // add to under-construction list
 
-    // place a delimiter in the list which separates blocks 
+    // place a delimiter in the list which separates blocks
     // that have been reported from those that have not
     BlockInfo delimiter = new BlockInfoContiguous(new Block(), (short) 1);
     AddBlockResult result = storageInfo.addBlock(delimiter);
-    assert result == AddBlockResult.ADDED 
+    assert result == AddBlockResult.ADDED
         : "Delimiting block cannot be present in the node";
     int headIndex = 0; //currently the delimiter is in the head of the list
     int curIndex;
@@ -2320,7 +2338,7 @@ public class BlockManager implements BlockStatsMXBean {
     // all of them are next to the delimiter
     Iterator<BlockInfo> it =
         storageInfo.new BlockIterator(delimiter.getNext(0));
-    while(it.hasNext())
+    while (it.hasNext())
       toRemove.add(it.next());
     storageInfo.removeBlock(delimiter);
   }
