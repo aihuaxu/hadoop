@@ -5949,6 +5949,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
         renewer, realUser);
       token = new Token<DelegationTokenIdentifier>(
         dtId, dtSecretManager);
+
       long expiryTime = dtSecretManager.getTokenExpiryTime(dtId);
       getEditLog().logGetDelegationToken(dtId, expiryTime);
     } finally {
@@ -6236,6 +6237,11 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   @Override // NameNodeMXBean
   public int getThreads() {
     return ManagementFactory.getThreadMXBean().getThreadCount();
+  }
+
+  @Override // NameNodeMXBean
+  public long getDelegationTokensCount() {
+    return dtSecretManager != null ? dtSecretManager.getCurrentTokensSize() : -1;
   }
 
   /**

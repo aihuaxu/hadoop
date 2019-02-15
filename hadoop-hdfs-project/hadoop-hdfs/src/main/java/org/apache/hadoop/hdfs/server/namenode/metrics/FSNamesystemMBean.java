@@ -208,4 +208,10 @@ public interface FSNamesystemMBean {
    * Return total time spent doing sync operations on FSEditLog.
    */
   String getTotalSyncTimes();
+
+  /**
+   * Return count of delegation tokens in memory.
+   */
+  long getDelegationTokensCount();
+
 }

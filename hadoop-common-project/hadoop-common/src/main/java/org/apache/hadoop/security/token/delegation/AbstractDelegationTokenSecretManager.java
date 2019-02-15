@@ -144,7 +144,10 @@ extends AbstractDelegationTokenIdentifier>
     setDelegationTokenSeqNum(0);
     currentTokens.clear();
   }
-  
+
+  public long getCurrentTokensSize() {
+    return currentTokens.size();
+  }
   /** 
    * Add a previously used master key to cache (when NN restarts), 
    * should be called before activate(). 
