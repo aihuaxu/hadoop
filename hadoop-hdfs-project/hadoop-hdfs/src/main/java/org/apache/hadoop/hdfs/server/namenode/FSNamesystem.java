@@ -5596,7 +5596,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       writeUnlock("getDelegationToken");
     }
     getEditLog().logSync();
-    logAuditEvent(success, operationName, tokenId);
     return token;
   }
 

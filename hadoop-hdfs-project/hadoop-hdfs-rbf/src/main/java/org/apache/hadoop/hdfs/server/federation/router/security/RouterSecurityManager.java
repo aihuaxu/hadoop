@@ -23,8 +23,11 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
 import org.apache.hadoop.hdfs.server.federation.router.RouterRpcServer;
+import org.apache.hadoop.hdfs.server.federation.router.Router;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.AccessControlException;
+import org.apache.hadoop.security.Credentials;
+import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
 import org.apache.hadoop.security.token.SecretManager;
@@ -34,6 +37,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 
 import static org.apache.hadoop.hdfs.server.federation.router.FederationUtil.newSecretManager;
 
@@ -195,6 +199,23 @@ public class RouterSecurityManager {
     }
   }
 
+  /** A utility method for creating credentials. */
+  public static Credentials createCredentials(
+      final Router router, final UserGroupInformation ugi,
+      final String renewer) throws IOException {
+    final Token<DelegationTokenIdentifier> token = router.getRpcServer().
+        getDelegationToken(new Text(renewer));
+    if (token == null) {
+      return null;
+    }
+
+    final InetSocketAddress addr = router.getRpcServerAddress();
+    SecurityUtil.setTokenService(token, addr);
+    final Credentials c = new Credentials();
+    c.addToken(new Text(ugi.getShortUserName()), token);
+    return c;
+  }
+
   public void verifyToken(DelegationTokenIdentifier identifier,
       byte[] password) throws SecretManager.InvalidToken{
     // WebHDFS needs this, RPC verification happen through different methods
@@ -203,6 +224,7 @@ public class RouterSecurityManager {
       this.dtSecretManager.verifyToken(identifier, password);
       LOG.info("Web token verified successfully ");
     } catch (SecretManager.InvalidToken it) {
+      LOG.error("Invalid Token by identifier " + identifier.toString());
       throw it;
     }
     return;

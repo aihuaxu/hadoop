@@ -85,8 +85,10 @@ public class RouterHttpServer extends AbstractService {
         RBFConfigKeys.DFS_ROUTER_KEYTAB_FILE_KEY);
 
     this.httpServer = builder.build();
-
-    NameNodeHttpServer.initWebHdfs(conf, httpAddress.getHostName(), httpServer,
+    String httpKeytab = conf.get(DFSUtil.getSpnegoKeytabKey
+        (conf, RBFConfigKeys.DFS_ROUTER_KEYTAB_FILE_KEY));
+    NameNodeHttpServer.initWebHdfs(conf, httpAddress.getHostName(),
+        httpKeytab, httpServer,
         RouterWebHdfsMethods.class.getPackage().getName());
 
     this.httpServer.setAttribute(NAMENODE_ATTRIBUTE_KEY, this.router);

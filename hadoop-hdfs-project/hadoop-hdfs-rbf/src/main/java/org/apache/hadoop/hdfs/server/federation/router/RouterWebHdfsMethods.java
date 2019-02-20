@@ -26,11 +26,16 @@ import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.DatanodeReportType;
+import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenSecretManager;
 import org.apache.hadoop.hdfs.server.common.JspHelper;
 import org.apache.hadoop.hdfs.server.federation.resolver.ActiveNamenodeResolver;
 import org.apache.hadoop.hdfs.server.federation.resolver.FederationNamenodeContext;
 import org.apache.hadoop.hdfs.server.federation.resolver.RemoteLocation;
+import org.apache.hadoop.hdfs.server.federation.router.security.RouterSecurityManager;
+import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.hdfs.server.namenode.web.resources.NamenodeWebHdfsMethods;
+import org.apache.hadoop.hdfs.web.*;
+import org.apache.hadoop.io.Text;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -40,10 +45,6 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
 import com.sun.jersey.spi.container.ResourceFilters;
-import org.apache.hadoop.hdfs.web.JsonUtil;
-import org.apache.hadoop.hdfs.web.ParamFilter;
-import org.apache.hadoop.hdfs.web.URLConnectionFactory;
-import org.apache.hadoop.hdfs.web.WebHdfsFileSystem;
 import org.apache.hadoop.hdfs.web.resources.AccessTimeParam;
 import org.apache.hadoop.hdfs.web.resources.AclPermissionParam;
 import org.apache.hadoop.hdfs.web.resources.BlockSizeParam;
@@ -90,6 +91,7 @@ import org.apache.hadoop.hdfs.web.resources.XAttrValueParam;
 import org.apache.hadoop.ipc.ExternalCall;
 import org.apache.hadoop.ipc.RetriableException;
 import org.apache.hadoop.net.Node;
+import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
@@ -361,6 +363,7 @@ public class RouterWebHdfsMethods extends NamenodeWebHdfsMethods {
           return Response.ok(js).type(MediaType.APPLICATION_JSON).build();
         }
       }
+      case GETDELEGATIONTOKEN:
       case GET_BLOCK_LOCATIONS:
       case GETFILESTATUS:
       case LISTSTATUS:
@@ -519,7 +522,7 @@ public class RouterWebHdfsMethods extends NamenodeWebHdfsMethods {
     } else {
       // generate a token
       final Token<? extends TokenIdentifier> t = generateDelegationToken(
-          router, ugi, request.getUserPrincipal().getName());
+          ugi, request.getUserPrincipal().getName());
       delegationQuery = "&delegation=" + t.encodeToUrlString();
     }
 
@@ -640,16 +643,19 @@ public class RouterWebHdfsMethods extends NamenodeWebHdfsMethods {
 
   /**
    * Generate the delegation tokens for this request.
-   * @param router Router.
    * @param ugi User group information.
    * @param renewer Who is asking for the renewal.
    * @return The delegation tokens.
    * @throws IOException If it cannot create the tokens.
    */
-  private Token<? extends TokenIdentifier> generateDelegationToken(
-      final Router router, final UserGroupInformation ugi,
-      final String renewer) throws IOException {
-    throw new UnsupportedOperationException("TODO Generate token for ugi=" +
-        ugi + " request=" + request);
+
+  @Override
+  public Credentials createCredentials
+          (final UserGroupInformation ugi, final String renewer) throws IOException {
+    final Router router = (Router)getContext().getAttribute("name.node");
+    final Credentials c = RouterSecurityManager.createCredentials(
+            router, ugi, renewer != null? renewer: ugi.getShortUserName());
+    return c;
   }
+
 }

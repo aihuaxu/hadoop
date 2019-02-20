@@ -352,6 +352,14 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol {
     super.serviceStop();
   }
 
+  /**
+   * Get the Security manager to the Router.
+   *
+   * @return Security manager to the Router.
+   */
+  public RouterSecurityManager getRouterSecurityManager() {
+    return this.securityManager;
+  }
 
   /**
    * Get the RPC client to the Namenode.
@@ -503,7 +511,7 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol {
   @Override // ClientProtocol
   public void cancelDelegationToken(Token<DelegationTokenIdentifier> token)
       throws IOException {
-    checkOperation(OperationCategory.WRITE, false);
+    checkOperation(OperationCategory.WRITE, true);
     this.securityManager.cancelDelegationToken(token);
     return;
   }
