@@ -19,6 +19,7 @@ package org.apache.hadoop.hdfs.server.namenode.ha;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.util.ArrayList;
@@ -33,6 +34,8 @@ import org.apache.hadoop.hdfs.DFSUtilClient;
 import org.apache.hadoop.hdfs.HAUtilClient;
 import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
 import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.net.DomainNameResolver;
+import org.apache.hadoop.net.DomainNameResolverFactory;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -90,6 +93,11 @@ public class ConfiguredFailoverProxyProvider<T> extends
       }
 
       Collection<InetSocketAddress> addressesOfNns = addressesInNN.values();
+      try {
+        addressesOfNns = getResolvedAddressesIfNecessary(addressesOfNns, uri);
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
       for (InetSocketAddress address : addressesOfNns) {
         proxies.add(new AddressRpcProxyPair<T>(address));
       }
@@ -107,6 +115,51 @@ public class ConfiguredFailoverProxyProvider<T> extends
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
+  }
+
+  /**
+   * If resolved is needed: for every domain name in the parameter list,
+   * resolve them into the actual IP addresses.
+   *
+   * @param addressesOfNns The domain name list from config.
+   * @param nameNodeUri The URI of namenode/nameservice.
+   * @return The collection of resolved IP addresses.
+   * @throws IOException If there are issues resolving the addresses.
+   */
+  Collection<InetSocketAddress> getResolvedAddressesIfNecessary(
+      Collection<InetSocketAddress> addressesOfNns, URI nameNodeUri)
+      throws IOException {
+    // 'host' here is usually the ID of the nameservice when address
+    // resolving is needed.
+    String host = nameNodeUri.getHost();
+    String configKeyWithHost =
+        HdfsClientConfigKeys.Failover.RESOLVE_ADDRESS_NEEDED_KEY  + "." + host;
+    boolean resolveNeeded = conf.getBoolean(configKeyWithHost,
+        HdfsClientConfigKeys.Failover.RESOLVE_ADDRESS_NEEDED_DEFAULT);
+    if (!resolveNeeded) {
+      // Early return is no resolve is necessary
+      return addressesOfNns;
+    }
+
+    Collection<InetSocketAddress> addressOfResolvedNns = new ArrayList<>();
+    DomainNameResolver dnr = DomainNameResolverFactory.newInstance(
+        conf, nameNodeUri, HdfsClientConfigKeys.Failover.RESOLVE_SERVICE_KEY);
+    // If the address needs to be resolved, get all of the IP addresses
+    // from this address and pass them into the proxy
+    LOG.info("Namenode domain name will be resolved with {}",
+        dnr.getClass().getName());
+    for (InetSocketAddress address : addressesOfNns) {
+      InetAddress[] resolvedAddresses = dnr.getAllByDomainName(
+          address.getHostName());
+      int port = address.getPort();
+      for (InetAddress raddress : resolvedAddresses) {
+        InetSocketAddress resolvedAddress = new InetSocketAddress(
+            raddress, port);
+        addressOfResolvedNns.add(resolvedAddress);
+      }
+    }
+
+    return addressOfResolvedNns;
   }
 
   /**
