@@ -23,6 +23,7 @@ import java.io.Flushable;
 import java.util.LinkedList;
 import java.util.Queue;
 
+import com.google.common.base.Strings;
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.log4j.FileAppender;
@@ -38,7 +39,7 @@ public class ContainerLogAppender extends FileAppender
   implements Flushable
 {
   private String containerLogDir;
-  private String containerLogFile;
+  private String containerLogFile = "syslog";  // For backward compatibility
   //so that log4j can configure it from the configuration(log4j.properties). 
   private int maxEvents;
   private Queue<LoggingEvent> tail = null;
@@ -50,6 +51,7 @@ public class ContainerLogAppender extends FileAppender
       if (maxEvents > 0) {
         tail = new LinkedList<LoggingEvent>();
       }
+
       setFile(new File(this.containerLogDir, containerLogFile).toString());
       setAppend(true);
       super.activateOptions();
@@ -108,7 +110,9 @@ public class ContainerLogAppender extends FileAppender
   }
 
   public void setContainerLogFile(String containerLogFile) {
-    this.containerLogFile = containerLogFile;
+    if (!Strings.isNullOrEmpty(containerLogFile)) {
+      this.containerLogFile = containerLogFile;
+    }
   }
 
   private static final int EVENT_SIZE = 100;
