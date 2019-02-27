@@ -1010,6 +1010,14 @@ public class LeafQueue extends AbstractCSQueue {
                         ps, currentResourceLimits, schedulingMode, reservedContainer);
                 return assignment;
             }
+
+        LOG.info("Reserved container " +
+                " application attempt=" + application.getApplicationAttemptId() +
+                " container=" + reservedContainer +
+                " queue=" + this.toString() +
+                " usedCapacity=" + getUsedCapacity() +
+                " absoluteUsedCapacity=" + getAbsoluteUsedCapacity() +
+                " cluster=" + clusterResource);
         }
 
         return null;

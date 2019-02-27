@@ -955,10 +955,21 @@ public class CapacityScheduler extends
     // current attempt's AM container.
     // Note outside precondition check for the attempt id may be
     // outdated here, so double check it here is necessary.
+
     if (!application.getApplicationAttemptId().equals(applicationAttemptId)) {
       LOG.error("Calling allocate on previous or removed " +
-          "or non existent application attempt " + applicationAttemptId);
+              "or non existent application attempt " + applicationAttemptId);
       return EMPTY_ALLOCATION;
+    }
+
+    for (ResourceRequest resReq : ask) {
+      LOG.info("requestedResource" +
+              " applicationAttempt=" + applicationAttemptId +
+              " queue=" + application.getQueueName() +
+              " askNumContainers=" + resReq.getNumContainers() +
+              " askVcores=" + resReq.getCapability().getVirtualCores() +
+              " askMemory=" + resReq.getCapability().getMemory() +
+              " startTime=" + getClock().getTime());
     }
 
     // Handle all container updates
@@ -1014,6 +1025,12 @@ public class CapacityScheduler extends
         .isWaitingForAMContainer()) {
       updateDemandForQueue.getOrderingPolicy().demandUpdated(application);
     }
+
+    LOG.info("grantedResource" +
+            " applicationAttempt=" + applicationAttemptId.getApplicationId() +
+            " queue=" + application.getQueueName() +
+            " numContainers=" + allocation.getContainers().size() +
+            " endTime=" + getClock().getTime());
 
     return allocation;
   }
