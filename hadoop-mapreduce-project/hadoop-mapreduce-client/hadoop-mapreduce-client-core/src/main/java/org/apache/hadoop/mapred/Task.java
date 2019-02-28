@@ -516,9 +516,9 @@ abstract public class Task implements Writable, Configurable {
     out.writeBoolean(writeSkipRecs);
     out.writeBoolean(taskCleanup);
     Text.writeString(out, user);
-    out.writeInt(encryptedSpillKey.length);
+
+    extraData = new BytesWritable(encryptedSpillKey);
     extraData.write(out);
-    out.write(encryptedSpillKey);
   }
   
   public void readFields(DataInput in) throws IOException {
@@ -543,10 +543,9 @@ abstract public class Task implements Writable, Configurable {
       setPhase(TaskStatus.Phase.CLEANUP);
     }
     user = StringInterner.weakIntern(Text.readString(in));
-    int len = in.readInt();
-    encryptedSpillKey = new byte[len];
+
     extraData.readFields(in);
-    in.readFully(encryptedSpillKey);
+    encryptedSpillKey = extraData.copyBytes();
   }
 
   @Override
@@ -1769,6 +1768,11 @@ abstract public class Task implements Writable, Configurable {
   }
 
   void setExtraData(BytesWritable extraData) {
-    this.extraData = extraData;
+    /**
+     * We are using extraData to send the key to encrypt spills with.
+     * Cannot support this operation anymore.
+     */
+    throw new UnsupportedOperationException("Using extraData is not supported."
+            + "This field is used to store the key to encrypt spill data.");
   }
 }
