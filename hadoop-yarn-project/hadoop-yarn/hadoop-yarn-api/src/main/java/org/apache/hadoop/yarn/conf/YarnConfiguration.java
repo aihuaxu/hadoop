@@ -3259,6 +3259,16 @@ public class YarnConfiguration extends Configuration {
   public static final String TIMELINE_XFS_OPTIONS =
       TIMELINE_XFS_PREFIX + "xframe-options";
 
+  /** Single Compute optimistic configs **/
+  public static final String LOW_PRIORITY_APP_TAG =
+          "x-piper-sco";
+
+  public static final String LOW_PRIORITY_OPTIMISTIC_QUEUE_SUFFIX =
+          "-low-pri-optimistic";
+
+  public static final String YARN_INTERNAL_LOW_PRIORITY_ORIGINAL_QUEUE_PREFIX =
+          "yarn-internal-low-priority-original-queue=";
+
   public YarnConfiguration() {
     super();
   }

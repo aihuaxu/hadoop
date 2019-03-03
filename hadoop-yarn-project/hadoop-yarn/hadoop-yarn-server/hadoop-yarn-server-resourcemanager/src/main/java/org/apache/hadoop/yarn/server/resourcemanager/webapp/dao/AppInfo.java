@@ -37,6 +37,8 @@ import org.apache.hadoop.yarn.api.records.LogAggregationStatus;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.api.records.ResourceRequest;
 import org.apache.hadoop.yarn.api.records.YarnApplicationState;
+import org.apache.hadoop.yarn.conf.YarnConfiguration;
+import org.apache.hadoop.yarn.proto.YarnProtos;
 import org.apache.hadoop.yarn.server.resourcemanager.ResourceManager;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppMetrics;
@@ -51,6 +53,10 @@ import org.apache.hadoop.yarn.webapp.util.WebAppUtils;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
+
+import java.util.Comparator;
+import java.util.Set;
+import java.util.TreeSet;
 
 @XmlRootElement(name = "app")
 @XmlAccessorType(XmlAccessType.FIELD)
@@ -157,7 +163,7 @@ public class AppInfo {
       this.id = app.getApplicationId().toString();
       this.user = app.getUser().toString();
       this.name = app.getName().toString();
-      this.queue = app.getQueue().toString();
+      this.queue = getLowPriorityMappedQueue(app);
       this.priority = 0;
 
       if (app.getApplicationPriority() != null) {
@@ -231,7 +237,7 @@ public class AppInfo {
       preemptedResourceMB = appMetrics.getResourcePreempted().getMemorySize();
       numNonAMContainerPreempted = appMetrics.getNumNonAMContainersPreempted();
       preemptedResourceVCores =
-          appMetrics.getResourcePreempted().getVirtualCores();
+              appMetrics.getResourcePreempted().getVirtualCores();
       memorySeconds = appMetrics.getMemorySeconds();
       vcoreSeconds = appMetrics.getVcoreSeconds();
       preemptedMemorySeconds = appMetrics.getPreemptedMemorySeconds();
@@ -585,5 +591,44 @@ public class AppInfo {
 
   public void setName(String name) {
     this.name = name;
+  }
+
+  private String getLowPriorityMappedQueue(RMApp app) {
+    // Check if the application contains tag for "low priority jobs"
+    // If true, get the mapped queue
+    Set<String> appTags = app.getApplicationTags();
+    Set<String> caseIgnoreAppTags = new TreeSet<>(new Comparator<String>() {
+      @Override
+      public int compare(String a, String b) {
+        return a.toLowerCase().compareTo(b.toLowerCase());
+      }
+    });
+
+    if (appTags != null) {
+      caseIgnoreAppTags.addAll(appTags);
+    }
+
+    String queue = app.getQueue().toLowerCase();
+
+    /**
+     If appTag contains low priority tag and queue has low priority suffix, it means we may have mapped to
+     different queue. Retrieve the original queue in such cases.
+     **/
+
+    // If app tag contains low priority tag and queue is one of the low priority queue
+    if (caseIgnoreAppTags.contains(YarnConfiguration.LOW_PRIORITY_APP_TAG)
+            && queue.endsWith(YarnConfiguration.LOW_PRIORITY_OPTIMISTIC_QUEUE_SUFFIX)) {
+      // Iterate and get the tag for mapped queue
+      String lowPriorityOriginalQueuePrefix =
+              YarnConfiguration.YARN_INTERNAL_LOW_PRIORITY_ORIGINAL_QUEUE_PREFIX;
+      for (String appTag : caseIgnoreAppTags) {
+        if (appTag.startsWith(lowPriorityOriginalQueuePrefix)) {
+          // Get the mapped queue
+          String mappedQueue = appTag.substring(lowPriorityOriginalQueuePrefix.length(), appTag.length());
+          return mappedQueue;
+        }
+      }
+    }
+    return app.getQueue();
   }
 }
