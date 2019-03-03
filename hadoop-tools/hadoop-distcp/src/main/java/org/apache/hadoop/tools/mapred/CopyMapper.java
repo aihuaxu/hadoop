@@ -362,8 +362,23 @@ public class CopyMapper extends Mapper<Text, CopyListingFileStatus, Text, Text> 
             : "") +
         " to " + target, exception);
 
-    if (ignoreFailures &&
-        ExceptionUtils.indexOfType(exception, CopyReadException.class) != -1 && ExceptionUtils.indexOfType(exception, CopyReadException.class) != -1 ) {
+    LOG.error("Failure in copying " + sourceFileStatus.getPath() + " to " +
+                target, exception);
+
+    boolean isCopyReadException = false;
+    boolean isFileNotFoundException = false;
+    Throwable t = exception;
+    while (t != null) {
+      if (t instanceof RetriableFileCopyCommand.CopyReadException) {
+        isCopyReadException = true;
+      }
+      if (t instanceof FileNotFoundException) {
+        isFileNotFoundException = true;
+      }
+      t = t.getCause();
+    }
+
+    if (ignoreFailures && isCopyReadException && isFileNotFoundException) {
       incrementCounter(context, Counter.FAIL, 1);
       incrementCounter(context, Counter.BYTESFAILED, sourceFileStatus.getLen());
       context.write(null, new Text("FAIL: " + sourceFileStatus.getPath() + " - " +
