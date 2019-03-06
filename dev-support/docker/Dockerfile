@@ -146,7 +146,7 @@ RUN apt-get -y install nodejs && \
     apt-get -y install npm && \
     npm config set ca "" && \
     npm install -g bower && \
-    npm install -g ember-cli
+    npm install -g ember-cli@3.0.0
 
 ###
 # Everything past this point is either not needed for testing or breaks Yetus.
