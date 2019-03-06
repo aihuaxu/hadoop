@@ -88,7 +88,7 @@ RUN apt-get -q install --no-install-recommends -y openjdk-7-jdk
 ######
 RUN mkdir -p /opt/findbugs && \
     curl -L -s -S \
-         https://sourceforge.net/projects/findbugs/files/findbugs/3.0.1/findbugs-noUpdateChecks-3.0.1.tar.gz \
+         https://fossies.org/linux/misc/findbugs-3.0.1.tar.gz \
          -o /opt/findbugs.tar.gz && \
     tar xzf /opt/findbugs.tar.gz --strip-components 1 -C /opt/findbugs
 ENV FINDBUGS_HOME /opt/findbugs
