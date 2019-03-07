@@ -39,6 +39,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -1259,7 +1260,7 @@ public class TestRMAppTransitions {
   }
 
   @Test
-  public void testGetAppReportLowPriorityA() {
+  public void testGetAppReportLowPriorityA() throws IOException {
     ApplicationSubmissionContext submissionContext = new ApplicationSubmissionContextPBImpl();
     submissionContext.setQueue("testQ" + YarnConfiguration.LOW_PRIORITY_OPTIMISTIC_QUEUE_SUFFIX);
     Set<String> appTags = new HashSet<>();
@@ -1275,7 +1276,7 @@ public class TestRMAppTransitions {
   }
 
   @Test
-  public void testGetAppReportLowPriorityB() {
+  public void testGetAppReportLowPriorityB() throws IOException {
     ApplicationSubmissionContext submissionContext = new ApplicationSubmissionContextPBImpl();
     submissionContext.setQueue("testQ");
     Set<String> appTags = new HashSet<>();
