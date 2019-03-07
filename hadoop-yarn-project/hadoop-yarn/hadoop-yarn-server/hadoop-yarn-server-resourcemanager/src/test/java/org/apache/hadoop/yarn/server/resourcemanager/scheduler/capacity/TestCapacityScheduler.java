@@ -3070,6 +3070,75 @@ public class TestCapacityScheduler {
   }
 
   @Test
+  public void testQueuesDefaultMaxAllocation() throws Exception {
+    // queue level max allocation is set by the queue configuration explicitly
+    // or from queues-default value, or from the cluster configuration if both
+    // are missing.
+    CapacityScheduler cs = new CapacityScheduler();
+    cs.setConf(new YarnConfiguration());
+    cs.setRMContext(resourceManager.getRMContext());
+    CapacitySchedulerConfiguration conf = new CapacitySchedulerConfiguration();
+    setupQueueConfiguration(conf);
+    setMaxAllocMb(conf,
+            YarnConfiguration.DEFAULT_RM_SCHEDULER_MAXIMUM_ALLOCATION_MB);
+    setMaxAllocVcores(conf,
+            YarnConfiguration.DEFAULT_RM_SCHEDULER_MAXIMUM_ALLOCATION_VCORES);
+
+    conf.setInt(CapacitySchedulerConfiguration.MAXIMUM_ALLOCATION_MB_QUEUES_DEFAULT, 4096);
+    conf.setInt(CapacitySchedulerConfiguration.MAXIMUM_ALLOCATION_VCORES_QUEUES_DEFAULT, 2);
+
+    setMaxAllocMb(conf, A1, 6144);
+    setMaxAllocVcores(conf, A1, 3);
+    cs.init(conf);
+    cs.start();
+    cs.reinitialize(conf, mockContext);
+    checkQueueCapacities(cs, A_CAPACITY, B_CAPACITY);
+
+    assertEquals("max capability MB in CS",
+            YarnConfiguration.DEFAULT_RM_SCHEDULER_MAXIMUM_ALLOCATION_MB,
+            cs.getMaximumResourceCapability().getMemory());
+    assertEquals("max capability vcores in CS",
+            YarnConfiguration.DEFAULT_RM_SCHEDULER_MAXIMUM_ALLOCATION_VCORES,
+            cs.getMaximumResourceCapability().getVirtualCores());
+    assertEquals("max allocation MB A1",
+            6144,
+            conf.getMaximumAllocationPerQueue(A1).getMemory());
+    assertEquals("max allocation vcores A1",
+            3,
+            conf.getMaximumAllocationPerQueue(A1).getVirtualCores());
+    assertEquals("max allocation MB A2",
+            4096,
+            conf.getMaximumAllocationPerQueue(A2).getMemory());
+    assertEquals("max allocation vcores A2",
+            2,
+            conf.getMaximumAllocationPerQueue(A2).getVirtualCores());
+
+    // Unset queues default
+    conf.unset(CapacitySchedulerConfiguration.MAXIMUM_ALLOCATION_MB_QUEUES_DEFAULT);
+    conf.unset(CapacitySchedulerConfiguration.MAXIMUM_ALLOCATION_VCORES_QUEUES_DEFAULT);
+    cs.reinitialize(conf, mockContext);
+
+    assertEquals("max capability MB in CS",
+            YarnConfiguration.DEFAULT_RM_SCHEDULER_MAXIMUM_ALLOCATION_MB,
+            cs.getMaximumResourceCapability().getMemory());
+    assertEquals("max capability vcores in CS",
+            YarnConfiguration.DEFAULT_RM_SCHEDULER_MAXIMUM_ALLOCATION_VCORES,
+            cs.getMaximumResourceCapability().getVirtualCores());
+    assertEquals("max allocation MB A1",
+            6144,
+            conf.getMaximumAllocationPerQueue(A1).getMemory());
+    assertEquals("max allocation vcores A1",
+            3,
+            conf.getMaximumAllocationPerQueue(A1).getVirtualCores());
+    assertEquals("max allocation MB A2",
+            YarnConfiguration.DEFAULT_RM_SCHEDULER_MAXIMUM_ALLOCATION_MB,
+            conf.getMaximumAllocationPerQueue(A2).getMemory());
+    assertEquals("max allocation vcores A2",
+            YarnConfiguration.DEFAULT_RM_SCHEDULER_MAXIMUM_ALLOCATION_VCORES,
+            conf.getMaximumAllocationPerQueue(A2).getVirtualCores());
+  }
+
+  @Test
   public void testRefreshQueuesMaxAllocationCSError() throws Exception {
     // Try to refresh the cluster level max allocation size to be smaller
     // and it should error out

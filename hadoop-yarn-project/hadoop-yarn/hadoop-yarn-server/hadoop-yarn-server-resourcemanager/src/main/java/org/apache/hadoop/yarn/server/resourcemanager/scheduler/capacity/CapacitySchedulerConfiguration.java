@@ -155,6 +155,14 @@ public class CapacitySchedulerConfiguration extends ReservationSchedulerConfigur
       FIFO_APP_ORDERING_POLICY;
   
   @Private
+  public static final String MAXIMUM_ALLOCATION_MB_QUEUES_DEFAULT =
+          PREFIX + MAXIMUM_ALLOCATION_MB + DOT + "queues-default";
+
+  @Private
+  public static final String MAXIMUM_ALLOCATION_VCORES_QUEUES_DEFAULT =
+          PREFIX + MAXIMUM_ALLOCATION_VCORES + DOT + "queues-default";
+
+  @Private
   public static final int DEFAULT_MAXIMUM_SYSTEM_APPLICATIIONS = 10000;
   
   @Private
@@ -806,6 +814,12 @@ public class CapacitySchedulerConfiguration extends ReservationSchedulerConfigur
    * @return setting specified per queue else falls back to the cluster setting
    */
   public Resource getMaximumAllocationPerQueue(String queue) {
+    Resource clusterMax = getMaximumAllocation();
+    int maxAllocationMbDefault = getInt(MAXIMUM_ALLOCATION_MB_QUEUES_DEFAULT,
+            clusterMax.getMemory());
+    int maxAllocationVcoresDefault = getInt(MAXIMUM_ALLOCATION_VCORES_QUEUES_DEFAULT,
+            clusterMax.getVirtualCores());
+
     String queuePrefix = getQueuePrefix(queue);
     long maxAllocationMbPerQueue = getInt(queuePrefix + MAXIMUM_ALLOCATION_MB,
         (int)UNDEFINED);
@@ -817,14 +831,14 @@ public class CapacitySchedulerConfiguration extends ReservationSchedulerConfigur
       LOG.debug("max alloc vcores per queue for " + queue + " is "
           + maxAllocationVcoresPerQueue);
     }
-    Resource clusterMax = getMaximumAllocation();
+
     if (maxAllocationMbPerQueue == (int)UNDEFINED) {
       LOG.info("max alloc mb per queue for " + queue + " is undefined");
-      maxAllocationMbPerQueue = clusterMax.getMemorySize();
+      maxAllocationMbPerQueue = maxAllocationMbDefault;
     }
     if (maxAllocationVcoresPerQueue == (int)UNDEFINED) {
        LOG.info("max alloc vcore per queue for " + queue + " is undefined");
-      maxAllocationVcoresPerQueue = clusterMax.getVirtualCores();
+      maxAllocationVcoresPerQueue = maxAllocationVcoresDefault;
     }
     Resource result = Resources.createResource(maxAllocationMbPerQueue,
         maxAllocationVcoresPerQueue);
