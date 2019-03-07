@@ -1127,6 +1127,15 @@ public abstract class AbstractYarnScheduler
         getMinimumResourceCapability());
   }
 
+  @Override
+  public Resource getNormalizedResource(Resource requestedResource, String queueName) {
+    return SchedulerUtils.getNormalizedResource(requestedResource,
+            getResourceCalculator(),
+            getMinimumResourceCapability(),
+            getMaximumResourceCapability(queueName),
+            getMinimumResourceCapability());
+  }
+
   /**
    * Normalize a list of resource requests.
    *
@@ -1135,6 +1144,17 @@ public abstract class AbstractYarnScheduler
   protected void normalizeRequests(List<ResourceRequest> asks) {
     for (ResourceRequest ask: asks) {
       ask.setCapability(getNormalizedResource(ask.getCapability()));
+    }
+  }
+
+  /**
+   * Normalize a list of resource requests.
+   *
+   * @param asks resource requests
+   */
+  protected void normalizeRequests(List<ResourceRequest> asks, String queueName) {
+    for (ResourceRequest ask: asks) {
+      ask.setCapability(getNormalizedResource(ask.getCapability(), queueName));
     }
   }
 

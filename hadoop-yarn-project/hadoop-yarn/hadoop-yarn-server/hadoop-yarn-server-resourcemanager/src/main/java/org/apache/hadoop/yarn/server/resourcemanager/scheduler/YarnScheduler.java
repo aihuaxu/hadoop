@@ -388,6 +388,14 @@ public interface YarnScheduler extends EventHandler<SchedulerEvent> {
   Resource getNormalizedResource(Resource requestedResource);
 
   /**
+   *
+   * @param requestedResource
+   * @param queueName
+   * @return
+   */
+  Resource getNormalizedResource(Resource requestedResource, String queueName);
+
+  /**
    * Verify whether a submitted application lifetime is valid as per configured
    * Queue lifetime.
    * @param queueName Name of the Queue
