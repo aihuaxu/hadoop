@@ -2980,7 +2980,7 @@ public class TestCapacityScheduler {
 
   @Test
   public void testRefreshQueuesMaxAllocationPerQueueLarge() throws Exception {
-    // verify we can't set the allocation per queue larger then cluster setting
+    // verify we can override the allocation per queue larger then cluster setting
     CapacityScheduler cs = new CapacityScheduler();
     cs.setConf(new YarnConfiguration());
     cs.setRMContext(resourceManager.getRMContext());
@@ -2991,27 +2991,11 @@ public class TestCapacityScheduler {
     // change max allocation for B3 queue to be larger then cluster max
     setMaxAllocMb(conf, B3,
         YarnConfiguration.DEFAULT_RM_SCHEDULER_MAXIMUM_ALLOCATION_MB + 2048);
-    try {
-      cs.reinitialize(conf, mockContext);
-      fail("should have thrown exception");
-    } catch (IOException e) {
-      assertTrue("maximum allocation exception",
-          e.getCause().getMessage().contains("maximum allocation"));
-    }
-
-    setMaxAllocMb(conf, B3,
-        YarnConfiguration.DEFAULT_RM_SCHEDULER_MAXIMUM_ALLOCATION_MB);
     cs.reinitialize(conf, mockContext);
 
     setMaxAllocVcores(conf, B3,
         YarnConfiguration.DEFAULT_RM_SCHEDULER_MAXIMUM_ALLOCATION_VCORES + 1);
-    try {
-      cs.reinitialize(conf, mockContext);
-      fail("should have thrown exception");
-    } catch (IOException e) {
-      assertTrue("maximum allocation exception",
-          e.getCause().getMessage().contains("maximum allocation"));
-    }
+     cs.reinitialize(conf, mockContext);
   }
 
   @Test

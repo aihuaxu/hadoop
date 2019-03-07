@@ -828,14 +828,6 @@ public class CapacitySchedulerConfiguration extends ReservationSchedulerConfigur
     }
     Resource result = Resources.createResource(maxAllocationMbPerQueue,
         maxAllocationVcoresPerQueue);
-    if (maxAllocationMbPerQueue > clusterMax.getMemorySize()
-        || maxAllocationVcoresPerQueue > clusterMax.getVirtualCores()) {
-      throw new IllegalArgumentException(
-          "Queue maximum allocation cannot be larger than the cluster setting"
-          + " for queue " + queue
-          + " max allocation per queue: " + result
-          + " cluster setting: " + clusterMax);
-    }
     return result;
   }
 
