@@ -672,6 +672,7 @@ public abstract class Server {
     String prefix = getQueueClassPrefix();
     callQueue.swapQueue(getSchedulerClass(prefix, conf),
         getQueueClass(prefix, conf), maxQueueSize, prefix, conf);
+    callQueue.setClientBackoffEnabled(getClientBackoffEnable(prefix, conf));
   }
 
   public synchronized void addToBlackList(String identity) {

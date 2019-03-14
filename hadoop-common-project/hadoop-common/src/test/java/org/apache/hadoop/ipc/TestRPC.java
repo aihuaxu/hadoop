@@ -53,7 +53,6 @@ import org.apache.hadoop.test.MockitoUtil;
 import org.apache.log4j.Level;
 import org.junit.Before;
 import org.junit.Test;
-import org.mockito.Mockito;
 import org.mockito.internal.util.reflection.Whitebox;
 
 import javax.net.SocketFactory;
@@ -90,12 +89,12 @@ import static org.apache.hadoop.test.MetricsAsserts.assertCounterGt;
 import static org.apache.hadoop.test.MetricsAsserts.getLongCounter;
 import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotEquals;
-import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
@@ -1137,10 +1136,7 @@ public class TestRPC extends TestRpcBase {
                 return null;
               }
             }));
-      }
-      while (server.getCallQueueLen() != 1
-          && countThreads(CallQueueManager.class.getName()) != 1) {
-        Thread.sleep(100);
+        verify(spy, timeout(500).times(i + 1)).addInternal(any(Call.class), eq(false));
       }
       try {
         proxy.sleep(null, newSleepRequest(100));
@@ -1208,7 +1204,7 @@ public class TestRPC extends TestRpcBase {
                 return null;
               }
             }));
-        verify(spy, timeout(500).times(i + 1)).add(Mockito.<Call>anyObject());
+        verify(spy, timeout(500).times(i + 1)).addInternal(any(Server.Call.class), eq(false));
       }
       // Start another sleep RPC call and verify the call is backed off due to
       // avg response time(3s) exceeds threshold (2s).
