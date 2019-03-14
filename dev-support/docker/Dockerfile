@@ -52,7 +52,7 @@ RUN apt-get -q update && apt-get -q install --no-install-recommends -y \
     libsnappy-dev \
     libssl-dev \
     libtool \
-    openjdk-7-jdk \
+    openjdk-8-jdk \
     pinentry-curses \
     pkg-config \
     protobuf-compiler \
@@ -80,8 +80,8 @@ RUN apt-get -q install --no-install-recommends -y software-properties-common
 RUN add-apt-repository -y ppa:webupd8team/java
 RUN apt-get -q update
 
-# Install OpenJDK 7
-RUN apt-get -q install --no-install-recommends -y openjdk-7-jdk
+# Install OpenJDK 8
+RUN apt-get -q install --no-install-recommends -y openjdk-8-jdk
 
 ######
 # Install findbugs
