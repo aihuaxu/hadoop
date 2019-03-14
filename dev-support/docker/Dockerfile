@@ -52,7 +52,6 @@ RUN apt-get -q update && apt-get -q install --no-install-recommends -y \
     libsnappy-dev \
     libssl-dev \
     libtool \
-    openjdk-8-jdk \
     pinentry-curses \
     pkg-config \
     protobuf-compiler \
