@@ -47,12 +47,14 @@ import javax.management.NotCompliantMBeanException;
 import javax.management.ObjectName;
 import javax.management.StandardMBean;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.DatanodeReportType;
 import org.apache.hadoop.hdfs.server.federation.resolver.ActiveNamenodeResolver;
 import org.apache.hadoop.hdfs.server.federation.resolver.FederationNamenodeContext;
 import org.apache.hadoop.hdfs.server.federation.resolver.FederationNamespaceInfo;
 import org.apache.hadoop.hdfs.server.federation.resolver.RemoteLocation;
+import org.apache.hadoop.hdfs.server.federation.router.FederationUtil;
 import org.apache.hadoop.hdfs.server.federation.router.Router;
 import org.apache.hadoop.hdfs.server.federation.router.RouterRpcServer;
 import org.apache.hadoop.hdfs.server.federation.router.security.RouterSecurityManager;
@@ -166,7 +168,8 @@ public class FederationMetrics implements FederationMBean {
           membershipStore.getNamenodeRegistrations(request);
 
       // Order the namenodes
-      final List<MembershipState> namenodes = response.getNamenodeMemberships();
+      final List<MembershipState> namenodes = filterMembership(
+          response.getNamenodeMemberships());
       if (namenodes == null || namenodes.size() == 0) {
         return JSON.toString(info);
       }
@@ -773,5 +776,24 @@ public class FederationMetrics implements FederationMBean {
       }
     }
     return null;
+  }
+
+  /**
+   * Filter out membership based on whether this router is read-only or not.
+   *
+   * @param states list of membershipstate from the statestore
+   * @return filtered list of membershipstate this router should care about
+   */
+  private List<MembershipState> filterMembership(List<MembershipState> states) {
+    List<MembershipState> filteredStates = new ArrayList<>();
+    Configuration conf = this.router.getConfig();
+    for (MembershipState state : states) {
+      if (FederationUtil.shouldMonitor(conf,
+          state.getNameserviceId(), state.getNamenodeId())) {
+        filteredStates.add(state);
+      }
+    }
+
+    return filteredStates;
   }
 }

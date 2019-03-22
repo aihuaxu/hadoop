@@ -1577,6 +1577,17 @@
 </property>
 
 <property>
+  <name>dfs.ha.observer.namenodes.EXAMPLENAMESERVICE</name>
+  <value></value>
+  <description>
+    The prefix for a given nameservice, contains a comma-separated
+    list of observer namenodes for a given nameservice (eg EXAMPLENAMESERVICE).
+    Note that all the observer namenodes must also appear in
+    dfs.ha.namenodes.EXAMPLENAMESERVICE.
+  </description>
+</property>
+
+<property>
   <name>dfs.ha.log-roll.period</name>
   <value>120s</value>
   <description>

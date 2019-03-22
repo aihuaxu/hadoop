@@ -30,6 +30,7 @@ import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMESERVICE_ID;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_HTTP_POLICY_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_HTTPS_ADDRESS_KEY;
 import static org.apache.hadoop.hdfs.server.federation.FederationTestUtils.NAMENODES;
+import static org.apache.hadoop.hdfs.server.federation.FederationTestUtils.OBSERVERS;
 import static org.apache.hadoop.hdfs.server.federation.FederationTestUtils.addDirectory;
 import static org.apache.hadoop.hdfs.server.federation.FederationTestUtils.waitNamenodeRegistered;
 import static org.apache.hadoop.hdfs.server.federation.router.RBFConfigKeys.DFS_ROUTER_ADMIN_ADDRESS_KEY;
@@ -56,9 +57,12 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.Random;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.conf.Configuration;
@@ -150,11 +154,18 @@ public class MiniRouterDFSCluster {
     private Configuration conf;
     private RouterClient adminClient;
     private URI fileSystemUri;
+    private boolean isObserverRouter;
 
     public RouterContext(Configuration conf, String nsId, String nnId) {
+      this(conf, nsId, nnId, false);
+    }
+
+    public RouterContext(Configuration conf, String nsId, String nnId,
+                         boolean isObserverRouter) {
       this.conf = conf;
       this.nameserviceId = nsId;
       this.namenodeId = nnId;
+      this.isObserverRouter = isObserverRouter;
 
       this.router = new Router();
       this.router.init(conf);
@@ -261,13 +272,21 @@ public class MiniRouterDFSCluster {
     private URI fileSystemUri;
     private int index;
     private DFSClient client;
+    private boolean isObserver;
 
     public NamenodeContext(
         Configuration conf, String nsId, String nnId, int index) {
+      this(conf, nsId, nnId, index, false);
+    }
+
+    public NamenodeContext(
+        Configuration conf, String nsId, String nnId, int index,
+        boolean isObserver) {
       this.conf = conf;
       this.nameserviceId = nsId;
       this.namenodeId = nnId;
       this.index = index;
+      this.isObserver = isObserver;
     }
 
     public NameNode getNamenode() {
@@ -284,6 +303,14 @@ public class MiniRouterDFSCluster {
 
     public FileContext getFileContext() {
       return this.fileContext;
+    }
+
+    public boolean isObserver() {
+      return this.isObserver;
+    }
+
+    public void setObserver(boolean isObserver) {
+      this.isObserver = isObserver;
     }
 
     public void setNamenode(NameNode nn) throws URISyntaxException {
@@ -375,19 +402,35 @@ public class MiniRouterDFSCluster {
   }
 
   public MiniRouterDFSCluster(
-      boolean ha, int numNameservices, int numNamenodes,
+      boolean ha, int numNameservices, int numNamenodes, int numObservers,
       long heartbeatInterval, long cacheFlushInterval,
       Configuration overrideConf) {
     this.highAvailability = ha;
     this.heartbeatInterval = heartbeatInterval;
     this.cacheFlushInterval = cacheFlushInterval;
-    configureNameservices(numNameservices, numNamenodes, overrideConf);
+    configureNameservices(numNameservices, numNamenodes, numObservers,
+        overrideConf);
+  }
+
+  public MiniRouterDFSCluster(
+      boolean ha, int numNameservices, int numNamenodes,
+      long heartbeatInterval, long cacheFlushInterval,
+      Configuration overrideConf) {
+    this(ha, numNameservices, numNamenodes, 0,
+        heartbeatInterval, cacheFlushInterval, overrideConf);
   }
 
   public MiniRouterDFSCluster(
       boolean ha, int numNameservices, int numNamenodes,
       long heartbeatInterval, long cacheFlushInterval) {
     this(ha, numNameservices, numNamenodes,
+        heartbeatInterval, cacheFlushInterval, null);
+  }
+
+  public MiniRouterDFSCluster(
+      boolean ha, int numNameservices, int numNamenodes, int numObservers,
+      long heartbeatInterval, long cacheFlushInterval) {
+    this(ha, numNameservices, numNamenodes, numObservers,
         heartbeatInterval, cacheFlushInterval, null);
   }
 
@@ -563,7 +606,7 @@ public class MiniRouterDFSCluster {
   }
 
   public void configureNameservices(int numNameservices, int numNamenodes,
-      Configuration overrideConf) {
+      int numObservers, Configuration overrideConf) {
     this.nameservices = new ArrayList<>();
     this.namenodes = new ArrayList<>();
 
@@ -582,8 +625,14 @@ public class MiniRouterDFSCluster {
         context = new NamenodeContext(nnConf, ns, null, nnIndex++);
         this.namenodes.add(context);
       } else {
-        for (int j=0; j<numNamenodes; j++) {
+        // 4 namenodes at most
+        for (int j=0; j<Math.min(numNamenodes, NAMENODES.length); j++) {
           context = new NamenodeContext(nnConf, ns, NAMENODES[j], nnIndex++);
+          this.namenodes.add(context);
+        }
+        // 2 observers at most
+        for (int j=0; j<Math.min(numObservers, OBSERVERS.length); j++) {
+          context = new NamenodeContext(nnConf, ns, OBSERVERS[j], nnIndex++, true);
           this.namenodes.add(context);
         }
       }
@@ -739,14 +788,14 @@ public class MiniRouterDFSCluster {
     }
   }
 
-  public void startRouters()
+  public void startRouters(boolean isObserverRouter)
       throws InterruptedException, URISyntaxException, IOException {
-
     // Create one router per nameservice
     this.routers = new ArrayList<>();
     for (String ns : this.nameservices) {
       for (NamenodeContext context : getNamenodes(ns)) {
         RouterContext router = buildRouter(ns, context.namenodeId);
+        router.isObserverRouter = isObserverRouter;
         this.routers.add(router);
       }
     }
@@ -761,6 +810,11 @@ public class MiniRouterDFSCluster {
       waitActive(router);
       router.initRouter();
     }
+  }
+
+  public void startRouters()
+      throws InterruptedException, URISyntaxException, IOException {
+    startRouters(false);
   }
 
   public void waitActive(NamenodeContext nn) throws IOException {
@@ -810,14 +864,40 @@ public class MiniRouterDFSCluster {
   }
 
   public void waitNamenodeRegistration() throws Exception {
-    for (RouterContext r : this.routers) {
-      Router router = r.router;
-      for (NamenodeContext nn : this.namenodes) {
-        ActiveNamenodeResolver nnResolver = router.getNamenodeResolver();
-        waitNamenodeRegistered(
-            nnResolver, nn.nameserviceId, nn.namenodeId, null);
+    // Since the downstream cluster may be diverse in terms of
+    // whether there is observer, the logic becomes complex and
+    // to decide whether this namenode should be monitored, whether
+    // a cluster has observer should be considered.
+    Set<String> clusterWithObservers = new HashSet<>();
+    for (NamenodeContext nn : this.namenodes) {
+      if (nn.isObserver) {
+        clusterWithObservers.add(nn.nameserviceId);
       }
     }
+    for (RouterContext r : this.routers) {
+      Router router = r.router;
+      ActiveNamenodeResolver nnResolver = router.getNamenodeResolver();
+      for (NamenodeContext nn : this.namenodes) {
+        // only checks the corresponding nns this router should care about
+        if (shouldMonitor(r, nn, clusterWithObservers)) {
+          waitNamenodeRegistered(
+              nnResolver, nn.nameserviceId, nn.namenodeId, null);
+        }
+      }
+    }
+  }
+
+  private boolean shouldMonitor(RouterContext r,
+      NamenodeContext nn, Set<String> clusterWithObservers) {
+    // non observer router only monitors active/standy namenodes
+    if (!r.isObserverRouter) {
+      return !nn.isObserver;
+    }
+    // check whether this namenode belongs to the ns without observer
+    if (clusterWithObservers.contains(nn.nameserviceId)) {
+      return nn.isObserver;
+    }
+    return !nn.isObserver;
   }
 
   public void waitRouterRegistrationQuorum(RouterContext router,
@@ -1073,5 +1153,28 @@ public class MiniRouterDFSCluster {
     } catch (Exception e) {
       throw new IOException("Cannot wait for the namenodes", e);
     }
+  }
+
+  /////////////////////////////////////////////////////////////////////////////
+  // TestRouterNamenodeMonitoring Test Fixtures
+  /////////////////////////////////////////////////////////////////////////////
+
+  /**
+   * Remove some observer from namenode list for certain nameservice
+   * @param ns
+   * @param nn
+   * @return whether the removal is successful
+   */
+  public boolean removeNamenode(String ns, String nn) {
+    Iterator<NamenodeContext> iter = namenodes.iterator();
+    while (iter.hasNext()) {
+      NamenodeContext namenode = iter.next();
+      if (namenode.getNameserviceId().equals(ns)
+          && namenode.getNamenodeId().equals(nn)) {
+        iter.remove();
+        return true;
+      }
+    }
+    return false;
   }
 }

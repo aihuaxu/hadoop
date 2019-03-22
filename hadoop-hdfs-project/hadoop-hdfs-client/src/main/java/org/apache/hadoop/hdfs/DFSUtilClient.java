@@ -73,6 +73,7 @@ import java.net.URI;
 import java.nio.channels.SocketChannel;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
@@ -87,11 +88,11 @@ import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.Arrays;
 
 import static org.apache.hadoop.hdfs.client.HdfsClientConfigKeys.DFS_DATA_TRANSFER_CLIENT_TCPNODELAY_DEFAULT;
 import static org.apache.hadoop.hdfs.client.HdfsClientConfigKeys.DFS_DATA_TRANSFER_CLIENT_TCPNODELAY_KEY;
 import static org.apache.hadoop.hdfs.client.HdfsClientConfigKeys.DFS_HA_NAMENODES_KEY_PREFIX;
+import static org.apache.hadoop.hdfs.client.HdfsClientConfigKeys.DFS_HA_OBSERVER_NAMENODES_KEY_PREFIX;
 import static org.apache.hadoop.hdfs.client.HdfsClientConfigKeys.DFS_NAMESERVICES;
 
 @InterfaceAudience.Private
@@ -208,6 +209,21 @@ public class DFSUtilClient {
    */
   public static Collection<String> getNameNodeIds(Configuration conf, String nsId) {
     String key = addSuffix(DFS_HA_NAMENODES_KEY_PREFIX, nsId);
+    return conf.getTrimmedStringCollection(key);
+  }
+
+  /**
+   * Namenode Observer related configuration.
+   * Returns collection of observer namenode Ids from the configuration.
+   * One logical id for each observer in the HA setup.
+   *
+   * @param conf configuration
+   * @param nsId the nameservice ID to look at, or null for non-federated
+   * @return collection of observer namenode Ids
+   */
+  public static Collection<String> getObserverNameNodeIds(
+      Configuration conf, String nsId) {
+    String key = addSuffix(DFS_HA_OBSERVER_NAMENODES_KEY_PREFIX, nsId);
     return conf.getTrimmedStringCollection(key);
   }
 

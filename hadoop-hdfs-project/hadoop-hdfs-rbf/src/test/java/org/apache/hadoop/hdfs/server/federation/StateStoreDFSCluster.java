@@ -52,14 +52,17 @@ public class StateStoreDFSCluster extends MiniRouterDFSCluster {
   public StateStoreDFSCluster(boolean ha, int numNameservices, int numNamenodes,
       long heartbeatInterval, long cacheFlushInterval)
           throws IOException, InterruptedException {
-    this(ha, numNameservices, numNamenodes, heartbeatInterval,
+    this(ha, numNameservices, numNamenodes, 0, heartbeatInterval,
         cacheFlushInterval, DEFAULT_FILE_RESOLVER);
   }
 
-  public StateStoreDFSCluster(boolean ha, int numNameservices, int numNamenodes,
-      long heartbeatInterval, long cacheFlushInterval, Class<?> fileResolver)
+  public StateStoreDFSCluster(boolean ha,
+                              int numNameservices,
+                              int numNamenodes, int numObservers,
+                              long heartbeatInterval, long cacheFlushInterval,
+                              Class<?> fileResolver)
           throws IOException, InterruptedException {
-    super(ha, numNameservices, numNamenodes, heartbeatInterval,
+    super(ha, numNameservices, numNamenodes, numObservers, heartbeatInterval,
         cacheFlushInterval);
 
     // Attach state store and resolvers to router
@@ -76,7 +79,7 @@ public class StateStoreDFSCluster extends MiniRouterDFSCluster {
 
   public StateStoreDFSCluster(boolean ha, int numNameservices,
       Class<?> fileResolver) throws IOException, InterruptedException {
-    this(ha, numNameservices, 2,
+    this(ha, numNameservices, 2, 0,
         DEFAULT_HEARTBEAT_INTERVAL_MS, DEFAULT_CACHE_INTERVAL_MS, fileResolver);
   }
 
@@ -90,6 +93,14 @@ public class StateStoreDFSCluster extends MiniRouterDFSCluster {
       int numNamnodes) throws IOException, InterruptedException {
     this(ha, numNameservices, numNamnodes,
         DEFAULT_HEARTBEAT_INTERVAL_MS, DEFAULT_CACHE_INTERVAL_MS);
+  }
+
+  public StateStoreDFSCluster(boolean ha, int numNameservices,
+                              int numNamnodes, int numObservers)
+      throws IOException, InterruptedException {
+    this(ha, numNameservices, numNamnodes, numObservers,
+        DEFAULT_HEARTBEAT_INTERVAL_MS, DEFAULT_CACHE_INTERVAL_MS,
+        DEFAULT_FILE_RESOLVER);
   }
 
   /////////////////////////////////////////////////////////////////////////////

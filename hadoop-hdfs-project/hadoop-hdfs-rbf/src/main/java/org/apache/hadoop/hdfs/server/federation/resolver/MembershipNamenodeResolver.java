@@ -32,6 +32,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdfs.server.federation.router.FederationUtil;
 import org.apache.hadoop.hdfs.server.federation.store.MembershipStore;
 import org.apache.hadoop.hdfs.server.federation.store.StateStoreCache;
 import org.apache.hadoop.hdfs.server.federation.store.StateStoreService;
@@ -72,6 +73,9 @@ public class MembershipNamenodeResolver
   /** Cached lookup of NN for block pool. Invalidated on cache refresh. */
   private Map<String, List<? extends FederationNamenodeContext>> cacheBP;
 
+  /** Configuration */
+  private Configuration conf;
+
 
   public MembershipNamenodeResolver(
       Configuration conf, StateStoreService store) throws IOException {
@@ -84,6 +88,8 @@ public class MembershipNamenodeResolver
       // Request cache updates from the state store
       this.stateStore.registerCacheExternal(this);
     }
+
+    this.conf = conf;
   }
 
   private synchronized MembershipStore getMembershipStore() throws IOException {
@@ -180,7 +186,6 @@ public class MembershipNamenodeResolver
   @Override
   public List<? extends FederationNamenodeContext> getNamenodesForBlockPoolId(
       final String bpId) throws IOException {
-
     List<? extends FederationNamenodeContext> ret = cacheBP.get(bpId);
     if (ret == null) {
       try {
@@ -289,7 +294,8 @@ public class MembershipNamenodeResolver
     GetNamenodeRegistrationsResponse response =
         membershipStore.getNamenodeRegistrations(request);
 
-    List<MembershipState> memberships = response.getNamenodeMemberships();
+    final List<MembershipState> storedMemberships = response.getNamenodeMemberships();
+    List<MembershipState> memberships = getFilteredMemberships(storedMemberships);
     if (!addExpired || !addUnavailable) {
       Iterator<MembershipState> iterator = memberships.iterator();
       while (iterator.hasNext()) {
@@ -313,5 +319,23 @@ public class MembershipNamenodeResolver
   @Override
   public void setRouterId(String router) {
     this.routerId = router;
+  }
+
+  /**
+   * Filter out membership based on whether this router is read-only or not.
+   *
+   * @param states list of membershipstate from the statestore
+   * @return filtered list of membershipstate this router should care about
+   */
+  private List<MembershipState> getFilteredMemberships(List<MembershipState> states) {
+    List<MembershipState> filteredStates = new ArrayList<>();
+    for (MembershipState state : states) {
+      if (FederationUtil.shouldMonitor(this.conf,
+          state.getNameserviceId(), state.getNamenodeId())) {
+        filteredStates.add(state);
+      }
+    }
+
+    return filteredStates;
   }
 }

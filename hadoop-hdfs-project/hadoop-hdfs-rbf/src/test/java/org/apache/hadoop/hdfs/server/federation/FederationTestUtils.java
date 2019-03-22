@@ -62,6 +62,7 @@ public final class FederationTestUtils {
 
   public final static String[] NAMESERVICES = {"ns0", "ns1"};
   public final static String[] NAMENODES = {"nn0", "nn1", "nn2", "nn3"};
+  public final static String[] OBSERVERS = {"onn0", "onn1"};
   public final static String[] ROUTERS =
       {"router0", "router1", "router2", "router3"};
 

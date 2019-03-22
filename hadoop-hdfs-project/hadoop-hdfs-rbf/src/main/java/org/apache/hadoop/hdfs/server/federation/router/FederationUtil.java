@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.hdfs.server.federation.router;
 
+import static org.apache.hadoop.hdfs.server.federation.router.RBFConfigKeys.DFS_ROUTER_STARTUP_KEY;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -24,9 +26,12 @@ import java.io.InputStreamReader;
 import java.lang.reflect.Constructor;
 import java.net.URL;
 import java.net.URLConnection;
+import java.util.Collection;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hdfs.DFSUtilClient;
+import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
 import org.apache.hadoop.hdfs.server.federation.resolver.ActiveNamenodeResolver;
 import org.apache.hadoop.hdfs.server.federation.resolver.FileSubclusterResolver;
 import org.apache.hadoop.hdfs.server.federation.store.StateStoreService;
@@ -231,5 +236,81 @@ public final class FederationUtil {
 
     return path.charAt(parent.length()) == Path.SEPARATOR_CHAR
         || parent.equals(Path.SEPARATOR);
+  }
+
+  /**
+   * Determine whether a nn should be monitored by this router.
+   *
+   * @param conf Configuration
+   * @param nsId nameservice id
+   * @param nnId namenode id
+   * @return whether to monitor
+   */
+  public static boolean shouldMonitor(Configuration conf,
+                                      String nsId, String nnId) {
+    if (nsId == null) {
+      return false;
+    }
+    boolean isObserverRouter = isObserverRouter(conf);
+    if (nnId == null) {
+      // non-HA state there should be no observer, normal router should monitor
+      // observer router should not
+      return !isObserverRouter;
+    }
+    boolean isObserver = isObserver(conf, nsId, nnId);
+    // it is possible that the downstream ns doesn't have observers
+    // in this case an observer should be able to monitor the active
+    // and standby namenodes. This is to avoid the exception of no
+    // registered namenode for certain nameservice
+    if (isObserverRouter) {
+      // check whether there is observers
+      boolean hasObserver = DFSUtilClient
+          .getObserverNameNodeIds(conf, nsId).size() > 0;
+      return hasObserver ? isObserver : !isObserver;
+    }
+    return !isObserver;
+  }
+
+  /**
+   * Check whether the nnid is an observer in the nsid nameservice.
+   *
+   * @param nsId nameservice id
+   * @param nnId namenode id
+   * @return whether a namenode is observer
+   */
+  protected static boolean isObserver(Configuration conf,
+                                      String nsId, String nnId) {
+    Collection<String> observerIds =
+        DFSUtilClient.getObserverNameNodeIds(conf, nsId);
+    for (String oid : observerIds) {
+      if (oid.equals(nnId)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * Get startup options of router.
+   *
+   * @return startupoption
+   */
+  public static HdfsServerConstants.StartupOption getStartupOption(Configuration conf) {
+    return HdfsServerConstants.StartupOption.valueOf(conf.get(DFS_ROUTER_STARTUP_KEY,
+        HdfsServerConstants.StartupOption.REGULAR.toString()));
+  }
+
+  /**
+   * Decide whether this router is read-only
+   * @param conf Configuration
+   * @return whether this router is read-only
+   */
+  public static boolean isObserverRouter(Configuration conf) {
+    // Check the start up option to decide what namenodes
+    // the router should monitor
+    HdfsServerConstants.StartupOption option =
+        FederationUtil.getStartupOption(conf);
+    return option.equals(HdfsServerConstants.StartupOption.OBSERVER);
   }
 }

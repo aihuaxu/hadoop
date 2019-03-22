@@ -75,6 +75,9 @@ public class RBFConfigKeys extends CommonConfigurationKeysPublic {
       DFS_ROUTER_METRICS_CLASS_DEFAULT =
       FederationRPCPerformanceMonitor.class;
 
+  public static final String DFS_ROUTER_STARTUP_KEY =
+      FEDERATION_ROUTER_PREFIX + "startup";
+
   // HDFS Router heartbeat
   public static final String DFS_ROUTER_HEARTBEAT_ENABLE =
       FEDERATION_ROUTER_PREFIX + "heartbeat.enable";
