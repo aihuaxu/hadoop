@@ -92,6 +92,8 @@ public class TestEditLogRace {
     TestEditLogRace.useAsyncEditLog = useAsyncEditLog;
   }
 
+  private static final String NAME_DIR = MiniDFSCluster.getBaseDirectory() + "name-0-1";
+
   private static final Log LOG = LogFactory.getLog(TestEditLogRace.class);
 
   // This test creates NUM_THREADS threads and each thread continuously writes
