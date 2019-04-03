@@ -17,10 +17,10 @@
  */
 package org.apache.hadoop.hdfs.client;
 
+import java.util.concurrent.TimeUnit;
+
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
-
-import java.util.concurrent.TimeUnit;
 
 /** Client configuration properties */
 @InterfaceAudience.Private
@@ -291,6 +291,11 @@ public interface HdfsClientConfigKeys {
     int     CONNECTION_RETRIES_ON_SOCKET_TIMEOUTS_DEFAULT = 0;
     String  RANDOM_ORDER = PREFIX + "random.order";
     boolean RANDOM_ORDER_DEFAULT = false;
+    String  RESOLVE_ADDRESS_NEEDED_KEY = PREFIX + "resolve-needed";
+    boolean RESOLVE_ADDRESS_NEEDED_DEFAULT = false;
+    String RESOLVE_SERVICE_KEY = PREFIX + "resolver.impl";
+    String  RESOLVE_ADDRESS_TO_FQDN = PREFIX + "resolver.useFQDN";
+    boolean RESOLVE_ADDRESS_TO_FQDN_DEFAULT = true;
   }
 
   /** dfs.client.write configuration properties */

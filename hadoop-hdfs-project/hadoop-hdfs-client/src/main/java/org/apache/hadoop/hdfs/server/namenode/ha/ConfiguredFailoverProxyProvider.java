@@ -33,6 +33,8 @@ import org.apache.hadoop.hdfs.DFSUtilClient;
 import org.apache.hadoop.hdfs.HAUtilClient;
 import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
 import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.net.DomainNameResolver;
+import org.apache.hadoop.net.DomainNameResolverFactory;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -90,13 +92,16 @@ public class ConfiguredFailoverProxyProvider<T> extends
       }
 
       Collection<InetSocketAddress> addressesOfNns = addressesInNN.values();
+      try {
+        addressesOfNns = getResolvedHostsIfNecessary(addressesOfNns, uri);
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
       for (InetSocketAddress address : addressesOfNns) {
         proxies.add(new AddressRpcProxyPair<T>(address));
       }
       // Randomize the list to prevent all clients pointing to the same one
-      boolean randomized = conf.getBoolean(
-          HdfsClientConfigKeys.Failover.RANDOM_ORDER,
-          HdfsClientConfigKeys.Failover.RANDOM_ORDER_DEFAULT);
+      boolean randomized = getRandomOrder(conf, uri);
       if (randomized) {
         Collections.shuffle(proxies);
       }
@@ -109,6 +114,81 @@ public class ConfiguredFailoverProxyProvider<T> extends
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
+  }
+
+  /**
+   * If resolved is needed: for every domain name in the parameter list,
+   * resolve them into the actual IP addresses.
+   *
+   * @param addressesOfNns The domain name list from config.
+   * @param nameNodeUri The URI of namenode/nameservice.
+   * @return The collection of resolved IP addresses.
+   * @throws IOException If there are issues resolving the addresses.
+   */
+  Collection<InetSocketAddress> getResolvedHostsIfNecessary(
+      Collection<InetSocketAddress> addressesOfNns, URI nameNodeUri)
+      throws IOException {
+    // 'host' here is usually the ID of the nameservice when address
+    // resolving is needed.
+    String host = nameNodeUri.getHost();
+    String configKeyWithHost =
+        HdfsClientConfigKeys.Failover.RESOLVE_ADDRESS_NEEDED_KEY  + "." + host;
+    boolean resolveNeeded = conf.getBoolean(configKeyWithHost,
+        HdfsClientConfigKeys.Failover.RESOLVE_ADDRESS_NEEDED_DEFAULT);
+    if (!resolveNeeded) {
+      // Early return is no resolve is necessary
+      return addressesOfNns;
+    }
+    // decide whether to access server by IP or by host name
+    String useFQDNKeyWithHost =
+        HdfsClientConfigKeys.Failover.RESOLVE_ADDRESS_TO_FQDN + "." + host;
+    boolean requireFQDN = conf.getBoolean(useFQDNKeyWithHost,
+        HdfsClientConfigKeys.Failover.RESOLVE_ADDRESS_TO_FQDN_DEFAULT);
+
+    Collection<InetSocketAddress> addressOfResolvedNns = new ArrayList<>();
+    DomainNameResolver dnr = DomainNameResolverFactory.newInstance(
+        conf, nameNodeUri, HdfsClientConfigKeys.Failover.RESOLVE_SERVICE_KEY);
+    // If the address needs to be resolved, get all of the IP addresses
+    // from this address and pass them into the proxy
+    LOG.info("Namenode domain name will be resolved with {}",
+        dnr.getClass().getName());
+    for (InetSocketAddress address : addressesOfNns) {
+      String[] resolvedHostNames = dnr.getAllResolvedHostnameByDomainName(
+          address.getHostName(), requireFQDN);
+      int port = address.getPort();
+      for (String hostname : resolvedHostNames) {
+        InetSocketAddress resolvedAddress = new InetSocketAddress(
+            hostname, port);
+        addressOfResolvedNns.add(resolvedAddress);
+      }
+    }
+
+    return addressOfResolvedNns;
+  }
+
+  /**
+   * Check whether random order is configured for failover proxy provider
+   * for the namenode/nameservice.
+   *
+   * @param conf Configuration
+   * @param nameNodeUri The URI of namenode/nameservice
+   * @return random order configuration
+   */
+  private static boolean getRandomOrder(
+      Configuration conf, URI nameNodeUri) {
+    String host = nameNodeUri.getHost();
+    String configKeyWithHost = HdfsClientConfigKeys.Failover.RANDOM_ORDER
+        + "." + host;
+
+    if (conf.get(configKeyWithHost) != null) {
+      return conf.getBoolean(
+          configKeyWithHost,
+          HdfsClientConfigKeys.Failover.RANDOM_ORDER_DEFAULT);
+    }
+
+    return conf.getBoolean(
+        HdfsClientConfigKeys.Failover.RANDOM_ORDER,
+        HdfsClientConfigKeys.Failover.RANDOM_ORDER_DEFAULT);
   }
 
   @Override
