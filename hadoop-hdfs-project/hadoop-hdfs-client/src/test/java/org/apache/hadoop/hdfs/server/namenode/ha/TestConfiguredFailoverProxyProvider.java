@@ -17,25 +17,13 @@
  */
 package org.apache.hadoop.hdfs.server.namenode.ha;
 
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
-import org.apache.hadoop.hdfs.protocol.ClientProtocol;
-import org.apache.hadoop.net.MockDomainNameResolver;
-import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.test.GenericTestUtils;
-import org.apache.hadoop.util.StringUtils;
-import org.apache.hadoop.util.Time;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.ExpectedException;
-import org.mockito.invocation.InvocationOnMock;
-import org.mockito.stubbing.Answer;
-import org.apache.log4j.Level;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.io.IOException;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -44,11 +32,22 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
+import org.apache.hadoop.hdfs.protocol.ClientProtocol;
+import org.apache.hadoop.net.MockDomainNameResolver;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.hadoop.util.StringUtils;
+import org.apache.hadoop.util.Time;
+import org.apache.log4j.Level;
+import org.junit.Before;
+import org.junit.BeforeClass;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.ExpectedException;
+import org.mockito.invocation.InvocationOnMock;
+import org.mockito.stubbing.Answer;
 
 /**
  * Test {@link ConfiguredFailoverProxyProvider}.
@@ -143,7 +142,8 @@ public class TestConfiguredFailoverProxyProvider {
    * Add more DNS related settings to the passed in configuration.
    * @param config Configuration file to add settings to.
    */
-  private void addDNSSettings(Configuration config, boolean hostResolvable) {
+  private void addDNSSettings(Configuration config,
+                              boolean hostResolvable, boolean useFQDN) {
     config.set(
         HdfsClientConfigKeys.DFS_HA_NAMENODES_KEY_PREFIX + "." + ns3, "nn");
     String domain = hostResolvable
@@ -164,6 +164,10 @@ public class TestConfiguredFailoverProxyProvider {
     config.setBoolean(
         HdfsClientConfigKeys.Failover.RANDOM_ORDER + "." + ns3,
         true);
+    config.setBoolean(
+        HdfsClientConfigKeys.Failover.RESOLVE_ADDRESS_TO_FQDN + "." + ns3,
+        useFQDN
+    );
   }
 
   /**
@@ -251,17 +255,18 @@ public class TestConfiguredFailoverProxyProvider {
         nn1Count.get() + nn2Count.get() + nn3Count.get());
   }
 
-  @Test
-  public void testResolveDomainNameUsingDNS() throws Exception {
+  private void testResolveDomainNameUsingDNS(boolean useFQDN) throws Exception {
     Configuration dnsConf = new Configuration(conf);
-    addDNSSettings(dnsConf, true);
+    addDNSSettings(dnsConf, true, useFQDN);
 
     // Mock ClientProtocol
     Map<InetSocketAddress, ClientProtocol> proxyMap = new HashMap<>();
     final AtomicInteger nn1Count = addClientMock(
-        MockDomainNameResolver.BYTE_ADDR_1, proxyMap);
+        useFQDN ? MockDomainNameResolver.FQDN_1 : MockDomainNameResolver.ADDR_1,
+        proxyMap);
     final AtomicInteger nn2Count = addClientMock(
-        MockDomainNameResolver.BYTE_ADDR_2, proxyMap);
+        useFQDN ? MockDomainNameResolver.FQDN_2 : MockDomainNameResolver.ADDR_2,
+        proxyMap);
 
     // Get a client multiple times
     final Map<String, AtomicInteger> proxyResults = new HashMap<>();
@@ -281,16 +286,18 @@ public class TestConfiguredFailoverProxyProvider {
       proxy.getStats();
     }
 
+    String resolvedHost1 = useFQDN ?
+        MockDomainNameResolver.FQDN_1 : "/" + MockDomainNameResolver.ADDR_1;
+    String resolvedHost2 = useFQDN ?
+        MockDomainNameResolver.FQDN_2 : "/" + MockDomainNameResolver.ADDR_2;
     // Check we got the proper addresses
     assertEquals(2, proxyResults.size());
     assertTrue(
         "nn1 wasn't returned: " + proxyResults,
-        proxyResults.containsKey(
-            "/" + MockDomainNameResolver.ADDR_1 + ":8020"));
+        proxyResults.containsKey(resolvedHost1 + ":8020"));
     assertTrue(
         "nn2 wasn't returned: " + proxyResults,
-        proxyResults.containsKey(
-            "/" + MockDomainNameResolver.ADDR_2 + ":8020"));
+        proxyResults.containsKey(resolvedHost2 + ":8020"));
 
     // Check that the Namenodes were invoked
     assertEquals(NUM_ITERATIONS, nn1Count.get() + nn2Count.get());
@@ -306,9 +313,17 @@ public class TestConfiguredFailoverProxyProvider {
   }
 
   @Test
+  public void testResolveDomainNameUsingDNS() throws Exception {
+    // test resolving to IP
+    testResolveDomainNameUsingDNS(false);
+    // test resolving to FQDN
+    testResolveDomainNameUsingDNS(true);
+  }
+
+  @Test
   public void testResolveDomainNameUsingDNSUnknownHost() throws Exception {
     Configuration dnsConf = new Configuration(conf);
-    addDNSSettings(dnsConf, false);
+    addDNSSettings(dnsConf, false, false);
 
     Map<InetSocketAddress, ClientProtocol> proxyMap = new HashMap<>();
     exception.expect(RuntimeException.class);
@@ -322,19 +337,18 @@ public class TestConfiguredFailoverProxyProvider {
 
   /**
    * Add a ClientProtocol mock for the proxy.
-   * @param addr IP address for the destination.
+   * @param host host name for the destination.
    * @param proxyMap Map containing the client for each target address.
    * @return The counter for the number of calls to this target.
    * @throws Exception If the client cannot be created.
    */
   private AtomicInteger addClientMock(
-      byte[] addr, Map<InetSocketAddress, ClientProtocol> proxyMap)
-          throws Exception {
+      String host, Map<InetSocketAddress, ClientProtocol> proxyMap)
+      throws Exception {
 
     final AtomicInteger counter = new AtomicInteger(0);
-    InetAddress inetAddr = InetAddress.getByAddress(addr);
     InetSocketAddress inetSockerAddr =
-        new InetSocketAddress(inetAddr, rpcPort);
+        new InetSocketAddress(host, rpcPort);
 
     final ClientProtocol cpMock = mock(ClientProtocol.class);
     when(cpMock.getStats()).thenAnswer(createAnswer(counter, 1));
