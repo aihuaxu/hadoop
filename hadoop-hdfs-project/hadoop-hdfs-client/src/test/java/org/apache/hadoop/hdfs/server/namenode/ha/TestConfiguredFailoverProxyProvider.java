@@ -23,7 +23,6 @@ import org.apache.hadoop.hdfs.protocol.ClientProtocol;
 import org.apache.hadoop.net.MockDomainNameResolver;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.test.GenericTestUtils;
-import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Time;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -135,7 +134,7 @@ public class TestConfiguredFailoverProxyProvider {
     ns3Uri = new URI("hdfs://" + ns3);
 
     conf.set(HdfsClientConfigKeys.DFS_NAMESERVICES,
-        StringUtils.join(',', new String[]{ns1, ns2, ns3}));
+        String.join(",", ns1, ns2, ns3));
     conf.set("fs.defaultFS", "hdfs://" + ns1);
   }
 
