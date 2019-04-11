@@ -55,6 +55,7 @@ import org.apache.hadoop.hdfs.server.federation.resolver.FederationNamespaceInfo
 import org.apache.hadoop.hdfs.server.federation.resolver.RemoteLocation;
 import org.apache.hadoop.hdfs.server.federation.router.Router;
 import org.apache.hadoop.hdfs.server.federation.router.RouterRpcServer;
+import org.apache.hadoop.hdfs.server.federation.router.security.RouterSecurityManager;
 import org.apache.hadoop.hdfs.server.federation.store.MembershipStore;
 import org.apache.hadoop.hdfs.server.federation.store.MountTableStore;
 import org.apache.hadoop.hdfs.server.federation.store.RouterStore;
@@ -569,6 +570,16 @@ public class FederationMetrics implements FederationMBean {
   @Override
   public String getRouterStatus() {
     return "RUNNING";
+  }
+
+  @Override
+  public int getCurrentTokensCount() {
+    RouterSecurityManager mgr =
+        this.router.getRpcServer().getRouterSecurityManager();
+    if (mgr != null && mgr.getSecretManager() != null) {
+      return mgr.getSecretManager().getCurrentTokensCount();
+    }
+    return -1;
   }
 
   /**

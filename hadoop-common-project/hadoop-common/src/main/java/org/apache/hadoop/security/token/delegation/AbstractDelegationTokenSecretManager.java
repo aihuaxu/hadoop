@@ -715,4 +715,12 @@ extends AbstractDelegationTokenIdentifier>
     return token.decodeIdentifier();
   }
 
+  /**
+   * Return the total number of current valid tokens.
+   *
+   * @return the total number of valid tokens
+   */
+  public int getCurrentTokensCount() {
+    return currentTokens.size();
+  }
 }

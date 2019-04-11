@@ -18,6 +18,13 @@
 
 package org.apache.hadoop.hdfs.server.federation.security;
 
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+
+import java.io.IOException;
+import java.util.Map;
+
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
 import org.apache.hadoop.hdfs.server.federation.router.security.RouterSecurityManager;
 import org.apache.hadoop.io.Text;
@@ -27,17 +34,11 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.delegation.AbstractDelegationTokenSecretManager;
 import org.apache.hadoop.security.token.delegation.DelegationKey;
 import org.apache.hadoop.security.token.delegation.TestDelegationToken;
-import org.junit.rules.ExpectedException;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.assertNotNull;
-
-import java.io.IOException;
-import java.util.Map;
-
+import org.junit.rules.ExpectedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -95,7 +96,7 @@ public class TestRouterSecurityManager {
     securityManager.renewDelegationToken(token);
   }
 
-  static class TestDelegationTokenSecretManager
+  public static class TestDelegationTokenSecretManager
           extends AbstractDelegationTokenSecretManager<DelegationTokenIdentifier> {
 
     public boolean isStoreNewMasterKeyCalled = false;
@@ -110,6 +111,15 @@ public class TestRouterSecurityManager {
             long delegationTokenRemoverScanInterval) {
       super(delegationKeyUpdateInterval, delegationTokenMaxLifetime,
               delegationTokenRenewInterval, delegationTokenRemoverScanInterval);
+    }
+
+    public TestDelegationTokenSecretManager(Configuration conf) {
+      this(10000, 10000, 10000, 10000);
+      try {
+        super.startThreads();
+      } catch (IOException e) {
+        LOG.error("Error starting threads for zkDelegationTokens ");
+      }
     }
 
     @Override
