@@ -26,6 +26,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.metrics2.lib.MutableRatesWithAggregation;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Timer;
@@ -40,6 +41,7 @@ import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_READ_LOCK_REPORT
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_READ_LOCK_REPORTING_THRESHOLD_MS_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_WRITE_LOCK_REPORTING_THRESHOLD_MS_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_WRITE_LOCK_REPORTING_THRESHOLD_MS_KEY;
+import static org.apache.hadoop.ipc.ProcessingDetails.Timing;
 
 /**
  * Mimics a ReentrantReadWriteLock but does not directly implement the interface
@@ -145,10 +147,7 @@ class FSNamesystemLock {
   }
 
   public void readLock() {
-    coarseLock.readLock().lock();
-    if (coarseLock.getReadHoldCount() == 1) {
-      readLockHeldTimeStampNanos.set(timer.monotonicNowNanos());
-    }
+    doLock(false);
   }
 
   public void readUnlock() {
@@ -202,17 +201,11 @@ class FSNamesystemLock {
   }
   
   public void writeLock() {
-    coarseLock.writeLock().lock();
-    if (coarseLock.getWriteHoldCount() == 1) {
-      writeLockHeldTimeStampNanos = timer.monotonicNowNanos();
-    }
+    doLock(true);
   }
 
   public void writeLockInterruptibly() throws InterruptedException {
-    coarseLock.writeLock().lockInterruptibly();
-    if (coarseLock.getWriteHoldCount() == 1) {
-      writeLockHeldTimeStampNanos = timer.monotonicNowNanos();
-    }
+    doLockInterruptibly(true);
   }
 
   public void writeUnlock() {
@@ -307,6 +300,50 @@ class FSNamesystemLock {
 
       String overallMetric = getMetricName(OVERALL_METRIC_NAME, isWrite);
       detailedHoldTimeMetrics.add(overallMetric, value);
+    }
+    updateProcessingDetails(
+        isWrite ? Timing.LOCKEXCLUSIVE : Timing.LOCKSHARED, value);
+  }
+
+  private void doLock(boolean isWrite) {
+    long startNanos = timer.monotonicNowNanos();
+    if (isWrite) {
+      coarseLock.writeLock().lock();
+    } else {
+      coarseLock.readLock().lock();
+    }
+    updateLockWait(startNanos, isWrite);
+  }
+
+  private void doLockInterruptibly(boolean isWrite)
+      throws InterruptedException {
+    long startNanos = timer.monotonicNowNanos();
+    if (isWrite) {
+      coarseLock.writeLock().lockInterruptibly();
+    } else {
+      coarseLock.readLock().lockInterruptibly();
+    }
+    updateLockWait(startNanos, isWrite);
+  }
+
+  private void updateLockWait(long startNanos, boolean isWrite) {
+    long now = timer.monotonicNowNanos();
+    updateProcessingDetails(Timing.LOCKWAIT, now - startNanos);
+    if (isWrite) {
+      if (coarseLock.getWriteHoldCount() == 1) {
+        writeLockHeldTimeStampNanos = now;
+      }
+    } else {
+      if (coarseLock.getReadHoldCount() == 1) {
+        readLockHeldTimeStampNanos.set(now);
+      }
+    }
+  }
+
+  private static void updateProcessingDetails(Timing type, long deltaNanos) {
+    Server.Call call = Server.getCurCall().get();
+    if (call != null) {
+      call.getProcessingDetails().add(type, deltaNanos, TimeUnit.NANOSECONDS);
     }
   }
 
