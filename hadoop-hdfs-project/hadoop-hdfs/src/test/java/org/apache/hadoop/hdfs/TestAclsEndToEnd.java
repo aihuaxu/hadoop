@@ -48,6 +48,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 
 /**
@@ -63,6 +64,7 @@ import org.junit.Test;
  * interpreted by KMS as a blank value. (The KMS strips whitespace from ACL
  * values before interpreting them.)
  */
+@Ignore
 public class TestAclsEndToEnd {
   private static final Log LOG =
       LogFactory.getLog(TestAclsEndToEnd.class.getName());

@@ -23,6 +23,7 @@ import static org.hamcrest.core.Is.is;
 import static org.hamcrest.core.IsNot.not;
 
 import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import org.apache.hadoop.fs.FileUtil;
@@ -156,6 +157,7 @@ public class TestNameNodeRespectsBindHostKeys {
     }
   }
 
+  @Ignore
   @Test (timeout=300000)
   public void testLifelineRpcBindHostKey() throws IOException {
     Configuration conf = new HdfsConfiguration();

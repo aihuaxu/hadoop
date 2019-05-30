@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdfs.server.balancer;
 
+import org.junit.Ignore;
 import org.junit.Test;
 
 /**
@@ -25,6 +26,7 @@ import org.junit.Test;
  */
 public class TestBalancerRPCDelay {
 
+  @Ignore
   @Test(timeout=100000)
   public void testBalancerRPCDelay() throws Exception {
     new TestBalancer().testBalancerRPCDelay();

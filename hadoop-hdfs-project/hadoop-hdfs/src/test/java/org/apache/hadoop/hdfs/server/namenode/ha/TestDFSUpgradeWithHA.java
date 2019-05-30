@@ -50,6 +50,7 @@ import org.apache.hadoop.hdfs.util.BestEffortLongFile;
 import org.apache.hadoop.hdfs.util.PersistentLongFile;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import com.google.common.base.Joiner;
@@ -230,6 +231,7 @@ public class TestDFSUpgradeWithHA {
    * Make sure that an HA NN with NFS-based HA can successfully start and
    * upgrade.
    */
+  @Ignore
   @Test
   public void testNfsUpgrade() throws IOException, URISyntaxException {
     MiniDFSCluster cluster = null;

@@ -36,6 +36,7 @@ import org.apache.hadoop.util.ToolRunner;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.File;
@@ -111,6 +112,7 @@ public class TestNestedEncryptionZones {
     DFSTestUtil.createKey(NESTED_EZ_KEY, cluster, conf);
   }
 
+  @Ignore
   @Test(timeout = 60000)
   public void testNestedEncryptionZones() throws Exception {
     initTopEZDirAndNestedEZDir(new Path(rootDir, "topEZ"));

@@ -19,6 +19,8 @@ package org.apache.hadoop.contrib.bkjournal;
 
 import static org.junit.Assert.*;
 import static org.mockito.Mockito.spy;
+
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.Before;
 import org.junit.After;
@@ -59,6 +61,7 @@ import org.apache.zookeeper.ZooDefs.Ids;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
+@Ignore
 public class TestBookKeeperJournalManager {
   static final Log LOG = LogFactory.getLog(TestBookKeeperJournalManager.class);
   

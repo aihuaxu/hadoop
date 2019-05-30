@@ -27,6 +27,7 @@ import org.apache.hadoop.net.unix.TemporarySocketDirectory;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.htrace.core.Tracer;
 import org.junit.Assert;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.ByteArrayOutputStream;
@@ -136,6 +137,7 @@ public class TestTraceAdmin extends SaslDataTransferTestCase {
    *
    * @throws Exception
    */
+  @Ignore
   @Test
   public void testKerberizedTraceAdmin() throws Exception {
     MiniDFSCluster cluster = null;

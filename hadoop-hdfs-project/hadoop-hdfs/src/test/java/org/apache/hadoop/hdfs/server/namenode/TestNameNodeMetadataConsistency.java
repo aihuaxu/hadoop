@@ -28,6 +28,7 @@ import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
 import org.hamcrest.CoreMatchers;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.mockito.Mockito;
 import org.mockito.internal.util.reflection.Whitebox;
@@ -72,6 +73,7 @@ public class TestNameNodeMetadataConsistency {
    * that name node has not seen yet. It then asserts that name node moves into
    * safe mode while it is in startup mode.
    */
+  @Ignore
   @Test
   public void testGenerationStampInFuture() throws
       IOException, InterruptedException {

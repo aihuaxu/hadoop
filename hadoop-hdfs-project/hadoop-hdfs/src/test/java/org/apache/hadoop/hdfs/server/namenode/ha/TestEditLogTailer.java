@@ -46,6 +46,7 @@ import org.apache.hadoop.hdfs.server.namenode.NameNodeAdapter;
 import org.apache.hadoop.net.ServerSocketUtil;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.log4j.Level;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -53,6 +54,7 @@ import org.junit.runners.Parameterized.Parameters;
 
 import com.google.common.base.Supplier;
 
+@Ignore
 @RunWith(Parameterized.class)
 public class TestEditLogTailer {
   static {

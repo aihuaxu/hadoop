@@ -19,6 +19,7 @@ package org.apache.hadoop.contrib.bkjournal;
 
 import static org.junit.Assert.*;
 
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -66,6 +67,7 @@ import java.util.Collection;
  * Integration test to ensure that the BookKeeper JournalManager
  * works for HDFS Namenode HA
  */
+@Ignore
 @RunWith(Parameterized.class)
 public class TestBookKeeperAsHASharedDir {
   static final Log LOG = LogFactory.getLog(TestBookKeeperAsHASharedDir.class);

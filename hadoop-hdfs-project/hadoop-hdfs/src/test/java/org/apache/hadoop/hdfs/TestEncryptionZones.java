@@ -95,6 +95,7 @@ import org.apache.log4j.Logger;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
@@ -347,6 +348,7 @@ public class TestEncryptionZones {
   }
 
   // CHECKSTYLE:OFF:MethodLengthCheck
+  @Ignore
   @Test
   public void testBasicOperations() throws Exception {
 
@@ -831,6 +833,7 @@ public class TestEncryptionZones {
     out.close();
   }
 
+  @Ignore
   @Test
   public void testVersionAndSuiteNegotiation() throws Exception {
     final HdfsAdmin dfsAdmin =

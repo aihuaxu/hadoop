@@ -45,6 +45,7 @@ import org.apache.hadoop.test.MultithreadedTestUtil.TestContext;
 import org.apache.hadoop.test.MultithreadedTestUtil.TestingThread;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import com.google.common.base.Supplier;
@@ -157,6 +158,7 @@ public class TestDFSZKFailoverController extends ClientBaseWithFixes {
    * Test that automatic failover is triggered by shutting the
    * active NN down.
    */
+  @Ignore
   @Test(timeout=60000)
   public void testFailoverAndBackOnNNShutdown() throws Exception {
     Path p1 = new Path("/dir1");

@@ -37,6 +37,7 @@ import org.apache.log4j.Level;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 
 /**
@@ -110,6 +111,7 @@ public class TestWebHdfsWithMultipleNameNodes {
     return strings;
   }
 
+  @Ignore
   @Test
   public void testRedirect() throws Exception {
     final String dir = "/testRedirect/";

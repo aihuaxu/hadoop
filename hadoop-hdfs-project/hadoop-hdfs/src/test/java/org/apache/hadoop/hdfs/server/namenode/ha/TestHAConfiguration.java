@@ -37,6 +37,7 @@ import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.hdfs.server.namenode.SecondaryNameNode;
 import org.apache.hadoop.test.GenericTestUtils;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.mockito.Mockito;
 
@@ -131,6 +132,7 @@ public class TestHAConfiguration {
     }
   }
 
+  @Ignore
   @Test
   public void testGetOtherNNGenericConf() throws IOException {
     String nsId = "ns1";

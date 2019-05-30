@@ -48,6 +48,7 @@ import org.apache.hadoop.security.authentication.client.ConnectionConfigurator;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameter;
@@ -61,6 +62,7 @@ import org.junit.Test;
  * bogus server on the namenode HTTP port, which is rigged to not accept new
  * connections or to accept connections but not send responses.
  */
+@Ignore
 @RunWith(Parameterized.class)
 public class TestWebHdfsTimeouts {
 

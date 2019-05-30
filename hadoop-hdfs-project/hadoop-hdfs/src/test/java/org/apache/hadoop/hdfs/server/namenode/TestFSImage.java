@@ -49,6 +49,7 @@ import org.apache.hadoop.hdfs.util.MD5FileUtils;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.test.PathUtils;
 import org.apache.hadoop.util.Time;
+import org.junit.Ignore;
 import org.junit.Test;
 
 public class TestFSImage {
@@ -61,6 +62,7 @@ public class TestFSImage {
     testPersistHelper(conf);
   }
 
+  @Ignore
   @Test
   public void testCompression() throws IOException {
     Configuration conf = new Configuration();

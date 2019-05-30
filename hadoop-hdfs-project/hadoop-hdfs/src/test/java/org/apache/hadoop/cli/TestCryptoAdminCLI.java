@@ -46,6 +46,7 @@ import org.apache.hadoop.hdfs.tools.CryptoAdmin;
 import org.apache.hadoop.security.authorize.PolicyProvider;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.xml.sax.SAXException;
 
@@ -166,6 +167,7 @@ public class TestCryptoAdminCLI extends CLITestHelperDFS {
     return cmd.getExecutor(namenode, conf).executeCommand(cmd.getCmd());
   }
 
+  @Ignore
   @Test
   @Override
   public void testAll () {

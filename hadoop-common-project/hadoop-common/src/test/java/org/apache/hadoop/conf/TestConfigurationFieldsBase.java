@@ -529,6 +529,7 @@ public abstract class TestConfigurationFieldsBase {
    * Compares the properties that are in the XML properties file, but not
    * in the Configuration class.
    */
+  @Ignore
   @Test
   public void testCompareXmlAgainstConfigurationClass() {
     // Error if subclass hasn't set class members

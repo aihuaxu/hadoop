@@ -37,6 +37,7 @@ import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 public class TestNNHealthCheck {
@@ -66,6 +67,7 @@ public class TestNNHealthCheck {
     doNNHealthCheckTest();
   }
 
+  @Ignore
   @Test
   public void testNNHealthCheckWithLifelineAddress() throws IOException {
     conf.set(DFS_NAMENODE_LIFELINE_RPC_ADDRESS_KEY, "0.0.0.0:0");

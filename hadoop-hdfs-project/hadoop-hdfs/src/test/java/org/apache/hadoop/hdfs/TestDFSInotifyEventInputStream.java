@@ -35,6 +35,7 @@ import org.apache.hadoop.hdfs.server.namenode.FSEditLogOpCodes;
 import org.apache.hadoop.hdfs.server.namenode.ha.HATestUtil;
 import org.apache.hadoop.util.ExitUtil;
 import org.junit.Assert;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -79,6 +80,7 @@ public class TestDFSInotifyEventInputStream {
   /**
    * Tests all FsEditLogOps that are converted to inotify events.
    */
+  @Ignore
   @Test(timeout = 120000)
   @SuppressWarnings("deprecation")
   public void testBasic() throws IOException, URISyntaxException,

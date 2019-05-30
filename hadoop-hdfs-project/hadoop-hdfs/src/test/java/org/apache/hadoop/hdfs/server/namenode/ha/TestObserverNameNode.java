@@ -45,6 +45,7 @@ import org.apache.hadoop.io.retry.RetryInvocationHandler;
 import org.apache.hadoop.ipc.RetriableException;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.mockito.Mockito;
 import org.mockito.invocation.InvocationOnMock;
@@ -69,6 +70,7 @@ import static org.mockito.Mockito.doAnswer;
 
 import static org.apache.hadoop.hdfs.protocol.HdfsConstants.SafeModeAction;
 
+@Ignore
 public class TestObserverNameNode {
   private Configuration conf;
   private MiniQJMHACluster qjmhaCluster;
