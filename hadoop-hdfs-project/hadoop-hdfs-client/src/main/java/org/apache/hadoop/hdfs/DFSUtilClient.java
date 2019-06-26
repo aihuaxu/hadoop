@@ -818,4 +818,34 @@ public class DFSUtilClient {
     iioe.initCause(e);
     return iioe;
   }
+
+  /**
+   * Returns current user home directory under a home directory prefix.
+   * The home directory prefix can be defined by
+   * {@link HdfsClientConfigKeys#DFS_USER_HOME_DIR_PREFIX_KEY}.
+   * User info is obtained from given {@link UserGroupInformation}.
+   *
+   * @param conf configuration
+   * @param ugi {@link UserGroupInformation} of current user.
+   * @return the home directory of current user.
+   */
+  public static Path getHomeDirectory(Configuration conf,
+      UserGroupInformation ugi) {
+    String userHomePrefix = HdfsClientConfigKeys
+        .DFS_USER_HOME_DIR_PREFIX_DEFAULT;
+    if (conf != null) {
+      userHomePrefix = conf.get(
+          HdfsClientConfigKeys.DFS_USER_HOME_DIR_PREFIX_KEY,
+          HdfsClientConfigKeys.DFS_USER_HOME_DIR_PREFIX_DEFAULT);
+    }
+
+    String userName = null;
+    if (ugi != null) {
+      userName = ugi.getShortUserName();
+    } else {
+      userName = System.getProperty("user.name");
+    }
+
+    return new org.apache.hadoop.fs.Path(userHomePrefix + "/" + userName);
+  }
 }
