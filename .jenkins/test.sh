@@ -15,38 +15,5 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-### Copied from start-build-env.sh, with minor changes
-
 set -e               # exit on error
-
-cd "$(dirname "$0")/.." # connect to root
-
-docker build -t hadoop-build dev-support/docker
-
-if [ "$(uname -s)" == "Linux" ]; then
-  USER_NAME=${SUDO_USER:=$USER}
-  USER_ID=$(id -u "${USER_NAME}")
-  GROUP_ID=$(id -g "${USER_NAME}")
-else # boot2docker uid and gid
-  USER_NAME=$USER
-  USER_ID=1000
-  GROUP_ID=50
-fi
-
-docker build -t "hadoop-build-${USER_ID}" - <<UserSpecificDocker
-FROM hadoop-build
-RUN groupadd --non-unique -g ${GROUP_ID} ${USER_NAME}
-RUN useradd -g ${GROUP_ID} -u ${USER_ID} -k /root -m ${USER_NAME}
-ENV HOME /home/${USER_NAME}
-UserSpecificDocker
-
-# By mapping the .m2 directory you can do an mvn install from
-# within the container and use the result on your normal
-# system.  And this also is a significant speedup in subsequent
-# builds because the dependencies are downloaded only once.
-docker run --rm=true -i \
-  -v "${PWD}:/home/${USER_NAME}/hadoop" \
-  -w "/home/${USER_NAME}/hadoop" \
-  -v "/mnt/${USER_NAME}:/home/${USER_NAME}" \
-  -u "${USER_NAME}" \
-  "hadoop-build-${USER_ID}" mvn clean package -DskipTests
+mvn clean package -DskipTests
