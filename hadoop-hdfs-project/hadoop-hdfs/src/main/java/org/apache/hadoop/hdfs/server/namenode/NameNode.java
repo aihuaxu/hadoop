@@ -397,7 +397,7 @@ public class NameNode implements NameNodeStatusMXBean {
     rpcServer.getClientRpcServer().queueCall(extCall);
   }
 
-  static void initMetrics(Configuration conf, NamenodeRole role) {
+  public static void initMetrics(Configuration conf, NamenodeRole role) {
     metrics = NameNodeMetrics.create(conf, role);
   }
 
