@@ -50,6 +50,7 @@ import org.apache.hadoop.hdfs.NameNodeProxiesClient.ProxyAndInfo;
 import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
 import org.apache.hadoop.hdfs.protocol.ClientProtocol;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
+import org.apache.hadoop.hdfs.server.federation.fairness.FairnessManager;
 import org.apache.hadoop.hdfs.server.federation.resolver.ActiveNamenodeResolver;
 import org.apache.hadoop.hdfs.server.federation.resolver.FederationNamenodeContext;
 import org.apache.hadoop.hdfs.server.federation.resolver.FederationNamenodeServiceState;
@@ -108,6 +109,11 @@ public class RouterRpcClient {
   private static final Pattern STACK_TRACE_PATTERN =
       Pattern.compile("\\tat (.*)\\.(.*)\\((.*):(\\d*)\\)");
 
+  /** Fairness manager to control handlers assigned per NS. */
+  private FairnessManager fairnessManager;
+
+  /** Name service keyword to identify fan-out calls . */
+  private final String concurrentNS = "concurrent";
 
   /**
    * Create a router RPC client to manage remote procedure calls to NNs.
@@ -117,13 +123,22 @@ public class RouterRpcClient {
    * @param monitor Optional performance monitor.
    */
   public RouterRpcClient(Configuration conf, String identifier,
-      ActiveNamenodeResolver resolver, RouterRpcMonitor monitor) {
+      ActiveNamenodeResolver resolver, RouterRpcMonitor monitor)
+      throws IOException {
     this.routerId = identifier;
 
     this.namenodeResolver = resolver;
 
     this.connectionManager = new ConnectionManager(conf, monitor);
     this.connectionManager.start();
+
+    // Nameservice isolation settings
+    if (conf.getBoolean(
+        RBFConfigKeys.DFS_ROUTER_NAMESERVICE_FAIRNESS_ENABLE,
+        RBFConfigKeys.DFS_ROUTER_NAMESERVICE_FAIRNESS_ENABLE_DEFAULT)) {
+      LOG.info("Fairness manager enabled");
+      this.fairnessManager = new FairnessManager(conf);
+    }
 
     int numThreads = conf.getInt(
         RBFConfigKeys.DFS_ROUTER_CLIENT_THREADS_SIZE,
@@ -170,6 +185,9 @@ public class RouterRpcClient {
     }
     if (this.executorService != null) {
       this.executorService.shutdownNow();
+    }
+    if (this.fairnessManager != null) {
+      this.fairnessManager.shutdown();
     }
   }
 
@@ -651,8 +669,13 @@ public class RouterRpcClient {
     UserGroupInformation ugi = RouterRpcServer.getRemoteUser();
     List<? extends FederationNamenodeContext> nns =
         getNamenodesForNameservice(nsId);
-    RemoteLocationContext loc = new RemoteLocation(nsId, "/");
-    return invokeMethod(ugi, nns, method.getMethod(), method.getParams(loc));
+    acquirePermit(nsId, ugi, method.getMethod());
+    try {
+      RemoteLocationContext loc = new RemoteLocation(nsId, "/");
+      return invokeMethod(ugi, nns, method.getMethod(), method.getParams(loc));
+    } finally {
+      releasePermit(nsId, ugi, method.getMethod());
+    }
   }
 
   /**
@@ -729,6 +752,7 @@ public class RouterRpcClient {
       String ns = loc.getNameserviceId();
       List<? extends FederationNamenodeContext> namenodes =
           getNamenodesForNameservice(ns);
+      acquirePermit(ns, ugi, m);
       try {
         Object[] params = remoteMethod.getParams(loc);
         Object result = invokeMethod(ugi, namenodes, m, params);
@@ -760,6 +784,8 @@ public class RouterRpcClient {
         if (firstThrownException == null) {
           firstThrownException = lastThrownException;
         }
+      } finally {
+        releasePermit(ns, ugi, m);
       }
     }
 
@@ -958,9 +984,16 @@ public class RouterRpcClient {
       String ns = location.getNameserviceId();
       final List<? extends FederationNamenodeContext> namenodes =
           getNamenodesForNameservice(ns);
-      Object[] paramList = method.getParams(location);
-      Object result = invokeMethod(ugi, namenodes, m, paramList);
-      return Collections.singletonMap(location, clazz.cast(result));
+
+      // Check for permit to continue
+      acquirePermit(ns, ugi, m);
+      try {
+        Object[] paramList = method.getParams(location);
+        Object result = invokeMethod(ugi, namenodes, m, paramList);
+        return Collections.singletonMap(location, clazz.cast(result));
+      } finally {
+        releasePermit(ns, ugi, m);
+      }
     }
     if (rpcMonitor != null) {
       rpcMonitor.invokeConcurrentAsyncCount();
@@ -1005,6 +1038,8 @@ public class RouterRpcClient {
       rpcMonitor.callablesSize(callables.size());
     }
 
+    // Check for permit for all nameservices
+    acquirePermit(concurrentNS, ugi, m);
     try {
       List<Future<Object>> futures = null;
       if (timeOutMs > 0) {
@@ -1071,6 +1106,8 @@ public class RouterRpcClient {
       LOG.error("Unexpected error while invoking API: {}", ex.getMessage());
       throw new IOException(
           "Unexpected error while invoking API " + ex.getMessage(), ex);
+    } finally {
+      releasePermit(concurrentNS, ugi, m);
     }
   }
 
@@ -1129,5 +1166,32 @@ public class RouterRpcClient {
         getNamenodesForBlockPoolId(bpId);
     FederationNamenodeContext namenode = namenodes.get(0);
     return namenode.getNameserviceId();
+  }
+
+  private void acquirePermit(String nsId, UserGroupInformation ugi, Method m)
+      throws IOException {
+    if (fairnessManager != null) {
+      if (!fairnessManager.grantPermission(nsId)) {
+        // Throw StandByException,
+        // Clients could fail over and try another router.
+        if (this.rpcMonitor != null) {
+          rpcMonitor.getRPCMetrics().incrProxyOpPermitRejected();
+        }
+        LOG.warn("Permission denied for ugi: {} for method: {}",
+            ugi, m.getName());
+        String msg =
+            "Router " + routerId +
+                " is overloaded for NS: " + nsId;
+        throw new StandbyException(msg);
+      }
+    }
+  }
+
+  private void releasePermit(String nsId, UserGroupInformation ugi, Method m) {
+    if (fairnessManager != null) {
+      fairnessManager.releasePermission(nsId);
+      LOG.trace("Permission released for ugi: {} for method: {}",
+          ugi, m.getName());
+    }
   }
 }

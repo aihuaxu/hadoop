@@ -32,6 +32,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.DFSUtilClient;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
+import org.apache.hadoop.hdfs.server.federation.fairness.FairnessPolicyController;
 import org.apache.hadoop.hdfs.server.federation.resolver.ActiveNamenodeResolver;
 import org.apache.hadoop.hdfs.server.federation.resolver.FileSubclusterResolver;
 import org.apache.hadoop.hdfs.server.federation.store.StateStoreService;
@@ -146,9 +147,16 @@ public final class FederationUtil {
       final R context, final Class<R> contextClass, final Class<T> clazz) {
     try {
       if (contextClass == null) {
-        // Default constructor if no context
-        Constructor<T> constructor = clazz.getConstructor();
-        return constructor.newInstance();
+        if (conf == null) {
+          // Default constructor if no context
+          Constructor<T> constructor = clazz.getConstructor();
+          return constructor.newInstance();
+        } else {
+          // Constructor with configuration but no context
+          Constructor<T> constructor = clazz.getConstructor(
+              Configuration.class);
+          return constructor.newInstance(conf);
+        }
       } else {
         // Constructor with context
         Constructor<T> constructor = clazz.getConstructor(
@@ -217,6 +225,21 @@ public final class FederationUtil {
         RBFConfigKeys.FEDERATION_NAMENODE_RESOLVER_CLIENT_CLASS_DEFAULT,
         ActiveNamenodeResolver.class);
     return newInstance(conf, stateStore, StateStoreService.class, clazz);
+  }
+
+  /**
+   * Creates an instance of an FairnessPolicyController from the configuration.
+   *
+   * @param conf Configuration that defines the fairness controller class.
+   * @return Fairness policy controller.
+   */
+  public static FairnessPolicyController newFairnessPolicyResolver(
+          Configuration conf) {
+    Class<? extends FairnessPolicyController> clazz = conf.getClass(
+        RBFConfigKeys.DFS_ROUTER_POLICY_CONTROLLER_DRIVER_CLASS,
+        RBFConfigKeys.DFS_ROUTER_POLICY_CONTROLLER_DRIVER_CLASS_DEFAULT,
+        FairnessPolicyController.class);
+    return newInstance(conf, null, null, clazz);
   }
 
   /**

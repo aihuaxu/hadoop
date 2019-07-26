@@ -487,5 +487,22 @@
     </description>
   </property>
 
+  <property>
+    <name>dfs.federation.router.fairness.enable</name>
+    <value>false</value>
+    <description>
+      Set to true to enable fair allocation of handlers for all downstream
+      name services.
+    </description>
+  </property>
+
+  <property>
+    <name>dfs.federation.router.fairness.policy.controller.class</name>
+    <value>org.apache.hadoop.hdfs.server.federation.fairness.DefaultFairnessPolicyController</value>
+    <description>
+      Default handler allocation model to be used if
+      dfs.federation.router.fairness.enable is enabled.
+    </description>
+  </property>
 
 </configuration>

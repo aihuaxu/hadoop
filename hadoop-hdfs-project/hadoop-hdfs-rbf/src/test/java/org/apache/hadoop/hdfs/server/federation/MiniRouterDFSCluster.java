@@ -195,6 +195,10 @@ public class MiniRouterDFSCluster {
       return this.fileContext;
     }
 
+    public URI getFileSystemURI() {
+      return fileSystemUri;
+    }
+
     public String getHttpAddress() {
       InetSocketAddress httpAddress = router.getHttpServerAddress();
       return NetUtils.getHostPortString(httpAddress);

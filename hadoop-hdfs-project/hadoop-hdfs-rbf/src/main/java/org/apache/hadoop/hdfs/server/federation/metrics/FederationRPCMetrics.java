@@ -60,7 +60,8 @@ public class FederationRPCMetrics implements FederationRPCMBean {
   private MutableCounterLong proxyOpRetries;
   @Metric("Number of unusable connections")
   private MutableCounterLong proxyOpUnuableConnection;
-
+  @Metric("Number of operations to hit permit limits")
+  private MutableCounterLong proxyOpPermitRejected;
   @Metric("Failed requests due to State Store unavailable")
   private MutableCounterLong routerFailureStateStore;
   @Metric("Failed requests due to read only mount point")
@@ -444,5 +445,14 @@ public class FederationRPCMetrics implements FederationRPCMBean {
   @Override
   public double getFuturesCollectionTimeMax() {
     return futuresCollectionTime.lastStat().max();
+  }
+
+  public void incrProxyOpPermitRejected() {
+    proxyOpPermitRejected.incr();
+  }
+
+  @Override
+  public long getProxyOpPermitRejected() {
+    return proxyOpPermitRejected.value();
   }
 }

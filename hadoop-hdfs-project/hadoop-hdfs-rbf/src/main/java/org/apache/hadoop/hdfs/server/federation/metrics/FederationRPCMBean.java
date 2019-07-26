@@ -187,4 +187,9 @@ public interface FederationRPCMBean {
 
   double getUnusableConnectionInvokeTimeAvg();
 
+  /**
+   * Get the number of operations rejected due to lack of permits.
+   * @return Number of operations rejected due to lack of permits.
+   */
+  long getProxyOpPermitRejected();
 }

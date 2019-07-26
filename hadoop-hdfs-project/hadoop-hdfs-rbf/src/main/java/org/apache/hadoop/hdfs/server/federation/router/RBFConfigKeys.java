@@ -20,6 +20,8 @@ package org.apache.hadoop.hdfs.server.federation.router;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import org.apache.hadoop.hdfs.server.federation.fairness.DefaultFairnessPolicyController;
+import org.apache.hadoop.hdfs.server.federation.fairness.FairnessPolicyController;
 import org.apache.hadoop.hdfs.server.federation.metrics.FederationRPCPerformanceMonitor;
 import org.apache.hadoop.hdfs.server.federation.resolver.ActiveNamenodeResolver;
 import org.apache.hadoop.hdfs.server.federation.resolver.FileSubclusterResolver;
@@ -251,4 +253,19 @@ public class RBFConfigKeys extends CommonConfigurationKeysPublic {
   public static final Class<? extends AbstractDelegationTokenSecretManager>
       DFS_ROUTER_DELEGATION_TOKEN_DRIVER_CLASS_DEFAULT =
       ZKDelegationTokenSecretManagerImpl.class;
+
+  // Router fairness configs
+  public static final String FEDERATION_ROUTER_FAIRNESS_PREFIX =
+      FEDERATION_ROUTER_PREFIX + "fairness.";
+  public static final String DFS_ROUTER_NAMESERVICE_FAIRNESS_ENABLE =
+      FEDERATION_ROUTER_FAIRNESS_PREFIX + "enable";
+  public static final boolean DFS_ROUTER_NAMESERVICE_FAIRNESS_ENABLE_DEFAULT =
+      false;
+  public static final String DFS_ROUTER_POLICY_CONTROLLER_DRIVER_CLASS =
+      FEDERATION_ROUTER_FAIRNESS_PREFIX + "policy.controller.class";
+  public static final Class<? extends FairnessPolicyController>
+      DFS_ROUTER_POLICY_CONTROLLER_DRIVER_CLASS_DEFAULT =
+      DefaultFairnessPolicyController.class;
+  public static final String DFS_ROUTER_FAIR_HANDLER_COUNT_KEY_PREFIX =
+      FEDERATION_ROUTER_FAIRNESS_PREFIX + "handler.count.";
 }
