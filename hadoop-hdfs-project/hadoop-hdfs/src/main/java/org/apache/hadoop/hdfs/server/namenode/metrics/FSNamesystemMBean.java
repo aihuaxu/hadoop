@@ -214,4 +214,9 @@ public interface FSNamesystemMBean {
    */
   long getDelegationTokensCount();
 
+  /**
+   * Get the current number of delegation tokens in memory.
+   * @return number of DTs
+   */
+  long getCurrentTokensCount();
 }
