@@ -1,0 +1,21 @@
+# This is a dummy file just for registing hdfs service in Uber, so we can register HDFS as tier 0/1 service.
+# It does nothing in reality.
+
+schema_version: 2.0.0
+service_name: hdfs
+service_type: java
+debian_packages_for_build:
+  - name: wget
+  - name: sudo
+java:
+  jdk_version: 'java-8-openjdk-amd64'
+  build_system: 'mvn'
+  build_cmds:
+    - 'RUN apt-get update'
+applications:
+  - udeploy_app_id: hdfs
+    app_type: command_line
+    command_line:
+      run_cmd: '/bin/bash'
+    health_check: none
+
