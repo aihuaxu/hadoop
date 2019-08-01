@@ -8,8 +8,8 @@ debian_packages_for_build:
   - name: wget
   - name: sudo
 java:
-  jdk_version: 'java-8-openjdk-amd64'
-  build_system: 'mvn'
+  jdk_version: 'openjdk_7u95'
+  build_system: 'maven'
   build_cmds:
     - 'RUN apt-get update'
 applications:
