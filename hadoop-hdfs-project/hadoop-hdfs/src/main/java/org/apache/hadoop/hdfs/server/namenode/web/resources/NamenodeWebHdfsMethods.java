@@ -53,6 +53,7 @@ import javax.ws.rs.core.StreamingOutput;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.fs.QuotaUsage;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.FileStatus;
@@ -939,6 +940,12 @@ public class NamenodeWebHdfsMethods {
     {
       final ContentSummary contentsummary = np.getContentSummary(fullpath);
       final String js = JsonUtil.toJsonString(contentsummary);
+      return Response.ok(js).type(MediaType.APPLICATION_JSON).build();
+    }
+    case GETQUOTAUSAGE:
+    {
+      final QuotaUsage quotaUsage = np.getQuotaUsage(fullpath);
+      final String js = JsonUtil.toJsonString(quotaUsage);
       return Response.ok(js).type(MediaType.APPLICATION_JSON).build();
     }
     case GETFILECHECKSUM:
