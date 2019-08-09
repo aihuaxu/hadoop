@@ -187,9 +187,6 @@ public interface HdfsClientConfigKeys {
       "dfs.data.transfer.client.tcpnodelay";
   boolean DFS_DATA_TRANSFER_CLIENT_TCPNODELAY_DEFAULT = true;
 
-  String DFS_CLIENT_FAILOVER_IPFAILOVER_VIRTUAL_ADDRESS =
-      Failover.PREFIX + "ipfailover.virtual-address";
-
   /**
    * These are deprecated config keys to client code.
    */

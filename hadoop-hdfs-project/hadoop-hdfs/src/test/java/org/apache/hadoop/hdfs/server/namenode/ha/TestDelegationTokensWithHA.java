@@ -44,11 +44,11 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.log4j.Level;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.internal.util.reflection.Whitebox;
-import org.slf4j.event.Level;
 
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
@@ -137,8 +137,12 @@ public class TestDelegationTokensWithHA {
         getDelegationToken(dfs, ugi.getShortUserName());
     ugi.addToken(token);
     // Recreate the DFS, this time authenticating using a DT
-    dfs = ugi.doAs((PrivilegedExceptionAction<DistributedFileSystem>)
-        () -> (DistributedFileSystem) FileSystem.get(conf));
+    dfs = ugi.doAs(new PrivilegedExceptionAction<DistributedFileSystem>() {
+      @Override
+      public DistributedFileSystem run() throws Exception {
+        return (DistributedFileSystem) FileSystem.get(conf);
+      }
+    });
 
     GenericTestUtils.setLogLevel(ObserverReadProxyProvider.LOG, Level.DEBUG);
     GenericTestUtils.LogCapturer logCapture = GenericTestUtils.LogCapturer
