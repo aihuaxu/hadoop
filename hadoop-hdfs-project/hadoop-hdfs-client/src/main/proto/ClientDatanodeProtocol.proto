@@ -165,6 +165,7 @@ message StartReconfigurationResponseProto {
 
 message TriggerBlockReportRequestProto {
   required bool incremental = 1;
+  optional string nnAddress = 2;
 }
 
 message TriggerBlockReportResponseProto {

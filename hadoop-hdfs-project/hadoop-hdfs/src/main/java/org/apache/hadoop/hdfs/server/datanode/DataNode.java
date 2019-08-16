@@ -3073,10 +3073,14 @@ public class DataNode extends ReconfigurableBase
   public void triggerBlockReport(BlockReportOptions options)
       throws IOException {
     checkSuperuserPrivilege();
+    InetSocketAddress namenodeAddr = options.getNamenodeAddr();
+    boolean shouldTriggerToAllNn = (namenodeAddr == null);
     for (BPOfferService bpos : blockPoolManager.getAllNamenodeThreads()) {
       if (bpos != null) {
         for (BPServiceActor actor : bpos.getBPServiceActors()) {
-          actor.triggerBlockReport(options);
+          if (shouldTriggerToAllNn || namenodeAddr.equals(actor.nnAddr)) {
+            actor.triggerBlockReport(options);
+          }
         }
       }
     }
