@@ -19,8 +19,9 @@ package org.apache.hadoop.hdfs.server.federation.router;
 
 import static org.apache.hadoop.hdfs.server.federation.FederationTestUtils.createFile;
 import static org.apache.hadoop.hdfs.server.federation.FederationTestUtils.verifyFileExists;
-import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.*;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.net.URISyntaxException;
@@ -42,9 +43,11 @@ import org.apache.hadoop.hdfs.server.federation.MockResolver;
 import org.apache.hadoop.hdfs.server.federation.MiniRouterDFSCluster;
 import org.apache.hadoop.hdfs.server.federation.MiniRouterDFSCluster.NamenodeContext;
 import org.apache.hadoop.hdfs.server.federation.MiniRouterDFSCluster.RouterContext;
+import org.apache.hadoop.hdfs.server.federation.metrics.FederationRPCMetrics;
 import org.apache.hadoop.hdfs.server.federation.resolver.FileSubclusterResolver;
 import org.apache.hadoop.hdfs.server.federation.resolver.PathLocation;
 import org.apache.hadoop.hdfs.server.federation.resolver.RemoteLocation;
+import org.apache.hadoop.ipc.RemoteException;
 import org.junit.Test;
 
 /**
@@ -163,6 +166,41 @@ public class TestRouterRpcMultiDestination extends TestRouterRpc {
     assertEquals(
         requiredPaths + " doesn't match " + Arrays.toString(partialListing),
         requiredPaths.size(), partialListing.length);
+  }
+
+  /**
+   * Verify the metric ProxyOpFailureCommunicate is not added for user error
+   */
+  @Test
+  public void testProxyOpWithRemoteException() throws IOException {
+    final String testPath = "/ns1/remote_exception.txt";
+    final FederationRPCMetrics metrics = getRouterContext().
+        getRouter().getRpcServer().getRPCMetrics();
+
+    // Test with FileNotFoundException
+    long beforeProxyOp = metrics.getProxyOps();
+    try {
+      getRouterProtocol().getBlockLocations(testPath, 0, 1);
+      assertTrue(false);
+    } catch (RemoteException e) {
+      assertTrue(e.unwrapRemoteException() instanceof FileNotFoundException);
+      assertEquals(0, metrics.getProxyOpFailureCommunicate());
+      assertEquals(1, metrics.getProxyOps() - beforeProxyOp);
+    }
+
+    // Test with existing file and no exception thrown
+    FileSystem routerFS = getRouterFileSystem();
+    try {
+      // Create the test file
+      createFile(routerFS, testPath, 32);
+
+      beforeProxyOp = metrics.getProxyOps();
+      getRouterProtocol().getBlockLocations(testPath, 0, 1);
+      assertEquals(0, metrics.getProxyOpFailureCommunicate());
+      assertEquals(1, metrics.getProxyOps() - beforeProxyOp);
+    } finally {
+      routerFS.delete(new Path(testPath), true);
+    }
   }
 
   @Override
