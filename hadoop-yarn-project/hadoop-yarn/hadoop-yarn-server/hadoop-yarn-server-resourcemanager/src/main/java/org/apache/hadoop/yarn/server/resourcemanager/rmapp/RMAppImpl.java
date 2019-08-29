@@ -893,7 +893,7 @@ public class RMAppImpl implements RMApp, Recoverable {
           (((recoveredFinalState == null)) ||
             (event.getType() != RMAppEventType.RECOVER))) {
         LOG.info(String.format(STATE_CHANGE_MESSAGE, appID, oldState,
-            getState(), event.getType(), ", queue:" + submissionContext.getQueue()));
+            getState(), event.getType()) + ", queue:" + submissionContext.getQueue());
       } else if ((oldState != getState()) && LOG.isDebugEnabled()) {
         LOG.debug(String.format(STATE_CHANGE_MESSAGE, appID, oldState,
             getState(), event.getType()));

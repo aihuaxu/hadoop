@@ -1646,6 +1646,10 @@ public class LeafQueue extends AbstractCSQueue {
 
                     releaseResource(clusterResource, application, container.getResource(),
                             node.getPartition(), rmContainer);
+                    LOG.info("completedContainer" +
+                            " container=" + container +
+                            " queue=" + this +
+                            " cluster=" + clusterResource);
                 }
             } finally {
                 writeLock.unlock();
