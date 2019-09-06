@@ -170,6 +170,8 @@ public class RMAppAttemptImpl implements RMAppAttempt, Recoverable {
   private long finishTime = 0;
   private long launchAMStartTime = 0;
   private long launchAMEndTime = 0;
+  private long scheduledTime = 0;
+  private long containerAllocatedTime = 0;
 
   // Set to null initially. Will eventually get set
   // if an RMAppAttemptUnregistrationEvent occurs
@@ -1126,6 +1128,7 @@ public class RMAppAttemptImpl implements RMAppAttempt, Recoverable {
             && amContainerAllocation.getContainers() != null) {
           assert (amContainerAllocation.getContainers().size() == 0);
         }
+        appAttempt.scheduledTime = System.currentTimeMillis();
         return RMAppAttemptState.SCHEDULED;
       } else {
         // save state and then go to LAUNCHED state
@@ -1176,6 +1179,11 @@ public class RMAppAttemptImpl implements RMAppAttempt, Recoverable {
         .clearNodeSetForAttempt(appAttempt.applicationAttemptId);
       appAttempt.getSubmissionContext().setResource(
         appAttempt.getMasterContainer().getResource());
+      appAttempt.containerAllocatedTime = System.currentTimeMillis();
+      long allocationDelay =
+          appAttempt.containerAllocatedTime - appAttempt.scheduledTime;
+      ClusterMetrics.getMetrics().addAMContainerAllocationDelay(
+          allocationDelay);
       appAttempt.storeAttempt();
       return RMAppAttemptState.ALLOCATED_SAVING;
     }
