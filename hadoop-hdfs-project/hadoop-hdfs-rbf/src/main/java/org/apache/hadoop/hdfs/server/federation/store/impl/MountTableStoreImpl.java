@@ -41,6 +41,8 @@ import org.apache.hadoop.hdfs.server.federation.store.records.MountTable;
 import org.apache.hadoop.hdfs.server.federation.store.records.Query;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.util.Time;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Implementation of the {@link MountTableStore} state store API.
@@ -48,6 +50,16 @@ import org.apache.hadoop.util.Time;
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public class MountTableStoreImpl extends MountTableStore {
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(MountTableStoreImpl.class);
+
+  private static final String MOUNTTABLE_ENTRY_ADD_MESSAGE =
+      "Added a mounttable entry %s with status %s";
+  private static final String MOUNTTABLE_ENTRY_UPDATE_MESSAGE =
+      "Updated a mounttable entry from %s to %s with status %s";
+  private static final String MOUNTTABLE_ENTRY_REMOVE_MESSAGE =
+      "Deleted a mounttable entry %s with status %s";
 
   public MountTableStoreImpl(StateStoreDriver driver) {
     super(driver);
@@ -65,6 +77,8 @@ public class MountTableStoreImpl extends MountTableStore {
     }
 
     boolean status = getDriver().put(mountTable, false, true);
+    LOG.info(String.format(MOUNTTABLE_ENTRY_ADD_MESSAGE,
+        mountTable.toString(), status));
     AddMountTableEntryResponse response =
         AddMountTableEntryResponse.newInstance();
     response.setStatus(status);
@@ -81,8 +95,15 @@ public class MountTableStoreImpl extends MountTableStore {
         pc.checkPermission(mountTable, FsAction.WRITE);
       }
     }
+    // get current source -> destinations first before rewriting
+    final MountTable currentPartialEntry = MountTable.newInstance();
+    currentPartialEntry.setSourcePath(mountTable.getSourcePath());
+    final Query<MountTable> query = new Query<>(currentPartialEntry);
+    final MountTable updatedEntry = getDriver().get(getRecordClass(), query);
 
     boolean status = getDriver().put(mountTable, true, true);
+    LOG.info(String.format(MOUNTTABLE_ENTRY_UPDATE_MESSAGE,
+        updatedEntry.toString(), mountTable.toString(), status));
     UpdateMountTableEntryResponse response =
         UpdateMountTableEntryResponse.newInstance();
     response.setStatus(status);
@@ -107,6 +128,8 @@ public class MountTableStoreImpl extends MountTableStore {
       status = getDriver().remove(deleteEntry);
     }
 
+    LOG.info(String.format(MOUNTTABLE_ENTRY_REMOVE_MESSAGE,
+        deleteEntry.toString(), status));
     RemoveMountTableEntryResponse response =
         RemoveMountTableEntryResponse.newInstance();
     response.setStatus(status);
