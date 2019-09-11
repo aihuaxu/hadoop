@@ -36,7 +36,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * 
+ *
  * The class which provides functionality of checking the health of the node
  * using the configured node health script and reporting back to the service
  * for which the health checker has been asked to report.
@@ -70,10 +70,26 @@ public class NodeHealthScriptRunner extends AbstractService {
 
   private long lastReportedTime;
 
+  /** Pattern used for searching in the output of the node health script for stress */
+  private static final String STRESS_PATTERN = "STRESS:";
+
+  /** Node stressed message*/
+  public static final String NODE_STRESSED_MSG = "NODE_STRESSED";
+
+  private String[] stressFields;
+
+  /** Records the timestamp when a stress field turned true from false */
+  private long[] stressTimeMeters;
+
+  private long stressTimeThreshold;
+
+  private boolean isStressed;
+
   private TimerTask timer;
-  
+
   private enum HealthCheckerExitStatus {
     SUCCESS,
+    SUCCESS_WITH_STRESS_CHECK,
     TIMED_OUT,
     FAILED_WITH_EXIT_CODE,
     FAILED_WITH_EXCEPTION,
@@ -84,7 +100,7 @@ public class NodeHealthScriptRunner extends AbstractService {
   /**
    * Class which is used by the {@link Timer} class to periodically execute the
    * node health script.
-   * 
+   *
    */
   private class NodeHealthMonitorExecutor extends TimerTask {
 
@@ -102,7 +118,8 @@ public class NodeHealthScriptRunner extends AbstractService {
 
     @Override
     public void run() {
-      HealthCheckerExitStatus status = HealthCheckerExitStatus.SUCCESS;
+      HealthCheckerExitStatus status = (stressFields != null )?
+              HealthCheckerExitStatus.SUCCESS_WITH_STRESS_CHECK : HealthCheckerExitStatus.SUCCESS;
       try {
         shexec.execute();
       } catch (ExitCodeException e) {
@@ -122,7 +139,8 @@ public class NodeHealthScriptRunner extends AbstractService {
         }
         exceptionStackTrace = StringUtils.stringifyException(e);
       } finally {
-        if (status == HealthCheckerExitStatus.SUCCESS) {
+        if (status == HealthCheckerExitStatus.SUCCESS ||
+                status == HealthCheckerExitStatus.SUCCESS_WITH_STRESS_CHECK ) {
           if (hasErrors(shexec.getOutput())) {
             status = HealthCheckerExitStatus.FAILED;
           }
@@ -134,10 +152,10 @@ public class NodeHealthScriptRunner extends AbstractService {
     /**
      * Method which is used to parse output from the node health monitor and
      * send to the report address.
-     * 
+     *
      * The timed out script or script which causes IOException output is
      * ignored.
-     * 
+     *
      * The node is marked unhealthy if
      * <ol>
      * <li>The node health script times out</li>
@@ -147,7 +165,7 @@ public class NodeHealthScriptRunner extends AbstractService {
      * If the script throws {@link IOException} or {@link ExitCodeException} the
      * output is ignored and node is left remaining healthy, as script might
      * have syntax error.
-     * 
+     *
      * @param status
      */
     void reportHealthStatus(HealthCheckerExitStatus status) {
@@ -155,6 +173,16 @@ public class NodeHealthScriptRunner extends AbstractService {
       switch (status) {
       case SUCCESS:
         setHealthStatus(true, "", now);
+        break;
+      case SUCCESS_WITH_STRESS_CHECK:
+        boolean[] stressCheckOutputs = parseScriptStressOutput(shexec.getOutput());
+        setStress(stressCheckOutputs);
+        if (isStressed()) {
+           setHealthStatus(true, NODE_STRESSED_MSG, now);
+        }
+        else {
+           setHealthStatus(true, "", now);
+        }
         break;
       case TIMED_OUT:
         setHealthStatus(false, NODE_HEALTH_SCRIPT_TIMED_OUT_MSG);
@@ -173,7 +201,7 @@ public class NodeHealthScriptRunner extends AbstractService {
 
     /**
      * Method to check if the output string has line which begins with ERROR.
-     * 
+     *
      * @param output
      *          string
      * @return true if output string has error pattern in it.
@@ -186,6 +214,37 @@ public class NodeHealthScriptRunner extends AbstractService {
         }
       }
       return false;
+    }
+
+    /**
+     * Method to parse stress output line which begins with STRESS:.
+     * Stress output should be comma separated value of true(stressed) or
+     * false(not stressed) for each stress field at the time. Default is false
+     *
+     * @param output
+     *          string
+     * @return parsed output of boolean array.
+     */
+
+    private boolean[] parseScriptStressOutput(String output) {
+      String[] lines = output.split("\n");
+      for (String line : lines) {
+        if (line.startsWith(STRESS_PATTERN)) {
+          String stressOutput = line.replaceFirst(STRESS_PATTERN, "");
+          String[] splits = stressOutput.split(",");
+          if (splits.length != stressFields.length) {
+            LOG.warn("Stress output fields count do not match expected fields count");
+            return null;
+          }
+          boolean[] stressCheck = new boolean[splits.length];
+          for (int i =0; i < splits.length; i++ ) {
+            stressCheck[i] = Boolean.parseBoolean(splits[i]);
+          }
+          return stressCheck;
+        }
+      }
+      LOG.warn("Can not find stress output that starts with STRESS:");
+      return null;
     }
   }
 
@@ -201,6 +260,25 @@ public class NodeHealthScriptRunner extends AbstractService {
     this.timer = new NodeHealthMonitorExecutor(scriptArgs);
   }
 
+  public NodeHealthScriptRunner(String scriptName, long chkInterval, long timeout,
+      String[] scriptArgs, String[] stressCheckFields, long stressTimeThreshold) {
+    super(NodeHealthScriptRunner.class.getName());
+    this.lastReportedTime = System.currentTimeMillis();
+    this.isHealthy = true;
+    this.isStressed = false;
+    this.healthReport = "";
+    this.nodeHealthScript = scriptName;
+    this.intervalTime = chkInterval;
+    this.scriptTimeout = timeout;
+    this.stressFields = stressCheckFields;
+    this.stressTimeThreshold = stressTimeThreshold;
+    if (stressCheckFields != null && stressCheckFields.length != 0) {
+      this.stressTimeMeters = new long[stressCheckFields.length];
+      Arrays.fill(this.stressTimeMeters, Long.MAX_VALUE);
+    }
+    this.timer = new NodeHealthMonitorExecutor(scriptArgs);
+  }
+
   /*
    * Method which initializes the values for the script path and interval time.
    */
@@ -211,7 +289,7 @@ public class NodeHealthScriptRunner extends AbstractService {
 
   /**
    * Method used to start the Node health monitoring.
-   * 
+   *
    */
   @Override
   protected void serviceStart() throws Exception {
@@ -224,7 +302,7 @@ public class NodeHealthScriptRunner extends AbstractService {
 
   /**
    * Method used to terminate the node health monitoring service.
-   * 
+   *
    */
   @Override
   protected void serviceStop() {
@@ -241,7 +319,7 @@ public class NodeHealthScriptRunner extends AbstractService {
 
   /**
    * Gets the if the node is healthy or not
-   * 
+   *
    * @return true if node is healthy
    */
   public boolean isHealthy() {
@@ -250,7 +328,7 @@ public class NodeHealthScriptRunner extends AbstractService {
 
   /**
    * Sets if the node is healhty or not considering disks' health also.
-   * 
+   *
    * @param isHealthy
    *          if or not node is healthy
    */
@@ -261,7 +339,7 @@ public class NodeHealthScriptRunner extends AbstractService {
   /**
    * Returns output from health script. if node is healthy then an empty string
    * is returned.
-   * 
+   *
    * @return output from health script
    */
   public String getHealthReport() {
@@ -277,10 +355,10 @@ public class NodeHealthScriptRunner extends AbstractService {
   private synchronized void setHealthReport(String healthReport) {
     this.healthReport = healthReport;
   }
-  
+
   /**
    * Returns time stamp when node health script was last run.
-   * 
+   *
    * @return timestamp when node health script was last run
    */
   public long getLastReportedTime() {
@@ -289,7 +367,7 @@ public class NodeHealthScriptRunner extends AbstractService {
 
   /**
    * Sets the last run time of the node health script.
-   * 
+   *
    * @param lastReportedTime
    */
   private synchronized void setLastReportedTime(long lastReportedTime) {
@@ -299,12 +377,12 @@ public class NodeHealthScriptRunner extends AbstractService {
   /**
    * Method used to determine if or not node health monitoring service should be
    * started or not. Returns true if following conditions are met:
-   * 
+   *
    * <ol>
    * <li>Path to Node health check script is not empty</li>
    * <li>Node health check script file exists</li>
    * </ol>
-   * 
+   *
    * @return true if node health monitoring service can be started.
    */
   public static boolean shouldRun(String healthScript) {
@@ -315,12 +393,35 @@ public class NodeHealthScriptRunner extends AbstractService {
     return f.exists() && FileUtil.canExecute(f);
   }
 
+  public boolean isStressed() { return isStressed; }
+
+  /**
+  * Sets if the node is stressed or not based on whether stressed fields have continued
+  * above threshold time. Reset time when stress check output is null
+  *
+  * @param stressCheck
+  */
+  private synchronized void setStress(boolean[] stressCheck) {
+      isStressed = false;
+      if (stressCheck == null) {
+         Arrays.fill(stressTimeMeters, Long.MAX_VALUE);
+      }
+      else {
+        for (int i = 0; i < stressTimeMeters.length; i++) {
+          stressTimeMeters[i] =
+            stressCheck[i] ? Math.min(stressTimeMeters[i], System.currentTimeMillis()) : Long.MAX_VALUE;
+          isStressed =
+            isStressed || (System.currentTimeMillis() - stressTimeMeters[i]) >= stressTimeThreshold;
+        }
+      }
+  }
+
   private synchronized void setHealthStatus(boolean isHealthy, String output) {
-		LOG.info("health status being set as " + output);
+	LOG.info("health status being set as " + output);
     this.setHealthy(isHealthy);
     this.setHealthReport(output);
   }
-  
+
   private synchronized void setHealthStatus(boolean isHealthy, String output,
       long time) {
 	LOG.info("health status being set as " + output);

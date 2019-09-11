@@ -328,6 +328,15 @@ public class NodeManager extends CompositeService
         YarnConfiguration.DEFAULT_NM_HEALTH_CHECK_SCRIPT_TIMEOUT_MS);
     String[] scriptArgs = conf.getStrings(
         YarnConfiguration.NM_HEALTH_CHECK_SCRIPT_OPTS, new String[] {});
+    String[] stressCheckFields = conf.getStrings(
+        YarnConfiguration.NM_HEALTH_CHECK_SCRIPT_STRESS_CHECK_FIELDS, new String[] {});
+    if (stressCheckFields !=null && stressCheckFields.length != 0) {
+      long stressTimeThreshold = conf.getLong(
+        YarnConfiguration.NM_HEALTH_CHECK_SCRIPT_STRESS_THRESHOLD_MS,
+        YarnConfiguration.DEFAULT_NM_HEALTH_CHECK_SCRIPT_STRESS_THRESHOLD_MS);
+      return new NodeHealthScriptRunner(nodeHealthScript,
+          nmCheckintervalTime, scriptTimeout, scriptArgs, stressCheckFields, stressTimeThreshold);
+    }
     return new NodeHealthScriptRunner(nodeHealthScript,
         nmCheckintervalTime, scriptTimeout, scriptArgs);
   }

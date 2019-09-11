@@ -1533,6 +1533,15 @@ public class YarnConfiguration extends Configuration {
   public static final String NM_HEALTH_CHECK_SCRIPT_OPTS = 
     NM_PREFIX + "health-checker.script.opts";
 
+  /** The expected stress indicator fields from health check script.*/
+  public static final String NM_HEALTH_CHECK_SCRIPT_STRESS_CHECK_FIELDS =
+    NM_PREFIX + "health-checker.script.stress-check-fields";
+
+  /** The time threshold when a node is considered stressed */
+  public static final String NM_HEALTH_CHECK_SCRIPT_STRESS_THRESHOLD_MS =
+    NM_PREFIX + "health-checker.script.stress-time-ms";
+  public static final long DEFAULT_NM_HEALTH_CHECK_SCRIPT_STRESS_THRESHOLD_MS = 30 * 60 * 1000;
+
   /** The JVM options used on forking ContainerLocalizer process
       by container executor. */
   public static final String NM_CONTAINER_LOCALIZER_JAVA_OPTS_KEY =

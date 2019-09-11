@@ -37,7 +37,7 @@ public class TestNodeHealthScriptRunner {
 
   protected static File testRootDir = new File("target",
       TestNodeHealthScriptRunner.class.getName() +
-      "-localDir").getAbsoluteFile();
+       "-localDir").getAbsoluteFile();
 
   private File nodeHealthscriptFile = new File(testRootDir,
       Shell.appendScriptExtension("failingscript"));
@@ -116,7 +116,7 @@ public class TestNodeHealthScriptRunner {
         nodeHealthScriptRunner.isHealthy());
     Assert.assertTrue(
         nodeHealthScriptRunner.getHealthReport().contains("ERROR"));
-    
+
     // Healthy script.
     writeNodeHealthScriptFile(normalScript, true);
     timerTask.run();
@@ -128,9 +128,35 @@ public class TestNodeHealthScriptRunner {
     writeNodeHealthScriptFile(timeOutScript, true);
     timerTask.run();
     Assert.assertFalse("Node health status reported healthy even after timeout",
-    nodeHealthScriptRunner.isHealthy());
+        nodeHealthScriptRunner.isHealthy());
     Assert.assertEquals(
             NodeHealthScriptRunner.NODE_HEALTH_SCRIPT_TIMED_OUT_MSG,
             nodeHealthScriptRunner.getHealthReport());
+  }
+
+  @Test
+  public void testNodeHealthScriptWithStress() throws Exception {
+    String stressScript = "echo \"STRESS:true,false\"";
+    Configuration conf = new Configuration();
+    writeNodeHealthScriptFile(stressScript, true);
+    NodeHealthScriptRunner nodeHealthScriptRunner = new NodeHealthScriptRunner(
+        nodeHealthscriptFile.getAbsolutePath(),
+        200, 1000, new String[]{}, new String[] {"diskio", "cpu"}, 100);
+    nodeHealthScriptRunner.init(conf);
+    TimerTask timerTask = nodeHealthScriptRunner.getTimerTask();
+
+    timerTask.run();
+    // Stress Script runs successfully Node is reported healthy and not stressed
+    Assert.assertTrue("Node health status reported healthy",
+        nodeHealthScriptRunner.isHealthy());
+    Assert.assertEquals("", nodeHealthScriptRunner.getHealthReport());
+
+    Thread.sleep(300);
+
+    // Stress Script runs successfully Node is reported healthy but stressed
+    timerTask.run();
+    Assert.assertTrue("Node health status reported healthy",
+        nodeHealthScriptRunner.isHealthy());
+    Assert.assertEquals("NODE_STRESSED", nodeHealthScriptRunner.getHealthReport());
   }
 }
