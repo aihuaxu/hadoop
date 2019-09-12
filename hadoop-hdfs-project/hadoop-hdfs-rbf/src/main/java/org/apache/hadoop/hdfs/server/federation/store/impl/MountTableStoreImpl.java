@@ -102,8 +102,15 @@ public class MountTableStoreImpl extends MountTableStore {
     final MountTable updatedEntry = getDriver().get(getRecordClass(), query);
 
     boolean status = getDriver().put(mountTable, true, true);
-    LOG.info(String.format(MOUNTTABLE_ENTRY_UPDATE_MESSAGE,
-        updatedEntry.toString(), mountTable.toString(), status));
+    if (updatedEntry != null) {
+      LOG.info(String.format(MOUNTTABLE_ENTRY_UPDATE_MESSAGE,
+          updatedEntry.toString(), mountTable.toString(), status));
+    } else {
+      // an entry-add happened since no previous entry exists
+      LOG.info(String.format(MOUNTTABLE_ENTRY_ADD_MESSAGE,
+          mountTable.toString(), status));
+    }
+
     UpdateMountTableEntryResponse response =
         UpdateMountTableEntryResponse.newInstance();
     response.setStatus(status);
@@ -126,10 +133,10 @@ public class MountTableStoreImpl extends MountTableStore {
         pc.checkPermission(deleteEntry, FsAction.WRITE);
       }
       status = getDriver().remove(deleteEntry);
+      LOG.info(String.format(MOUNTTABLE_ENTRY_REMOVE_MESSAGE,
+          deleteEntry.toString(), status));
     }
 
-    LOG.info(String.format(MOUNTTABLE_ENTRY_REMOVE_MESSAGE,
-        deleteEntry.toString(), status));
     RemoveMountTableEntryResponse response =
         RemoveMountTableEntryResponse.newInstance();
     response.setStatus(status);
