@@ -26,6 +26,7 @@ import java.net.InetSocketAddress;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -82,6 +83,13 @@ public class ObserverReadProxyProvider<T> extends ConfiguredFailoverProxyProvide
   /** The last proxy that has been used. Only used for testing */
   private volatile ProxyInfo<T> lastProxy = null;
 
+  /**
+   * If this is true, this observer proxy will try observers in random
+   * order instead of config order. Each nameservice has different
+   * settings with nameservice name as the suffix in config
+   */
+  private final boolean observerReadRandomOrder;
+
   public ObserverReadProxyProvider(
       Configuration conf, URI uri, Class<T> xface, HAProxyFactory<T> factory) {
     super(conf, uri, xface, factory);
@@ -116,11 +124,43 @@ public class ObserverReadProxyProvider<T> extends ConfiguredFailoverProxyProvide
       LOG.debug("Reading from observer namenode is enabled");
     }
 
+    observerReadRandomOrder = getRandomOrder(conf, uri);
+    if (observerReadRandomOrder) {
+      LOG.debug("Reading from observer namenode in random order");
+      Collections.shuffle(observerProxies);
+    }
+
     // The client may have a delegation token set for the logical
     // URI of the cluster. Clone this token to apply to each of the
     // underlying IPC addresses so that the IPC code can find it.
     // Copied from the parent class.
     HAUtilClient.cloneDelegationTokenForLogicalUri(ugi, uri, addressesOfNns);
+  }
+
+  /**
+   * Check whether random order is configured for observer read proxy
+   * provider for the namenode/nameservice.
+   *
+   * @param conf Configuration
+   * @param nameNodeUri The URI of namenode/nameservice
+   * @return random order configuration
+   */
+  private static boolean getRandomOrder(
+      Configuration conf, URI nameNodeUri) {
+    String host = nameNodeUri.getHost();
+    String configKeyWithHost =
+        HdfsClientConfigKeys.DFS_CLIENT_OBSERVER_READS_RANDOM_ORDER
+            + "." + host;
+
+    if (conf.get(configKeyWithHost) != null) {
+      return conf.getBoolean(
+          configKeyWithHost,
+          HdfsClientConfigKeys.DFS_CLIENT_OBSERVER_READS_RANDOM_ORDER_DEFAULT);
+    }
+
+    return conf.getBoolean(
+        HdfsClientConfigKeys.DFS_CLIENT_OBSERVER_READS_RANDOM_ORDER,
+        HdfsClientConfigKeys.DFS_CLIENT_OBSERVER_READS_RANDOM_ORDER_DEFAULT);
   }
 
   @SuppressWarnings("unchecked")

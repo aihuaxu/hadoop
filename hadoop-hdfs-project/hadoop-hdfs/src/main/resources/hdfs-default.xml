@@ -1353,6 +1353,20 @@
 </property>
 
 <property>
+  <name>dfs.client.observer.reads.random.order</name>
+  <value>false</value>
+  <description>
+    Similar to dfs.client.failover.random.order, this determines if the
+    observers are accessed in random order instead of the
+    configured order.
+    The config name can be extended with an optional nameservice ID
+    (of form dfs.client.observer.reads.random.order[.nameservice]) in case
+    multiple nameservices exist and observer read random order should be
+    enabled for specific nameservices.
+  </description>
+</property>
+
+<property>
   <name>dfs.client.failover.max.attempts</name>
   <value>15</value>
   <description>
