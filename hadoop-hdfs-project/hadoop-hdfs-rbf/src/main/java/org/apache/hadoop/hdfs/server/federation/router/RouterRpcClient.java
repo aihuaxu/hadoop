@@ -46,6 +46,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdfs.DFSUtilClient;
 import org.apache.hadoop.hdfs.NameNodeProxiesClient.ProxyAndInfo;
 import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
 import org.apache.hadoop.hdfs.protocol.ClientProtocol;
@@ -115,6 +116,9 @@ public class RouterRpcClient {
   /** Name service keyword to identify fan-out calls . */
   private final String concurrentNS = "concurrent";
 
+  /** Whether this is a router on observer. */
+  private boolean isObserverRouter;
+
   /**
    * Create a router RPC client to manage remote procedure calls to NNs.
    *
@@ -126,6 +130,7 @@ public class RouterRpcClient {
       ActiveNamenodeResolver resolver, RouterRpcMonitor monitor)
       throws IOException {
     this.routerId = identifier;
+    this.isObserverRouter = FederationUtil.isObserverRouter(conf);
 
     this.namenodeResolver = resolver;
 
@@ -542,12 +547,29 @@ public class RouterRpcClient {
         .getNamenodesForNameserviceId(nsId);
 
     if (nnState != null) {
+      int standbyCount = 0;
       for (FederationNamenodeContext nnContext : nnState) {
         // Once we find one NN is in active state, we assume this
         // cluster is available.
         if (nnContext.getState() == FederationNamenodeServiceState.ACTIVE) {
           return false;
         }
+        if (nnContext.getState() == FederationNamenodeServiceState.STANDBY) {
+          standbyCount++;
+        }
+      }
+      // At this moment, there is no ACTIVE nn in the cluster.
+      // Here are some cases:
+      // if this is a normal router, no retry;
+      // if this is a router on observer, sub cases are:
+      //    if all states are standby, then they are all observers, retry;
+      //    if not all states are standby, either this is a normal
+      //        active-standby cluster and no active is working OR this is
+      //        active-standby-observer cluster with some observer is broken
+      //        Right now we cannot distinguish HA state for observer from
+      //        standby so there is no way to decide thus no retry.
+      if (isObserverRouter) {
+        return standbyCount != nnState.size();
       }
     }
 
