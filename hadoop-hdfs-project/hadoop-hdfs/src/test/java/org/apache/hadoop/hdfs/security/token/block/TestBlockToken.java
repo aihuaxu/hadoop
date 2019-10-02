@@ -423,7 +423,7 @@ public class TestBlockToken {
     for(int nnIdx = 0; nnIdx < 64; nnIdx++) {
       BlockTokenSecretManager sm = new BlockTokenSecretManager(
           blockKeyUpdateInterval, blockTokenLifetime, nnIdx, numNNs,
-          "fake-pool", null, false);
+          "fake-pool", null);
       int rangeStart = nnIdx * interval;
       for(int i = 0; i < interval * 3; i++) {
         int serialNo = sm.getSerialNoForTesting();

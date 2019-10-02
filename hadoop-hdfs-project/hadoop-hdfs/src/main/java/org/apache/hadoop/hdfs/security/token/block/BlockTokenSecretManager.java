@@ -113,7 +113,7 @@ public class BlockTokenSecretManager extends
     Preconditions.checkArgument(numNNs > 0);
   }
   
-  private BlockTokenSecretManager(boolean isMaster, long keyUpdateInterval,
+  public BlockTokenSecretManager(boolean isMaster, long keyUpdateInterval,
       long tokenLifetime, String blockPoolId, String encryptionAlgorithm, int nnIndex, int numNNs) {
     this.intRange = Integer.MAX_VALUE / numNNs;
     this.nnRangeStart = intRange * nnIndex;

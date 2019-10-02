@@ -26,6 +26,8 @@ import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_LIFELINE_HANDLER
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_LIFELINE_HANDLER_RATIO_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_SERVICE_HANDLER_COUNT_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_SERVICE_HANDLER_COUNT_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_STATE_CONTEXT_ENABLED_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_STATE_CONTEXT_ENABLED_KEY;
 import static org.apache.hadoop.hdfs.server.common.HdfsServerConstants.MAX_PATH_DEPTH;
 import static org.apache.hadoop.hdfs.server.common.HdfsServerConstants.MAX_PATH_LENGTH;
 import static org.apache.hadoop.util.Time.now;
@@ -416,6 +418,16 @@ public class NameNodeRpcServer implements NamenodeProtocols {
     }
     LOG.info("RPC server is binding to " + bindHost + ":" + rpcAddr.getPort());
 
+    boolean enableStateContext = conf.getBoolean(
+        DFS_NAMENODE_STATE_CONTEXT_ENABLED_KEY,
+        DFS_NAMENODE_STATE_CONTEXT_ENABLED_DEFAULT);
+    LOG.info("Enable NameNode state context:" + enableStateContext);
+
+    GlobalStateIdContext stateIdContext = null;
+    if (enableStateContext) {
+      stateIdContext = new GlobalStateIdContext((namesystem));
+    }
+
     this.clientRpcServer = new RPC.Builder(conf)
         .setProtocol(
             org.apache.hadoop.hdfs.protocolPB.ClientNamenodeProtocolPB.class)
@@ -423,7 +435,7 @@ public class NameNodeRpcServer implements NamenodeProtocols {
         .setPort(rpcAddr.getPort()).setNumHandlers(handlerCount)
         .setVerbose(false)
         .setSecretManager(namesystem.getDelegationTokenSecretManager())
-        .setAlignmentContext(new GlobalStateIdContext(namesystem))
+        .setAlignmentContext(stateIdContext)
         .build();
 
     // Add all the RPC protocols that the namenode implements

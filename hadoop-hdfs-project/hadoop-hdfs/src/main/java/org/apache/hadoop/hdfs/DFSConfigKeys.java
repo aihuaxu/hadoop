@@ -964,7 +964,11 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
       "httpfs.buffer.size";
   public static final int HTTP_BUFFER_SIZE_DEFAULT = 4096;
 
-  // dfs.client.retry confs are moved to HdfsClientConfigKeys.Retry 
+  public static final String DFS_NAMENODE_STATE_CONTEXT_ENABLED_KEY =
+      "dfs.namenode.state.context.enabled";
+  public static final boolean DFS_NAMENODE_STATE_CONTEXT_ENABLED_DEFAULT = false;
+
+  // dfs.client.retry confs are moved to HdfsClientConfigKeys.Retry
   @Deprecated
   public static final String  DFS_CLIENT_RETRY_POLICY_ENABLED_KEY
       = HdfsClientConfigKeys.Retry.POLICY_ENABLED_KEY;
