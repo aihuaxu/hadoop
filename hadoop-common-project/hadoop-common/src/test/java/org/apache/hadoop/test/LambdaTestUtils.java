@@ -523,7 +523,6 @@ public final class LambdaTestUtils {
    * A simple interface for lambdas, which returns nothing; this exists
    * to simplify lambda tests on operations with no return value.
    */
-  @FunctionalInterface
   public interface VoidCallable {
     void call() throws Exception;
   }
