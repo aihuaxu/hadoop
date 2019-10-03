@@ -109,6 +109,7 @@ import org.apache.hadoop.hdfs.server.datanode.fsdataset.impl.FsDatasetUtil;
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.impl.FsVolumeImpl;
 import org.apache.hadoop.hdfs.server.namenode.EditLogFileOutputStream;
 import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
+import org.apache.hadoop.hdfs.server.namenode.ImageServlet;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.hdfs.server.namenode.NameNodeAdapter;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeStorage;
@@ -934,6 +935,11 @@ public class MiniDFSCluster implements AutoCloseable {
           manageNameDfsDirs, enableManagedDfsDirsRedundancy,
           format, operation, clusterId, nnCounter);
       nnCounter += nameservice.getNNs().size();
+    }
+
+    for (NameNodeInfo nn : namenodes.values()) {
+      nn.nameNode.getHttpServer()
+          .setAttribute(ImageServlet.RECENT_IMAGE_CHECK_ENABLED, false);
     }
   }
 
@@ -2036,6 +2042,8 @@ public class MiniDFSCluster implements AutoCloseable {
     }
 
     NameNode nn = NameNode.createNameNode(args, info.conf);
+    nn.getHttpServer()
+        .setAttribute(ImageServlet.RECENT_IMAGE_CHECK_ENABLED, false);
     info.nameNode = nn;
     info.setStartOpt(startOpt);
     if (waitActive) {

@@ -59,6 +59,7 @@ import org.apache.hadoop.hdfs.server.protocol.NamenodeProtocol;
 import org.apache.hadoop.hdfs.server.protocol.NamenodeProtocols;
 import org.apache.hadoop.hdfs.server.protocol.NamenodeRegistration;
 import org.apache.hadoop.hdfs.server.protocol.NamespaceInfo;
+import org.apache.hadoop.http.HttpServer2;
 import org.apache.hadoop.ipc.ExternalCall;
 import org.apache.hadoop.ipc.RefreshCallQueueProtocol;
 import org.apache.hadoop.ipc.RetriableException;
@@ -485,7 +486,12 @@ public class NameNode implements NameNodeStatusMXBean {
     LOG.info("Setting ADDRESS {}", address);
     conf.set(DFS_NAMENODE_SERVICE_RPC_ADDRESS_KEY, address);
   }
-  
+
+  @VisibleForTesting
+  public HttpServer2 getHttpServer() {
+    return httpServer.getHttpServer();
+  }
+
   /**
    * Fetches the address for services to use when connecting to namenode
    * based on the value of fallback returns null if the special
