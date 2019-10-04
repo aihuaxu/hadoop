@@ -43,6 +43,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerUtils;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.AppPriorityACLConfigurationParser.AppPriorityACLKeyType;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.policy.PriorityUtilizationQueueOrderingPolicy;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.policy.QueueOrderingPolicy;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.policy.RandomQueueOrderingPolicy;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.policy.FairOrderingPolicy;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.policy.FifoOrderingPolicy;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.policy.OrderingPolicy;
@@ -1344,6 +1345,12 @@ public class CapacitySchedulerConfiguration extends ReservationSchedulerConfigur
   public static final String QUEUE_PRIORITY_UTILIZATION_ORDERING_POLICY =
       "priority-utilization";
 
+  /**
+   * Random queue selection
+   */
+  public static final String RANDOM_ORDERING_POLICY =
+      "random-queue";
+
   public static final String DEFAULT_QUEUE_ORDERING_POLICY =
       QUEUE_UTILIZATION_ORDERING_POLICY;
 
@@ -1371,6 +1378,8 @@ public class CapacitySchedulerConfiguration extends ReservationSchedulerConfigur
     } else if (policyType.trim().equals(
         QUEUE_PRIORITY_UTILIZATION_ORDERING_POLICY)) {
       qop = new PriorityUtilizationQueueOrderingPolicy(true);
+    } else if (policyType.trim().equals(RANDOM_ORDERING_POLICY)) {
+      qop = new RandomQueueOrderingPolicy();
     } else {
       String message =
           "Unable to construct queue ordering policy=" + policyType + " queue="
