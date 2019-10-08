@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.hdfs.qjournal.client;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.TimeoutException;
@@ -61,13 +63,15 @@ class QuorumCall<KEY, RESULT> {
    */
   private static final float WAIT_PROGRESS_WARN_THRESHOLD = 0.7f;
   private final StopWatch quorumStopWatch = new StopWatch();
-  
+  private final List<ListenableFuture<RESULT>> allCalls;
+
   static <KEY, RESULT> QuorumCall<KEY, RESULT> create(
       Map<KEY, ? extends ListenableFuture<RESULT>> calls) {
     final QuorumCall<KEY, RESULT> qr = new QuorumCall<KEY, RESULT>();
     for (final Entry<KEY, ? extends ListenableFuture<RESULT>> e : calls.entrySet()) {
       Preconditions.checkArgument(e.getValue() != null,
           "null future for key: " + e.getKey());
+      qr.addCall(e.getValue());
       Futures.addCallback(e.getValue(), new FutureCallback<RESULT>() {
         @Override
         public void onFailure(Throwable t) {
@@ -85,6 +89,11 @@ class QuorumCall<KEY, RESULT> {
   
   private QuorumCall() {
     // Only instantiated from factory method above
+    this.allCalls = new ArrayList<>();
+  }
+
+  private void addCall(ListenableFuture<RESULT> call) {
+    allCalls.add(call);
   }
 
   private void restartQuorumStopWatch() {
@@ -168,6 +177,15 @@ class QuorumCall<KEY, RESULT> {
       if (shouldIncreaseQuorumTimeout(-rem, millis)) {
         et = et + millis;
       }
+    }
+  }
+
+  /**
+   * Cancel any outstanding calls.
+   */
+  void cancelCalls() {
+    for (ListenableFuture<RESULT> call : allCalls) {
+      call.cancel(true);
     }
   }
 
