@@ -97,7 +97,7 @@ then
   fi
 fi
 HADOOP_LOGLEVEL="${HADOOP_LOGLEVEL:-INFO}"
- 
+
 # Allow alternate conf dir location.
 if [ -e "${HADOOP_PREFIX}/conf/hadoop-env.sh" ]; then
   DEFAULT_CONF_DIR="conf"
@@ -106,6 +106,18 @@ else
 fi
 
 export HADOOP_CONF_DIR="${HADOOP_CONF_DIR:-$HADOOP_PREFIX/$DEFAULT_CONF_DIR}"
+
+# Set conf file. Default to $envScript (hadoop-env.sh)
+envScript="${HADOOP_CONF_DIR}/hadoop-env.sh"
+if [ $# -gt 1 ]
+then
+  if [ "--env" = "$1" ]
+  then
+    shift
+    envScript=$1
+    shift
+  fi
+fi
 
 # User can specify hostnames or a file where the hostnames are (not both)
 if [[ ( "$HADOOP_SLAVES" != '' ) && ( "$HADOOP_SLAVE_NAMES" != '' ) ]] ; then
@@ -141,8 +153,8 @@ if [[ ( "$HADOOP_SLAVES" != '' ) && ( "$HADOOP_SLAVE_NAMES" != '' ) ]] ; then
   exit 1
 fi
 
-if [ -f "${HADOOP_CONF_DIR}/hadoop-env.sh" ]; then
-  . "${HADOOP_CONF_DIR}/hadoop-env.sh"
+if [ -f "$envScript" ]; then
+  . "$envScript"
 fi
 
 cygwin=false

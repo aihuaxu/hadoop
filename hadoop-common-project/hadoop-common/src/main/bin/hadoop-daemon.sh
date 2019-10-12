@@ -28,20 +28,13 @@
 #   HADOOP_NICENESS The scheduling priority for daemons. Defaults to 0.
 ##
 
-usage="Usage: hadoop-daemon.sh [--config <conf-dir>] [--hosts hostlistfile] [--script script] (start|stop) <hadoop-command> <args...>"
+usage="Usage: hadoop-daemon.sh [--config <conf-dir>] [--hosts hostlistfile] [--script script] [--env envScript] (start|stop) <hadoop-command> <args...>"
 
 # if no args specified, show usage
 if [ $# -le 1 ]; then
   echo $usage
   exit 1
 fi
-
-bin=`dirname "${BASH_SOURCE-$0}"`
-bin=`cd "$bin"; pwd`
-
-DEFAULT_LIBEXEC_DIR="$bin"/../libexec
-HADOOP_LIBEXEC_DIR=${HADOOP_LIBEXEC_DIR:-$DEFAULT_LIBEXEC_DIR}
-. $HADOOP_LIBEXEC_DIR/hadoop-config.sh
 
 # get arguments
 
@@ -53,10 +46,24 @@ if [ "--script" = "$1" ]
     hadoopScript=$1
     shift
 fi
+envScript="${HADOOP_CONF_DIR}/hadoop-env.sh"
+if [ "--env" = "$1" ]
+  then
+    shift
+    envScript=$1
+    shift
+fi
 startStop=$1
 shift
 command=$1
 shift
+
+bin=`dirname "${BASH_SOURCE-$0}"`
+bin=`cd "$bin"; pwd`
+
+DEFAULT_LIBEXEC_DIR="$bin"/../libexec
+HADOOP_LIBEXEC_DIR=${HADOOP_LIBEXEC_DIR:-$DEFAULT_LIBEXEC_DIR}
+. $HADOOP_LIBEXEC_DIR/hadoop-config.sh --env "$envScript"
 
 hadoop_rotate_log ()
 {
@@ -74,10 +81,6 @@ hadoop_rotate_log ()
 	mv "$log" "$log.$num";
     fi
 }
-
-if [ -f "${HADOOP_CONF_DIR}/hadoop-env.sh" ]; then
-  . "${HADOOP_CONF_DIR}/hadoop-env.sh"
-fi
 
 # Determine if we're starting a secure datanode, and if so, redefine appropriate variables
 if [ "$command" == "datanode" ] && [ "$EUID" -eq 0 ] && [ -n "$HADOOP_SECURE_DN_USER" ]; then
