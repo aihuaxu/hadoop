@@ -31,6 +31,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.util.HostsFileReader;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
@@ -42,6 +43,7 @@ import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.api.records.NodeState;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.api.records.ResourceOption;
+import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.event.EventHandler;
 import org.apache.hadoop.yarn.event.InlineDispatcher;
 import org.apache.hadoop.yarn.server.api.protocolrecords.NodeHeartbeatResponse;
@@ -53,6 +55,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.ContainerAllocationExpirer;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeCleanAppEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeCleanContainerEvent;
+import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeDecommissioningEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeEventType;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeFinishedContainersPulledByAMEvent;
@@ -117,6 +120,7 @@ public class TestRMNodeTransitions {
         new RMContextImpl(rmDispatcher, mock(ContainerAllocationExpirer.class),
           null, null, mock(DelegationTokenRenewer.class), null, null, null,
           null, null);
+    ((RMContextImpl) rmContext).setYarnConfiguration(new YarnConfiguration());
     NodesListManager nodesListManager = mock(NodesListManager.class);
     HostsFileReader reader = mock(HostsFileReader.class);
     when(nodesListManager.getHostsReader()).thenReturn(reader);
@@ -130,7 +134,7 @@ public class TestRMNodeTransitions {
             final SchedulerEvent event = (SchedulerEvent)(invocation.getArguments()[0]);
             eventType = event.getType();
             if (eventType == SchedulerEventType.NODE_UPDATE) {
-              List<UpdatedContainerInfo> lastestContainersInfoList = 
+              List<UpdatedContainerInfo> lastestContainersInfoList =
                   ((NodeUpdateSchedulerEvent)event).getRMNode().pullContainerUpdates();
               for(UpdatedContainerInfo lastestContainersInfo : lastestContainersInfoList) {
             	  completedContainers.addAll(lastestContainersInfo.getCompletedContainers()); 
@@ -673,6 +677,296 @@ public class TestRMNodeTransitions {
   }
 
   @Test
+  public void testHealthyToUnHealthyStressedSingleNodeAboveThreshold() {
+    Configuration conf = new YarnConfiguration();
+    // No threshold for stressed nodes, which means all stressed reports should be ignored
+    conf.set(YarnConfiguration.RM_THRESHOLD_PERCENTAGE_STRESSED_NODES, "0.0");
+    ((RMContextImpl) rmContext).setYarnConfiguration(conf);
+
+    RMNodeImpl node = getRunningNode();
+    rmContext.getRMNodes().put(node.getNodeID(), node);
+
+    NodeHealthStatus status = NodeHealthStatus.newInstance(true, "NODE_STRESSED",
+            System.currentTimeMillis());
+    NodeStatus nodeStatus = NodeStatus.newInstance(node.getNodeID(), 0,
+            null, null, status, null, null,
+            null);
+    node.handle(new RMNodeStatusEvent(node.getNodeID(), nodeStatus, null));
+
+    // Change in the node running status
+    Assert.assertEquals(NodeState.RUNNING, node.getState());
+    Assert.assertEquals(0, rmContext.getStressedRMNodes().size());
+    // Node should not have stressed in the health report
+    Assert.assertTrue(!node.getHealthReport().contains("NODE_STRESSED"));
+
+    node = getRunningNode();
+    rmContext.getRMNodes().put(node.getNodeID(), node);
+
+    status = NodeHealthStatus.newInstance(false, "NODE_STRESSED",
+        System.currentTimeMillis());
+    nodeStatus = NodeStatus.newInstance(node.getNodeID(), 0,
+        null, null, status, null, null,
+        null);
+    node.handle(new RMNodeStatusEvent(node.getNodeID(), nodeStatus, null));
+
+    // Node should change to unhealthy irrespective of stress threshold
+    Assert.assertEquals(NodeState.UNHEALTHY, node.getState());
+    // Node should not have stressed in the health report as threshold has been reached
+    Assert.assertTrue(!node.getHealthReport().contains("NODE_STRESSED"));
+
+    rmContext.getRMNodes().clear();
+    rmContext.getStressedRMNodes().clear();
+  }
+
+  @Test
+  public void testHealthyToUnHealthyStressedDifferentNodes() {
+    Configuration conf = new YarnConfiguration();
+    // 100% of nodes could be stressed
+    conf.set(YarnConfiguration.RM_THRESHOLD_PERCENTAGE_STRESSED_NODES, "100.0");
+    ((RMContextImpl) rmContext).setYarnConfiguration(conf);
+
+    RMNodeImpl nodeA = getRunningNode();
+    rmContext.getRMNodes().put(nodeA.getNodeID(), nodeA);
+
+    NodeHealthStatus status = NodeHealthStatus.newInstance(true, "unhealthy;NODE_STRESSED",
+            System.currentTimeMillis());
+    NodeStatus nodeStatus = NodeStatus.newInstance(nodeA.getNodeID(), 0,
+            null, null, status, null, null,
+            null);
+    nodeA.handle(new RMNodeStatusEvent(nodeA.getNodeID(), nodeStatus, null));
+
+    // Node should become unhealthy
+    Assert.assertEquals(NodeState.UNHEALTHY, nodeA.getState());
+    Assert.assertEquals(1, rmContext.getStressedRMNodes().size());
+    Assert.assertTrue(nodeA.getHealthReport().contains("NODE_STRESSED"));
+    Assert.assertTrue(nodeA.getHealthReport().contains("unhealthy"));
+
+    RMNodeImpl nodeB = getRunningNode("ver1", 4096);
+    rmContext.getRMNodes().put(nodeB.getNodeID(), nodeB);
+
+    // 50% of nodes could be stressed
+    conf.set(YarnConfiguration.RM_THRESHOLD_PERCENTAGE_STRESSED_NODES, "50.0");
+    ((RMContextImpl) rmContext).setYarnConfiguration(conf);
+
+    status = NodeHealthStatus.newInstance(true, "NODE_STRESSED",
+            System.currentTimeMillis());
+    nodeStatus = NodeStatus.newInstance(nodeB.getNodeID(), 0,
+            null, null, status, null, null,
+            null);
+
+    nodeB.handle(new RMNodeStatusEvent(nodeB.getNodeID(), nodeStatus, null));
+
+    // Only 50% of the nodes could be in stressed state
+    // This node should not go to the UNHEALTHY state
+    Assert.assertEquals(NodeState.RUNNING, nodeB.getState());
+    Assert.assertEquals(1, rmContext.getStressedRMNodes().size());
+    Assert.assertTrue(!nodeB.getHealthReport().contains("NODE_STRESSED"));
+
+    rmContext.getStressedRMNodes().clear();
+    rmContext.getRMNodes().clear();
+  }
+
+  @Test
+  public void testUnHealthyStressedToUnHealthyStressedSingleNode() {
+    Configuration conf = new YarnConfiguration();
+    conf.set(YarnConfiguration.RM_THRESHOLD_PERCENTAGE_STRESSED_NODES, "0.0");
+    ((RMContextImpl) rmContext).setYarnConfiguration(conf);
+
+    RMNodeImpl nodeA = getUnhealthyNode();
+    rmContext.getRMNodes().put(nodeA.getNodeID(), nodeA);
+    nodeA.setHealthReport("NODE_STRESSED");
+    rmContext.getStressedRMNodes().put(nodeA.getNodeID(), nodeA);
+
+    NodeHealthStatus status = NodeHealthStatus.newInstance(false, "unhealthy;NODE_STRESSED",
+            System.currentTimeMillis());
+    NodeStatus nodeStatus = NodeStatus.newInstance(nodeA.getNodeID(), 0,
+            null, null, status, null, null,
+            null);
+    nodeA.handle(new RMNodeStatusEvent(nodeA.getNodeID(), nodeStatus, null));
+
+    // Threshold doesn't matter as this node was already stressed
+    Assert.assertEquals(NodeState.UNHEALTHY, nodeA.getState());
+    Assert.assertEquals(1, rmContext.getStressedRMNodes().size());
+    Assert.assertTrue(nodeA.getHealthReport().contains("NODE_STRESSED"));
+    Assert.assertTrue(nodeA.getHealthReport().contains("unhealthy"));
+
+    rmContext.getStressedRMNodes().clear();
+    rmContext.getRMNodes().clear();
+  }
+
+  @Test
+  public void testUnHealthyStressedToRunningSingleNodeBelowThreshold() {
+    Configuration conf = new YarnConfiguration();
+    conf.set(YarnConfiguration.RM_THRESHOLD_PERCENTAGE_STRESSED_NODES, "0.0");
+    ((RMContextImpl) rmContext).setYarnConfiguration(conf);
+
+    RMNodeImpl nodeA = getUnhealthyNode();
+    nodeA.setHealthReport("NODE_STRESSED");
+
+    rmContext.getRMNodes().put(nodeA.getNodeID(), nodeA);
+    rmContext.getStressedRMNodes().put(nodeA.getNodeID(), nodeA);
+
+    NodeHealthStatus status = NodeHealthStatus.newInstance(true, "",
+            System.currentTimeMillis());
+    NodeStatus nodeStatus = NodeStatus.newInstance(nodeA.getNodeID(), 0,
+            null, null, status, null, null,
+            null);
+    nodeA.handle(new RMNodeStatusEvent(nodeA.getNodeID(), nodeStatus, null));
+
+    Assert.assertEquals(NodeState.RUNNING, nodeA.getState());
+    Assert.assertEquals(0, rmContext.getStressedRMNodes().size());
+    Assert.assertTrue(!nodeA.getHealthReport().contains("NODE_STRESSED"));
+    Assert.assertTrue(nodeA.getHealthReport().equals(""));
+
+    rmContext.getStressedRMNodes().clear();
+    rmContext.getRMNodes().clear();
+  }
+
+  @Test
+  public void testUnHealthyToRunningSingleNodeBelowThreshold() {
+    Configuration conf = new YarnConfiguration();
+    conf.set(YarnConfiguration.RM_THRESHOLD_PERCENTAGE_STRESSED_NODES, "0.0");
+    ((RMContextImpl) rmContext).setYarnConfiguration(conf);
+
+    RMNodeImpl nodeA = getUnhealthyNode();
+    rmContext.getRMNodes().put(nodeA.getNodeID(), nodeA);
+
+    NodeHealthStatus status = NodeHealthStatus.newInstance(true, "healthy;NODE_STRESSED",
+            System.currentTimeMillis());
+    NodeStatus nodeStatus = NodeStatus.newInstance(nodeA.getNodeID(), 0,
+            null, null, status, null, null,
+            null);
+
+    nodeA.handle(new RMNodeStatusEvent(nodeA.getNodeID(), nodeStatus, null));
+
+    // Node should be running mode since threshold doesn't allow
+    Assert.assertEquals(NodeState.RUNNING, nodeA.getState());
+    Assert.assertTrue(!nodeA.getHealthReport().contains("NODE_STRESSED"));
+    Assert.assertTrue(nodeA.getHealthReport().contains("healthy"));
+
+    rmContext.getRMNodes().clear();
+    rmContext.getStressedRMNodes().clear();
+  }
+
+  // Unhealthy to Unhealthy + stressed above threshold
+  @Test
+  public void testUnHealthyToUnHealthyStressedAboveThreshold() {
+    Configuration conf = new YarnConfiguration();
+    conf.set(YarnConfiguration.RM_THRESHOLD_PERCENTAGE_STRESSED_NODES, "100.0");
+    ((RMContextImpl) rmContext).setYarnConfiguration(conf);
+
+    ClusterMetrics cm = ClusterMetrics.getMetrics();
+    int initialStressed = cm.getNumStressedNodes();
+
+    RMNodeImpl nodeA = getUnhealthyNode();
+    rmContext.getRMNodes().put(nodeA.getNodeID(), nodeA);
+
+    NodeHealthStatus status = NodeHealthStatus.newInstance(true, "healthy;NODE_STRESSED",
+            System.currentTimeMillis());
+    NodeStatus nodeStatus = NodeStatus.newInstance(nodeA.getNodeID(), 0,
+            null, null, status, null, null,
+            null);
+    nodeA.handle(new RMNodeStatusEvent(nodeA.getNodeID(), nodeStatus, null));
+    Assert.assertEquals(NodeState.UNHEALTHY, nodeA.getState());
+    Assert.assertEquals(rmContext.getStressedRMNodes().size(), 1);
+    Assert.assertTrue(nodeA.getHealthReport().contains("NODE_STRESSED"));
+
+    Assert.assertEquals("Stressed Nodes", initialStressed + 1,
+        cm.getNumStressedNodes());
+
+    rmContext.getRMNodes().clear();
+    rmContext.getStressedRMNodes().clear();
+  }
+
+  // Unhealthy to unhealthy + stressed
+  // Running to unhealthy + stressed
+  @Test
+  public void testTransitionToStressedMultipleNodes() {
+    Configuration conf = new YarnConfiguration();
+    conf.set(YarnConfiguration.RM_THRESHOLD_PERCENTAGE_STRESSED_NODES, "100.0");
+    ((RMContextImpl) rmContext).setYarnConfiguration(conf);
+
+    ClusterMetrics cm = ClusterMetrics.getMetrics();
+    int initialStressed = cm.getNumStressedNodes();
+
+    RMNodeImpl nodeA = getUnhealthyNode();
+    rmContext.getRMNodes().put(nodeA.getNodeID(), nodeA);
+
+    NodeHealthStatus status = NodeHealthStatus.newInstance(true, "NODE_STRESSED",
+            System.currentTimeMillis());
+    NodeStatus nodeStatus = NodeStatus.newInstance(nodeA.getNodeID(), 0,
+            null, null, status, null, null,
+            null);
+    nodeA.handle(new RMNodeStatusEvent(nodeA.getNodeID(), nodeStatus, null));
+    Assert.assertEquals(NodeState.UNHEALTHY, nodeA.getState());
+    Assert.assertEquals(1, rmContext.getStressedRMNodes().size());
+
+    RMNodeImpl nodeB = getRunningNode("ver1", 4096);
+    rmContext.getRMNodes().put(nodeB.getNodeID(), nodeB);
+
+    status = NodeHealthStatus.newInstance(true, "NODE_STRESSED",
+            System.currentTimeMillis());
+    nodeStatus = NodeStatus.newInstance(nodeB.getNodeID(), 0,
+            null, null, status, null, null,
+            null);
+    nodeB.handle(new RMNodeStatusEvent(nodeB.getNodeID(), nodeStatus, null));
+
+    // All of the nodes could be stressed
+    // This node should  go to the UNHEALTHY state
+    Assert.assertEquals(NodeState.UNHEALTHY, nodeB.getState());
+    Assert.assertEquals(2, rmContext.getStressedRMNodes().size());
+
+    Assert.assertEquals("Stressed Nodes", initialStressed + 2,
+        cm.getNumStressedNodes());
+
+    rmContext.getStressedRMNodes().clear();
+    rmContext.getRMNodes().clear();
+  }
+
+  @Test
+  public void testUnHealthyToDecommissionAndDeActivated() {
+    // unhealthy + stressed to decommissioning
+    Configuration conf = new YarnConfiguration();
+    conf.set(YarnConfiguration.RM_THRESHOLD_PERCENTAGE_STRESSED_NODES, "100.0");
+    ((RMContextImpl) rmContext).setYarnConfiguration(conf);
+
+    ClusterMetrics cm = ClusterMetrics.getMetrics();
+    int initialStressed = cm.getNumStressedNodes();
+
+    RMNodeImpl nodeA = getUnhealthyNode();
+    rmContext.getRMNodes().put(nodeA.getNodeID(), nodeA);
+    rmContext.getStressedRMNodes().put(nodeA.getNodeID(), nodeA);
+    nodeA.setHealthReport("healthy;NODE_STRESSED");
+
+    nodeA.handle(new RMNodeDecommissioningEvent(nodeA.getNodeID(), Integer.MAX_VALUE));
+
+    Assert.assertEquals(NodeState.DECOMMISSIONING, nodeA.getState());
+    Assert.assertEquals(0, rmContext.getStressedRMNodes().size());
+    Assert.assertTrue(!nodeA.getHealthReport().contains("NODE_STRESSED"));
+
+    RMNodeImpl nodeB = getUnhealthyNode();
+    rmContext.getRMNodes().put(nodeA.getNodeID(), nodeA);
+    rmContext.getStressedRMNodes().put(nodeA.getNodeID(), nodeA);
+    nodeA.setHealthReport("healthy;NODE_STRESSED");
+
+    Assert.assertEquals("Stressed Nodes", initialStressed - 1,
+        cm.getNumStressedNodes());
+
+    // unhealthy + stressed to expire
+    nodeB.handle(new RMNodeEvent(nodeB.getNodeID(), RMNodeEventType.EXPIRE));
+
+    Assert.assertEquals(NodeState.LOST, nodeB.getState());
+    Assert.assertEquals(0, rmContext.getStressedRMNodes().size());
+    Assert.assertTrue(!nodeB.getHealthReport().contains("NODE_STRESSED"));
+
+    Assert.assertEquals("Stressed Nodes", initialStressed - 2,
+        cm.getNumStressedNodes());
+
+    rmContext.getStressedRMNodes().clear();
+    rmContext.getRMNodes().clear();
+  }
+
+  @Test
   public void testUnknownNodeId() {
     NodeId nodeId =
         NodesListManager.createUnknownNodeId("host1");
@@ -919,8 +1213,12 @@ public class TestRMNodeTransitions {
   // Otherwise, it will go to decommissioned
   @Test
   public void testDecommissioningUnhealthy() {
+    Configuration conf = new YarnConfiguration();
+    conf.set(YarnConfiguration.RM_THRESHOLD_PERCENTAGE_STRESSED_NODES, "100.0");
+    ((RMContextImpl) rmContext).setYarnConfiguration(conf);
+
     RMNodeImpl node = getDecommissioningNode();
-    NodeHealthStatus status = NodeHealthStatus.newInstance(false, "sick",
+    NodeHealthStatus status = NodeHealthStatus.newInstance(false, "sick;NODE_STRESSED",
         System.currentTimeMillis());
     List<ApplicationId> keepAliveApps = new ArrayList<>();
     keepAliveApps.add(BuilderUtils.newApplicationId(1, 1));
@@ -928,8 +1226,14 @@ public class TestRMNodeTransitions {
         null, keepAliveApps, status, null, null, null);
     node.handle(new RMNodeStatusEvent(node.getNodeID(), nodeStatus, null));
     Assert.assertEquals(NodeState.DECOMMISSIONING, node.getState());
+    Assert.assertTrue(!node.getHealthReport().contains("NODE_STRESSED"));
+    Assert.assertTrue(node.getHealthReport().contains("sick"));
+    Assert.assertEquals(0, rmContext.getStressedRMNodes().size());
     nodeStatus.setKeepAliveApplications(null);
     node.handle(new RMNodeStatusEvent(node.getNodeID(), nodeStatus, null));
+    Assert.assertTrue(!node.getHealthReport().contains("NODE_STRESSED"));
+    Assert.assertTrue(node.getHealthReport().contains("sick"));
+    Assert.assertEquals(0, rmContext.getStressedRMNodes().size());
     Assert.assertEquals(NodeState.DECOMMISSIONED, node.getState());
   }
 

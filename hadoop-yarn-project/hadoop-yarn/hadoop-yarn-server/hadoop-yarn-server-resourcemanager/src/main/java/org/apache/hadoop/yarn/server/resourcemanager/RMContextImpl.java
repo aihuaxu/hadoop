@@ -33,6 +33,7 @@ import org.apache.hadoop.yarn.LocalConfigurationProvider;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.conf.ConfigurationProvider;
+import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.event.Dispatcher;
 import org.apache.hadoop.yarn.server.resourcemanager.ahs.RMApplicationHistoryWriter;
 import org.apache.hadoop.yarn.server.resourcemanager.metrics.SystemMetricsPublisher;
@@ -277,6 +278,23 @@ public class RMContextImpl implements RMContext {
     serviceContext.setYarnConfiguration(yarnConfiguration);
   }
 
+  @Override
+  public boolean canAddStressedNodes() {
+    double thresholdPercentage = YarnConfiguration.thresholdPercentageOfStressedNodes(getYarnConfiguration());
+
+    // Current number of stressed nodes
+    int stressedNodes = getStressedRMNodes().size();
+    // Total nodes
+    int totalNodes = getRMNodes().size();
+
+    // Percentage of stressed nodes if one more node is added to stressed map
+    double stressedNodesPercentage = ((stressedNodes + 1) * 100.0 ) / totalNodes;
+
+    // Return false, if violation of threshold occurs
+    // Return true, if no violation of threshold occurs
+    return stressedNodesPercentage <= thresholdPercentage;
+  }
+
   public String getHAZookeeperConnectionState() {
     return serviceContext.getHAZookeeperConnectionState();
   }
@@ -317,6 +335,11 @@ public class RMContextImpl implements RMContext {
   @Override
   public ConcurrentMap<NodeId, RMNode> getInactiveRMNodes() {
     return activeServiceContext.getInactiveRMNodes();
+  }
+
+  @Override
+  public ConcurrentMap<NodeId, RMNode> getStressedRMNodes() {
+    return activeServiceContext.getStressedRMNodes();
   }
 
   @Override

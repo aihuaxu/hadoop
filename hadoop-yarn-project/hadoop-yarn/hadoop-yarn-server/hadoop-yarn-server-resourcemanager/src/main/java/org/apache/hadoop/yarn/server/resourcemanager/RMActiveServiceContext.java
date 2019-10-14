@@ -73,6 +73,9 @@ public class RMActiveServiceContext {
   private final ConcurrentMap<NodeId, RMNode> inactiveNodes =
       new ConcurrentHashMap<NodeId, RMNode>();
 
+  private final ConcurrentMap<NodeId, RMNode> stressedNodes =
+      new ConcurrentHashMap<>();
+
   private final ConcurrentMap<ApplicationId, ByteBuffer> systemCredentials =
       new ConcurrentHashMap<ApplicationId, ByteBuffer>();
 
@@ -191,6 +194,12 @@ public class RMActiveServiceContext {
   @Unstable
   public ConcurrentMap<NodeId, RMNode> getInactiveRMNodes() {
     return this.inactiveNodes;
+  }
+
+  @Private
+  @Unstable
+  public ConcurrentMap<NodeId, RMNode> getStressedRMNodes() {
+    return this.stressedNodes;
   }
 
   @Private

@@ -1,20 +1,20 @@
 /**
-* Licensed to the Apache Software Foundation (ASF) under one
-* or more contributor license agreements.  See the NOTICE file
-* distributed with this work for additional information
-* regarding copyright ownership.  The ASF licenses this file
-* to you under the Apache License, Version 2.0 (the
-* "License"); you may not use this file except in compliance
-* with the License.  You may obtain a copy of the License at
-*
-*     http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
-*/
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 package org.apache.hadoop.yarn.server.resourcemanager.rmnode;
 
@@ -35,6 +35,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
 
+import com.google.common.base.CharMatcher;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
@@ -105,6 +106,9 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
   private static final RecordFactory recordFactory = RecordFactoryProvider
       .getRecordFactory(null);
 
+  /** Node stressed message*/
+  private static final String NODE_STRESSED_MSG = "NODE_STRESSED";
+
   private final ReadLock readLock;
   private final WriteLock writeLock;
 
@@ -143,7 +147,7 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
   private final ContainerAllocationExpirer containerAllocationExpirer;
   /* set of containers that have just launched */
   private final Set<ContainerId> launchedContainers =
-    new HashSet<ContainerId>();
+      new HashSet<ContainerId>();
 
   /* track completed container globally */
   private final Set<ContainerId> completedContainers =
@@ -171,7 +175,7 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
   /* the list of applications that are running on this node */
   private final List<ApplicationId> runningApplications =
       new ArrayList<ApplicationId>();
-  
+
   private final Map<ContainerId, Container> toBeUpdatedContainers =
       new HashMap<>();
 
@@ -188,7 +192,7 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
   private static final StateMachineFactory<RMNodeImpl,
                                            NodeState,
                                            RMNodeEventType,
-                                           RMNodeEvent> stateMachineFactory 
+                                           RMNodeEvent> stateMachineFactory
                  = new StateMachineFactory<RMNodeImpl,
                                            NodeState,
                                            RMNodeEventType,
@@ -254,7 +258,7 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
           RMNodeEventType.FINISHED_CONTAINERS_PULLED_BY_AM,
           new AddContainersToBeRemovedFromNMTransition())
 
-       //Transitions from DECOMMISSIONING state
+      //Transitions from DECOMMISSIONING state
       .addTransition(NodeState.DECOMMISSIONING, NodeState.DECOMMISSIONED,
           RMNodeEventType.DECOMMISSION,
           new DeactivateNodeTransition(NodeState.DECOMMISSIONED))
@@ -279,8 +283,8 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
           RMNodeEventType.REBOOTING,
           new DeactivateNodeTransition(NodeState.REBOOTED))
       .addTransition(NodeState.DECOMMISSIONING, NodeState.DECOMMISSIONING,
-         RMNodeEventType.FINISHED_CONTAINERS_PULLED_BY_AM,
-         new AddContainersToBeRemovedFromNMTransition())
+          RMNodeEventType.FINISHED_CONTAINERS_PULLED_BY_AM,
+          new AddContainersToBeRemovedFromNMTransition())
 
       .addTransition(NodeState.DECOMMISSIONING, NodeState.DECOMMISSIONING,
           RMNodeEventType.CLEANUP_APP, new CleanUpAppTransition())
@@ -358,7 +362,7 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
       .installTopology();
 
   private final StateMachine<NodeState, RMNodeEventType,
-                             RMNodeEvent> stateMachine;
+      RMNodeEvent> stateMachine;
 
   public RMNodeImpl(NodeId nodeId, RMContext context, String hostName,
       int cmPort, int httpPort, Node node, Resource capability,
@@ -375,7 +379,7 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
     this.hostName = hostName;
     this.commandPort = cmPort;
     this.httpPort = httpPort;
-    this.totalCapability = capability; 
+    this.totalCapability = capability;
     this.nodeAddress = hostName + ":" + cmPort;
     this.httpAddress = hostName + ":" + httpPort;
     this.node = node;
@@ -447,12 +451,12 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
   public String getRackName() {
     return node.getNetworkLocation();
   }
-  
+
   @Override
   public Node getNode() {
     return this.node;
   }
-  
+
   @Override
   public String getHealthReport() {
     this.readLock.lock();
@@ -463,7 +467,7 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
       this.readLock.unlock();
     }
   }
-  
+
   public void setHealthReport(String healthReport) {
     this.writeLock.lock();
 
@@ -473,7 +477,7 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
       this.writeLock.unlock();
     }
   }
-  
+
   public void setLastHealthReportTime(long lastHealthReportTime) {
     this.writeLock.lock();
 
@@ -483,7 +487,7 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
       this.writeLock.unlock();
     }
   }
-  
+
   @Override
   public long getLastHealthReportTime() {
     this.readLock.lock();
@@ -574,7 +578,7 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
     }
 
   }
-  
+
   @Override
   public List<ApplicationId> getRunningApps() {
     this.readLock.lock();
@@ -661,18 +665,18 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
       writeLock.lock();
       NodeState oldState = getState();
       try {
-         stateMachine.doTransition(event.getType(), event);
+        stateMachine.doTransition(event.getType(), event);
       } catch (InvalidStateTransitionException e) {
         LOG.error("Can't handle this event at current state", e);
-        LOG.error("Invalid event " + event.getType() + 
+        LOG.error("Invalid event " + event.getType() +
             " on Node  " + this.nodeId + " oldState " + oldState);
       }
       if (oldState != getState()) {
         LOG.info(nodeId + " Node Transitioned from " + oldState + " to "
-                 + getState());
+            + getState());
       }
     }
-    
+
     finally {
       writeLock.unlock();
     }
@@ -800,25 +804,102 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
     context.getDispatcher().getEventHandler()
         .handle(new RMAppRunningOnNodeEvent(appId, nodeId));
   }
-  
-  private static void updateNodeResourceFromEvent(RMNodeImpl rmNode, 
-     RMNodeResourceUpdateEvent event){
-      ResourceOption resourceOption = event.getResourceOption();
-      // Set resource on RMNode
-      rmNode.totalCapability = resourceOption.getResource();
+
+  private static void updateNodeResourceFromEvent(RMNodeImpl rmNode,
+      RMNodeResourceUpdateEvent event){
+    ResourceOption resourceOption = event.getResourceOption();
+    // Set resource on RMNode
+    rmNode.totalCapability = resourceOption.getResource();
   }
 
   private static NodeHealthStatus updateRMNodeFromStatusEvents(
       RMNodeImpl rmNode, RMNodeStatusEvent statusEvent) {
     // Switch the last heartbeatresponse.
+
     NodeHealthStatus remoteNodeHealthStatus = statusEvent.getNodeHealthStatus();
-    rmNode.setHealthReport(remoteNodeHealthStatus.getHealthReport());
+    String remoteNodeHealthReport = remoteNodeHealthStatus.getHealthReport();
+
+    // Process the stressed node signal
+    // Remote node is not reporting stress
+    if (!remoteNodeHealthStatus.isNodeStressed()) {
+      // Local node is already stressed
+      if (rmNode.context.getStressedRMNodes().containsKey(rmNode.nodeId)) {
+        // Remove the node from the stressed map
+        rmNode.context.getStressedRMNodes().remove(rmNode.nodeId);
+        ClusterMetrics.getMetrics().decrStressedNodes();
+        LOG.info("Removing the node:"+rmNode.toString() + " from the stressed state");
+      }
+      // Copy the remote health report as it is
+      rmNode.setHealthReport(remoteNodeHealthReport);
+    } else {
+      // Remote node is reporting stress
+      // Local node is also stressed
+      if (rmNode.context.getStressedRMNodes().containsKey(rmNode.nodeId)) {
+        // Copy the remote health report as it is
+        rmNode.setHealthReport(remoteNodeHealthReport);
+      } else {
+        // Local node state is not stressed
+        // Check if a node could be added to stressed map
+        if (rmNode.context.canAddStressedNodes()) {
+          // Put the stressed node in the stressed map
+          rmNode.context.getStressedRMNodes().put(rmNode.nodeId, rmNode);
+          ClusterMetrics.getMetrics().incrStressedNodes();
+          LOG.info("Put the node:"+rmNode.toString() + " in the stressed state");
+
+          // Copy the remote health report as it is
+          rmNode.setHealthReport(remoteNodeHealthReport);
+        } else {
+          LOG.warn("Not adding the node:"+rmNode.toString() +
+              " to the stressed state due to the threshold");
+
+          // If not, remove stress from healthReport and copy the remaining healthReport as it is
+          String healthReport = removeStressFromHealthReport(remoteNodeHealthReport);
+          rmNode.setHealthReport(healthReport);
+        }
+      }
+    }
+
     rmNode.setLastHealthReportTime(remoteNodeHealthStatus
         .getLastHealthReportTime());
     rmNode.setAggregatedContainersUtilization(statusEvent
         .getAggregatedContainersUtilization());
     rmNode.setNodeUtilization(statusEvent.getNodeUtilization());
     return remoteNodeHealthStatus;
+  }
+
+  // This function removes the stressed msg from node health report
+  // This is done when number of stressed nodes are more than threshold
+  private static String removeStressFromHealthReport(String healthReport) {
+    // HealthReport is ";" delimited list of health report
+    String[] healthReports = healthReport.split(";");
+    String localNodeHealthReport = "";
+
+    for (String report : healthReports) {
+      if (!report.equals(NODE_STRESSED_MSG)) {
+        localNodeHealthReport += report;
+        localNodeHealthReport += ";";
+      }
+    }
+
+    localNodeHealthReport = CharMatcher.is(';').trimTrailingFrom(localNodeHealthReport);
+
+    return localNodeHealthReport;
+  }
+
+  // This function cleans stressed signals from node
+  private static void cleanStressedSignalsFromNodeIfPresent(RMNodeImpl rmNode) {
+    if (rmNode != null &&
+        rmNode.context.getStressedRMNodes().containsKey(rmNode.nodeId)) {
+      // Remove node from the stressed map
+      rmNode.context.getStressedRMNodes().remove(rmNode.nodeId);
+      ClusterMetrics.getMetrics().decrStressedNodes();
+      LOG.info("Removing the node:"+rmNode.toString() + " from the stressed state");
+
+      // Also remove stressed report
+      String healthReport = rmNode.getHealthReport();
+      String removeStressedReport = removeStressFromHealthReport(healthReport);
+      rmNode.setHealthReport(removeStressedReport);
+    }
   }
 
   public static class AddNodeTransition implements
@@ -878,9 +959,9 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
       RMNode newNode = reconnectEvent.getReconnectedNode();
       rmNode.nodeManagerVersion = newNode.getNodeManagerVersion();
       List<ApplicationId> runningApps = reconnectEvent.getRunningApplications();
-      boolean noRunningApps = 
+      boolean noRunningApps =
           (runningApps == null) || (runningApps.size() == 0);
-      
+
       // No application running on the node, so send node-removal event with 
       // cleaning up old container info.
       if (noRunningApps) {
@@ -915,7 +996,7 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
           rmNode.totalCapability = newNode.getTotalCapability();
           isCapabilityChanged = true;
         }
-      
+
         handleNMContainerStatus(reconnectEvent.getNMContainerStatuses(), rmNode);
 
         for (ApplicationId appId : reconnectEvent.getRunningApplications()) {
@@ -959,7 +1040,7 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
       return cStatus;
     }
   }
-  
+
   public static class UpdateNodeResourceWhenRunningTransition
       implements SingleArcTransition<RMNodeImpl, RMNodeEvent> {
 
@@ -972,7 +1053,7 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
           new NodeResourceUpdateSchedulerEvent(rmNode, updateEvent.getResourceOption()));
     }
   }
-  
+
   public static class UpdateNodeResourceWhenUnusableTransition
       implements SingleArcTransition<RMNodeImpl, RMNodeEvent> {
 
@@ -986,9 +1067,9 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
       // and can sync later from RMnode.
     }
   }
-  
+
   public static class CleanUpAppTransition
-    implements SingleArcTransition<RMNodeImpl, RMNodeEvent> {
+      implements SingleArcTransition<RMNodeImpl, RMNodeEvent> {
 
     @Override
     public void transition(RMNodeImpl rmNode, RMNodeEvent event) {
@@ -1023,7 +1104,7 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
    */
   public static class UpdateContainersTransition
       implements SingleArcTransition<RMNodeImpl, RMNodeEvent> {
- 
+
     @Override
     public void transition(RMNodeImpl rmNode, RMNodeEvent event) {
       RMNodeUpdateContainerEvent de = (RMNodeUpdateContainerEvent) event;
@@ -1059,11 +1140,17 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
    * @param finalState
    */
   public static void deactivateNode(RMNodeImpl rmNode, NodeState finalState) {
+    // If node is UNHEALTHY
+    if (rmNode.getState() == NodeState.UNHEALTHY) {
+      // Remove from stressed map if already present
+      cleanStressedSignalsFromNodeIfPresent(rmNode);
+    }
 
     if (rmNode.getNodeID().getPort() == -1) {
       rmNode.updateMetricsForDeactivatedNode(rmNode.getState(), finalState);
       return;
     }
+
     reportNodeUnusable(rmNode, finalState);
 
     // Deactivate the node
@@ -1118,6 +1205,12 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
     @Override
     public void transition(RMNodeImpl rmNode, RMNodeEvent event) {
       Integer timeout = null;
+
+      // If node is unhealthy + stressed
+      if (initState == NodeState.UNHEALTHY) {
+        cleanStressedSignalsFromNodeIfPresent(rmNode);
+      }
+
       if (RMNodeDecommissioningEvent.class.isInstance(event)) {
         RMNodeDecommissioningEvent e = ((RMNodeDecommissioningEvent) event);
         timeout = e.getDecommissioningTimeout();
@@ -1126,7 +1219,7 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
       if (rmNode.getState() == NodeState.DECOMMISSIONING) {
         if (!Objects.equals(rmNode.getDecommissioningTimeout(), timeout)) {
           LOG.info("Update " + rmNode.getNodeID() +
-                   " DecommissioningTimeout to be " + timeout);
+              " DecommissioningTimeout to be " + timeout);
           rmNode.decommissioningTimeout = timeout;
         } else {
           LOG.info(rmNode.getNodeID() + " is already DECOMMISSIONING");
@@ -1195,18 +1288,25 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
         List<ApplicationId> keepAliveApps = statusEvent.getKeepAliveAppIds();
         if (rmNode.runningApplications.isEmpty() &&
             (keepAliveApps == null || keepAliveApps.isEmpty())) {
+          // Remove any stress signal from the node evaluated in updateRMNodeFromStatusEvents
+          cleanStressedSignalsFromNodeIfPresent(rmNode);
           RMNodeImpl.deactivateNode(rmNode, NodeState.DECOMMISSIONED);
           return NodeState.DECOMMISSIONED;
         }
       }
 
-      if (!remoteNodeHealthStatus.getIsNodeHealthy()) {
+      // Remote node state is unhealthy or stressed
+      // (evaluated in updateRMNodeFromStatusEvents)
+      if (!remoteNodeHealthStatus.getIsNodeHealthy()
+          || rmNode.context.getStressedRMNodes().containsKey(rmNode.nodeId)) {
         LOG.info("Node " + rmNode.nodeId +
             " reported UNHEALTHY with details: " +
             remoteNodeHealthStatus.getHealthReport());
-        // if a node in decommissioning receives an unhealthy report,
+
+        // If a node in decommissioning receives an unhealthy or stressed report,
         // it will stay in decommissioning.
         if (isNodeDecommissioning) {
+          cleanStressedSignalsFromNodeIfPresent(rmNode);
           return NodeState.DECOMMISSIONING;
         } else {
           reportNodeUnusable(rmNode, NodeState.UNHEALTHY);
@@ -1252,12 +1352,20 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
       // Switch the last heartbeatresponse.
       NodeHealthStatus remoteNodeHealthStatus = updateRMNodeFromStatusEvents(
           rmNode, statusEvent);
-      if (remoteNodeHealthStatus.getIsNodeHealthy()) {
+
+      // Node can become unhealthy in two cases
+      // a) Remote node is stressed and RM threshold for stressed node has not reached
+      //    (evaluated in updateRMNodeFromStatusEvents)
+      // b) Remote node state is unhealthy
+      if (rmNode.context.getStressedRMNodes().containsKey(rmNode.nodeId)
+          || !remoteNodeHealthStatus.getIsNodeHealthy()) {
+        return NodeState.UNHEALTHY;
+      } else {
         rmNode.context.getDispatcher().getEventHandler().handle(
             new NodeAddedSchedulerEvent(rmNode));
         rmNode.context.getDispatcher().getEventHandler().handle(
-                new NodesListManagerEvent(
-                    NodesListManagerEventType.NODE_USABLE, rmNode));
+            new NodesListManagerEvent(
+                NodesListManagerEventType.NODE_USABLE, rmNode));
         // ??? how about updating metrics before notifying to ensure that
         // notifiers get update metadata because they will very likely query it
         // upon notification
@@ -1265,8 +1373,6 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
         rmNode.updateMetricsForRejoinedNode(NodeState.UNHEALTHY);
         return NodeState.RUNNING;
       }
-
-      return NodeState.UNHEALTHY;
     }
   }
 
@@ -1282,7 +1388,7 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
 
   @Override
   public List<UpdatedContainerInfo> pullContainerUpdates() {
-    List<UpdatedContainerInfo> latestContainerInfoList = 
+    List<UpdatedContainerInfo> latestContainerInfoList =
         new ArrayList<UpdatedContainerInfo>();
     UpdatedContainerInfo containerInfo;
     while ((containerInfo = nodeUpdateQueue.poll()) != null) {
@@ -1296,7 +1402,7 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
   public void setNextHeartBeat(boolean nextHeartBeat) {
     this.nextHeartBeat = nextHeartBeat;
   }
-  
+
   @VisibleForTesting
   public int getQueueSize() {
     return nodeUpdateQueue.size();
@@ -1321,7 +1427,7 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
     }
     return nlm.getLabelsOnNode(nodeId);
   }
-  
+
   private void handleReportedIncreasedContainers(
       List<Container> reportedIncreasedContainers) {
     for (Container container : reportedIncreasedContainers) {
@@ -1345,7 +1451,7 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
             + " no further processing");
         continue;
       }
-      
+
       this.nmReportedIncreasedContainers.put(containerId, container);
     }
   }
@@ -1479,11 +1585,11 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
         nmReportedIncreasedContainers.clear();
         return container;
       }
-      
+
     } finally {
       writeLock.unlock();
     }
-   }
+  }
 
   public Resource getOriginalTotalCapability() {
     return this.originalTotalCapability;

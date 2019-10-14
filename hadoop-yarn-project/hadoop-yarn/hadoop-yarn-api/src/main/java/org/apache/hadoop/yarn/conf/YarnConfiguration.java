@@ -298,6 +298,15 @@ public class YarnConfiguration extends Configuration {
   public static final String DEFAULT_RM_WEBAPP_HTTPS_ADDRESS = "0.0.0.0:"
       + DEFAULT_RM_WEBAPP_HTTPS_PORT;
 
+  public static final String RM_THRESHOLD_PERCENTAGE_STRESSED_NODES =
+          RM_PREFIX + "threshold.percentage.stressed.nodes";
+  public static final double DEFAULT_THRESHOLD_PERCENTAGE_STRESSED_NODES = 10.0;
+
+  public static double thresholdPercentageOfStressedNodes(Configuration conf) {
+    return conf.getDouble(YarnConfiguration.RM_THRESHOLD_PERCENTAGE_STRESSED_NODES,
+            DEFAULT_THRESHOLD_PERCENTAGE_STRESSED_NODES);
+  }
+
   /**
    * Enable YARN WebApp V2.
    */

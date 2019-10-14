@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.yarn.server.api.records.impl.pb;
 
+import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.proto.YarnServerCommonProtos.NodeHealthStatusProto;
 import org.apache.hadoop.yarn.proto.YarnServerCommonProtos.NodeHealthStatusProtoOrBuilder;
 import org.apache.hadoop.yarn.server.api.records.NodeHealthStatus;
@@ -30,6 +31,8 @@ public class NodeHealthStatusPBImpl extends NodeHealthStatus {
   private boolean viaProto = false;
   private NodeHealthStatusProto proto = NodeHealthStatusProto
       .getDefaultInstance();
+  /** Node stressed message*/
+  private static final String NODE_STRESSED_MSG = "NODE_STRESSED";
 
   public NodeHealthStatusPBImpl() {
     this.builder = NodeHealthStatusProto.newBuilder();
@@ -103,6 +106,16 @@ public class NodeHealthStatusPBImpl extends NodeHealthStatus {
       return null;
     }
     return (p.getHealthReport());
+  }
+
+  @Override
+  public boolean isNodeStressed() {
+    String healthReport = getHealthReport();
+    if (healthReport == null) {
+      return false;
+    }
+
+    return (healthReport.contains(NODE_STRESSED_MSG));
   }
 
   @Override

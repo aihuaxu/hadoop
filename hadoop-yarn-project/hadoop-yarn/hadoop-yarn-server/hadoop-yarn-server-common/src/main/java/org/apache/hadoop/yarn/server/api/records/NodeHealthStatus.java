@@ -75,6 +75,10 @@ public abstract class NodeHealthStatus {
   @Stable
   public abstract String getHealthReport();
 
+  @Public
+  @Unstable
+  public abstract boolean isNodeStressed();
+
   @Private
   @Unstable
   public abstract void setHealthReport(String healthReport);

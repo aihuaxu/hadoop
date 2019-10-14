@@ -70,6 +70,10 @@ public interface RMContext extends ApplicationMasterServiceContext {
 
   ConcurrentMap<NodeId, RMNode> getInactiveRMNodes();
 
+  ConcurrentMap<NodeId, RMNode> getStressedRMNodes();
+
+  boolean canAddStressedNodes();
+
   ConcurrentMap<NodeId, RMNode> getRMNodes();
 
   AMLivelinessMonitor getAMLivelinessMonitor();

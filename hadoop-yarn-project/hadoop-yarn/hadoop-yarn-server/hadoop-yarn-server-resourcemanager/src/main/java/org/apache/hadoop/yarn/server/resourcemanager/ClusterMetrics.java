@@ -38,7 +38,8 @@ import com.google.common.annotations.VisibleForTesting;
 public class ClusterMetrics {
   
   private static AtomicBoolean isInitialized = new AtomicBoolean(false);
-  
+
+  @Metric("# of active stressed NMs") MutableGaugeInt numStressedNodes;
   @Metric("# of active NMs") MutableGaugeInt numActiveNMs;
   @Metric("# of decommissioning NMs") MutableGaugeInt numDecommissioningNMs;
   @Metric("# of decommissioned NMs") MutableGaugeInt numDecommissionedNMs;
@@ -198,5 +199,17 @@ public class ClusterMetrics {
 
   public MutableRate getAMContainerAllocationDelay() {
     return aMContainerAllocationDelay;
+  }
+
+  public void incrStressedNodes() {
+    numStressedNodes.incr();
+  }
+
+  public void decrStressedNodes() {
+    numStressedNodes.decr();
+  }
+
+  public int getNumStressedNodes() {
+    return numStressedNodes.value();
   }
 }
