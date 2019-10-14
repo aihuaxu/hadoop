@@ -20,6 +20,7 @@ package org.apache.hadoop.util;
 import com.google.common.base.Supplier;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.security.alias.AbstractJavaKeyStoreProvider;
+import org.junit.Assert;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -227,6 +228,49 @@ public class TestShell extends Assert {
     int timersAfter = countTimerThreads();
     System.err.println("after: " + timersAfter);
     assertEquals(timersBefore, timersAfter);
+  }
+
+  @Test
+  public void testGetCheckProcessIsAliveCommand() throws Exception {
+    String anyPid = "9999";
+    String[] checkProcessAliveCommand = getCheckProcessIsAliveCommand(
+        anyPid);
+
+    String[] expectedCommand;
+
+    if (Shell.WINDOWS) {
+      expectedCommand =
+          new String[]{getWinUtilsPath(), "task", "isAlive", anyPid };
+    } else if (Shell.isSetsidAvailable) {
+      expectedCommand = new String[] { "bash", "-c", "kill -0 -- -'" +
+            anyPid + "'"};
+    } else {
+      expectedCommand = new String[] {"bash", "-c", "kill -0 '" + anyPid +
+            "'" };
+    }
+    Assert.assertArrayEquals(expectedCommand, checkProcessAliveCommand);
+  }
+
+  @Test
+  public void testGetSignalKillCommand() throws Exception {
+    String anyPid = "9999";
+    int anySignal = 9;
+    String[] checkProcessAliveCommand = getSignalKillCommand(anySignal,
+        anyPid);
+
+    String[] expectedCommand;
+
+    if (Shell.WINDOWS) {
+      expectedCommand =
+          new String[]{getWinUtilsPath(), "task", "kill", anyPid };
+    } else if (Shell.isSetsidAvailable) {
+      expectedCommand = new String[] { "bash", "-c", "kill -9 -- -'" + anyPid +
+            "'"};
+    } else {
+      expectedCommand = new String[]{ "bash", "-c", "kill -9 '" + anyPid +
+            "'"};
+    }
+    Assert.assertArrayEquals(expectedCommand, checkProcessAliveCommand);
   }
 
   private void testInterval(long interval) throws IOException {

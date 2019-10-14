@@ -322,7 +322,7 @@ public abstract class Shell {
     // OSes.
     final String quotedPid = bashQuote(pid);
     if (isSetsidAvailable) {
-      return new String[] { "bash", "-c", "kill -" + code + "-" +
+      return new String[] { "bash", "-c", "kill -" + code + " -- -" +
           quotedPid };
     } else {
       return new String[] { "bash", "-c", "kill -" + code + " " +
