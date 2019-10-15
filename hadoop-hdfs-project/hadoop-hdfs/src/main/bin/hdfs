@@ -32,10 +32,24 @@ bin=`cd "$bin" > /dev/null; pwd`
 DEFAULT_LIBEXEC_DIR="$bin"/../libexec
 
 HADOOP_LIBEXEC_DIR=${HADOOP_LIBEXEC_DIR:-$DEFAULT_LIBEXEC_DIR}
-. $HADOOP_LIBEXEC_DIR/hdfs-config.sh
+if [ $# -gt 1 ]
+then
+  if [ "--env" = "$1" ]
+  then
+    shift
+    envScript=$1
+    shift
+  fi
+fi
+if [ -z $envScript ]
+then
+  . $HADOOP_LIBEXEC_DIR/hadoop-config.sh
+else
+  . $HADOOP_LIBEXEC_DIR/hadoop-config.sh --env "$envScript"
+fi
 
 function print_usage(){
-  echo "Usage: hdfs [--config confdir] [--loglevel loglevel] COMMAND"
+  echo "Usage: hdfs [--config confdir] [--loglevel loglevel] [--env envScript] COMMAND"
   echo "       where COMMAND is one of:"
   echo "  dfs                  run a filesystem command on the file systems supported in Hadoop."
   echo "  classpath            prints the classpath"

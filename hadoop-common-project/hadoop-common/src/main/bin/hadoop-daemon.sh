@@ -63,7 +63,11 @@ bin=`cd "$bin"; pwd`
 
 DEFAULT_LIBEXEC_DIR="$bin"/../libexec
 HADOOP_LIBEXEC_DIR=${HADOOP_LIBEXEC_DIR:-$DEFAULT_LIBEXEC_DIR}
-. $HADOOP_LIBEXEC_DIR/hadoop-config.sh --env "$envScript"
+if [ -z $envScript ]; then
+  . $HADOOP_LIBEXEC_DIR/hadoop-config.sh
+else
+  . $HADOOP_LIBEXEC_DIR/hadoop-config.sh --env "$envScript"
+fi
 
 hadoop_rotate_log ()
 {
@@ -159,10 +163,18 @@ case $startStop in
         else
           hdfsScript="$HADOOP_HDFS_HOME"/bin/hdfs
         fi
-        nohup nice -n $HADOOP_NICENESS $hdfsScript --config $HADOOP_CONF_DIR $command "$@" > "$log" 2>&1 < /dev/null &
+        if [ -z "$envScript" ]; then
+          nohup nice -n $HADOOP_NICENESS $hdfsScript $command "$@" > "$log" 2>&1 < /dev/null &
+        else
+          nohup nice -n $HADOOP_NICENESS $hdfsScript --env "$envScript" $command "$@" > "$log" 2>&1 < /dev/null &
+        fi
       ;;
       (*)
-        nohup nice -n $HADOOP_NICENESS $hadoopScript --config $HADOOP_CONF_DIR $command "$@" > "$log" 2>&1 < /dev/null &
+        if [ -z "$envScript" ]; then
+          nohup nice -n $HADOOP_NICENESS $hadoopScript $command "$@" > "$log" 2>&1 < /dev/null &
+        else
+          nohup nice -n $HADOOP_NICENESS $hadoopScript --env "$envScript" $command "$@" > "$log" 2>&1 < /dev/null &
+        fi
       ;;
     esac
     echo $! > $pid

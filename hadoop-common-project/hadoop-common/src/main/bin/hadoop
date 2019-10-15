@@ -24,7 +24,21 @@ bin=`cd "$bin"; pwd`
 DEFAULT_LIBEXEC_DIR="$bin"/../libexec
 
 HADOOP_LIBEXEC_DIR=${HADOOP_LIBEXEC_DIR:-$DEFAULT_LIBEXEC_DIR}
-. $HADOOP_LIBEXEC_DIR/hadoop-config.sh
+if [ $# -gt 1 ]
+then
+  if [ "--env" = "$1" ]
+  then
+    shift
+    envScript=$1
+    shift
+  fi
+fi
+if [ -z $envScript ]
+then
+  . $HADOOP_LIBEXEC_DIR/hadoop-config.sh
+else
+  . $HADOOP_LIBEXEC_DIR/hadoop-config.sh --env "$envScript"
+fi
 
 function print_usage(){
   echo "Usage: hadoop [--config confdir] [COMMAND | CLASSNAME]"
