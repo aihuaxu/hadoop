@@ -1871,13 +1871,15 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
           if ((b.getLocations() == null) || (b.getLocations().length == 0)) {
             SafeModeException se = newSafemodeException(
                 "Zero blocklocations for " + srcArg);
-            if (haEnabled && haContext != null &&
-                (haContext.getState() == NameNode.ACTIVE_STATE ||
-                    haContext.getState() == NameNode.OBSERVER_STATE)) {
-              throw new RetriableException(se);
-            } else {
-              throw se;
+            if (haEnabled && haContext != null) {
+              if (haContext.getState() == NameNode.ACTIVE_STATE) {
+                throw new RetriableException(se);
+              }
+              if (haContext.getState() == NameNode.OBSERVER_STATE) {
+                throw new StandbyException(se);
+              }
             }
+            throw se;
           }
         }
       }

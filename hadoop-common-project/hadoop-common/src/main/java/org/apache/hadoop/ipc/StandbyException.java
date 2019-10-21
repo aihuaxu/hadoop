@@ -31,4 +31,7 @@ public class StandbyException extends IOException {
   public StandbyException(String msg) {
     super(msg);
   }
+  public StandbyException(Exception e) {
+    super(e);
+  }
 }
