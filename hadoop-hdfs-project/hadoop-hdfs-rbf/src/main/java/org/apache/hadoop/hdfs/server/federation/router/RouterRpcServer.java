@@ -290,7 +290,6 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol {
     // We don't want the server to log the full stack trace for some exceptions
     this.rpcServer.addTerseExceptions(
         RemoteException.class,
-        StandbyException.class,
         SafeModeException.class,
         FileNotFoundException.class,
         FileAlreadyExistsException.class,
@@ -298,6 +297,9 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol {
         LeaseExpiredException.class,
         NotReplicatedYetException.class,
         IOException.class);
+
+    this.rpcServer.addSuppressedLoggingExceptions(
+        StandbyException.class);
 
     // The RPC-server port can be ephemeral... ensure we have the correct info
     InetSocketAddress listenAddress = this.rpcServer.getListenerAddress();
@@ -416,7 +418,7 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol {
    * @throws UnsupportedOperationException If the operation is not supported.
    */
   protected void checkOperation(OperationCategory op, boolean supported)
-      throws RouterSafeModeException, UnsupportedOperationException {
+      throws StandbyException, UnsupportedOperationException {
     checkOperation(op);
 
     if (!supported) {
@@ -438,7 +440,7 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol {
    *                           client requests.
    */
   protected void checkOperation(OperationCategory op)
-      throws RouterSafeModeException {
+      throws StandbyException {
     // Log the function we are currently calling.
     if (rpcMonitor != null) {
       rpcMonitor.startOp();
@@ -462,7 +464,8 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol {
       if (rpcMonitor != null) {
         rpcMonitor.routerFailureSafemode();
       }
-      throw new RouterSafeModeException(router.getRouterId(), op);
+      throw new StandbyException("Router " + router.getRouterId() +
+          " is in safe mode and cannot handle " + op + " requests");
     }
   }
 
