@@ -567,13 +567,6 @@ public class LinuxContainerExecutor extends ContainerExecutor {
         logOutput(diagnostics);
         container.handle(new ContainerDiagnosticsUpdateEvent(containerId,
             diagnostics));
-        if (exitCode ==
-                ExitCode.INVALID_CONTAINER_EXEC_PERMISSIONS.getExitCode() ||
-            exitCode ==
-                ExitCode.INVALID_CONFIG_FILE.getExitCode()) {
-          throw new ConfigurationException(
-              "Linux Container Executor reached unrecoverable exception", e);
-        }
       } else {
         container.handle(new ContainerDiagnosticsUpdateEvent(containerId,
             "Container killed on request. Exit code is " + exitCode));
