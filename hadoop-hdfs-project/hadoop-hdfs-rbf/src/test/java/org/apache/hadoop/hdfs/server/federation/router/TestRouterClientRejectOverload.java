@@ -27,6 +27,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -44,6 +45,8 @@ import org.apache.hadoop.hdfs.server.federation.metrics.FederationRPCMetrics;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.ipc.StandbyException;
+import org.apache.hadoop.test.GenericTestUtils;
+import org.codehaus.jackson.map.ObjectMapper;
 import org.junit.After;
 import org.junit.Test;
 import org.slf4j.Logger;
@@ -238,6 +241,73 @@ public class TestRouterClientRejectOverload {
           num >= expOverloadMin);
       assertTrue("Expected <=" + expOverloadMax + " but was " + num,
           num <= expOverloadMax);
+    }
+  }
+
+  @Test
+  public void testAsyncCallerPoolMetrics() throws Exception {
+    setupCluster(true);
+    simulateSlowNamenode(cluster.getCluster().getNameNode(0), 2);
+    final ObjectMapper objectMapper = new ObjectMapper();
+
+    // Set only one router to make test easier
+    cluster.getRouters().remove(1);
+    FederationRPCMetrics metrics = cluster.getRouters().get(0).getRouter()
+        .getRpcServer().getRPCMetrics();
+
+    // No active connection initially
+    Map<String, Integer> result = objectMapper
+        .readValue(metrics.getAsyncCallerPool(), Map.class);
+    assertEquals(0, result.get("active").intValue());
+    assertEquals(0, result.get("total").intValue());
+    assertEquals(4, result.get("max").intValue());
+
+    ExecutorService exec = Executors.newSingleThreadExecutor();
+
+    try {
+      // Run a client request to create an active connection
+      exec.submit(() -> {
+        DFSClient routerClient = null;
+        try {
+          routerClient = new DFSClient(new URI("hdfs://fed"),
+              cluster.getRouterClientConf());
+          String clientName = routerClient.getClientName();
+          ClientProtocol routerProto = routerClient.getNamenode();
+          routerProto.renewLease(clientName);
+        } catch (Exception e) {
+          fail("Client request failed: " + e);
+        } finally {
+          if (routerClient != null) {
+            try {
+              routerClient.close();
+            } catch (IOException e) {
+              LOG.error("Cannot close the client");
+            }
+          }
+        }
+      });
+
+      // Wait for client request to be active
+      GenericTestUtils.waitFor(() -> {
+        try {
+          Map<String, Integer> newResult = objectMapper.readValue(
+              metrics.getAsyncCallerPool(), Map.class);
+          if (newResult.get("active") != 1) {
+            return false;
+          }
+          if (newResult.get("max") != 4) {
+            return false;
+          }
+          int total = newResult.get("total");
+          // "total" is dynamic
+          return total >= 1 && total <= 4;
+        } catch (Exception e) {
+          LOG.error("Not able to parse metrics result: " + e);
+        }
+        return false;
+      }, 100, 2000);
+    } finally {
+      exec.shutdown();
     }
   }
 }

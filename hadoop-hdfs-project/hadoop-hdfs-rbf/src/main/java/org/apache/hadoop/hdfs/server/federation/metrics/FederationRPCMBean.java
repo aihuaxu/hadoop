@@ -194,4 +194,10 @@ public interface FederationRPCMBean {
    * @return Number of operations rejected due to lack of permits.
    */
   long getProxyOpPermitRejected();
+
+  /**
+   * Get the JSON representation of the async caller thread pool.
+   * @return JSON string representation of the async caller thread pool.
+   */
+  String getAsyncCallerPool();
 }
