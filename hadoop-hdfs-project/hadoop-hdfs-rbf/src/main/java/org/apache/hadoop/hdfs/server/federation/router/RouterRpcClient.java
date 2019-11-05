@@ -66,6 +66,7 @@ import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.ipc.StandbyException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
+import org.eclipse.jetty.util.ajax.JSON;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -251,6 +252,19 @@ public class RouterRpcClient {
    */
   public String getJSON() {
     return this.connectionManager.getJSON();
+  }
+
+  /**
+   * JSON representation of the async caller thread pool.
+   *
+   * @return String representation of the JSON.
+   */
+  public String getAsyncCallerPoolJson() {
+    final Map<String, Integer> info = new LinkedHashMap<>();
+    info.put("active", executorService.getActiveCount());
+    info.put("total", executorService.getPoolSize());
+    info.put("max", executorService.getMaximumPoolSize());
+    return JSON.toString(info);
   }
 
   /**
