@@ -42,6 +42,23 @@ public class BlockIdManager {
    */
   private final GenerationStamp generationStampV2 = new GenerationStamp();
   /**
+   * Most recent global generation stamp as seen on Active NameNode.
+   * Used by StandbyNode only.<p/>
+   * StandbyNode does not update its global {@link #generationStamp} during
+   * edits tailing. The global generation stamp on StandbyNode is updated
+   * <ol><li>when the block with the next generation stamp is actually
+   * received</li>
+   * <li>during fail-over it is bumped to the last value received from the
+   * Active NN through edits and stored as
+   * {@link #impendingGenerationStamp}</li></ol>
+   * The former helps to avoid a race condition with IBRs during edits tailing.
+   * The latter guarantees that generation stamps are never reused by new
+   * Active after fail-over.
+   * <p/> See HDFS-14941 for more details.
+   */
+  private final GenerationStamp impendingGenerationStamp
+      = new GenerationStamp();
+  /**
    * The value of the generation stamp when the first switch to sequential
    * block IDs was made. Blocks with generation stamps below this value
    * have randomly allocated block IDs. Blocks with generation stamps above
@@ -139,6 +156,35 @@ public class BlockIdManager {
 
   public long getGenerationStampV2() {
     return generationStampV2.getCurrentValue();
+  }
+
+  /**
+   * Set the currently highest gen stamp from active. Used
+   * by Standby only.
+   * @param stamp new genstamp
+   */
+  public void setImpendingGenerationStamp(long stamp) {
+    impendingGenerationStamp.setIfGreater(stamp);
+  }
+
+  /**
+   * Set the current genstamp to the impending genstamp.
+   */
+  public void applyImpendingGenerationStamp() {
+    setGenerationStampIfGreater(impendingGenerationStamp.getCurrentValue());
+  }
+
+  @VisibleForTesting
+  public long getImpendingGenerationStamp() {
+    return impendingGenerationStamp.getCurrentValue();
+  }
+
+  /**
+   * Set genstamp only when the given one is higher.
+   * @param stamp
+   */
+  public void setGenerationStampIfGreater(long stamp) {
+    generationStampV2.setIfGreater(stamp);
   }
 
   /**

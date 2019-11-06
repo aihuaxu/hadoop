@@ -1182,6 +1182,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
         blockManager.getDatanodeManager().markAllDatanodesStale();
         blockManager.clearQueues();
         blockManager.processAllPendingDNMessages();
+        getBlockIdManager().applyImpendingGenerationStamp();
 
         // Only need to re-process the queue, If not in SafeMode.
         if (!isInSafeMode()) {
@@ -6519,6 +6520,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     this.blockManager = bm;
   }
 
+  @Override
   public BlockIdManager getBlockIdManager() {
     return blockIdManager;
   }

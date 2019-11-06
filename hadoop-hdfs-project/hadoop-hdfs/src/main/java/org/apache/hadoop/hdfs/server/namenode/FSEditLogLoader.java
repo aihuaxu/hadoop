@@ -821,7 +821,9 @@ public class FSEditLogLoader {
     }
     case OP_SET_GENSTAMP_V2: {
       SetGenstampV2Op setGenstampV2Op = (SetGenstampV2Op) op;
-      fsNamesys.getBlockIdManager().setGenerationStampV2(
+      // update the impending gen stamp, but not the actual genstamp,
+      // see HDFS-14941
+      fsNamesys.getBlockIdManager().setImpendingGenerationStamp(
           setGenstampV2Op.genStampV2);
       break;
     }
