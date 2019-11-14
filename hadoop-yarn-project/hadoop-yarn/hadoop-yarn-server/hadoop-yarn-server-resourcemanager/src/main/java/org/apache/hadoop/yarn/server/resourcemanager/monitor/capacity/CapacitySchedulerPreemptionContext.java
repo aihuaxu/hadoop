@@ -68,4 +68,6 @@ interface CapacitySchedulerPreemptionContext {
 
   @Unstable
   IntraQueuePreemptionOrderPolicy getIntraQueuePreemptionOrderPolicy();
+
+  boolean isAMPreemptionEnabled();
 }

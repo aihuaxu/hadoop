@@ -130,6 +130,7 @@ public class ProportionalCapacityPreemptionPolicy
   private List<PreemptionCandidatesSelector> candidatesSelectionPolicies;
   private Set<String> allPartitions;
   private Set<String> leafQueueNames;
+  private boolean amPreemptionEnabled;
 
   // Preemptable Entities, synced from scheduler at every run
   private Map<String, PreemptableQueue> preemptableQueues;
@@ -218,6 +219,10 @@ public class ProportionalCapacityPreemptionPolicy
                 CapacitySchedulerConfiguration.INTRAQUEUE_PREEMPTION_ORDER_POLICY,
                 CapacitySchedulerConfiguration.DEFAULT_INTRAQUEUE_PREEMPTION_ORDER_POLICY)
             .toUpperCase());
+
+    amPreemptionEnabled = config.getBoolean(
+        CapacitySchedulerConfiguration.AM_PREEMPTION_ENABLED,
+        CapacitySchedulerConfiguration.DEFAULT_AM_PREEMPTION_ENABLED);
 
     candidatesSelectionPolicies = new ArrayList<>();
 
@@ -737,5 +742,10 @@ public class ProportionalCapacityPreemptionPolicy
   @Override
   public IntraQueuePreemptionOrderPolicy getIntraQueuePreemptionOrderPolicy() {
     return intraQueuePreemptionOrderPolicy;
+  }
+
+  @Override
+  public boolean isAMPreemptionEnabled() {
+    return amPreemptionEnabled;
   }
 }

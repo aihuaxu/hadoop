@@ -1362,6 +1362,12 @@ public class CapacitySchedulerConfiguration extends ReservationSchedulerConfigur
   public static final String DEFAULT_QUEUE_ORDERING_POLICY =
       QUEUE_UTILIZATION_ORDERING_POLICY;
 
+  /**
+   * Cluster wide setting to check if AM preemption should be enabled or not
+   */
+  public static final String AM_PREEMPTION_ENABLED = PREEMPTION_CONFIG_PREFIX
+      + "am-preemption-enabled";
+  public static final boolean DEFAULT_AM_PREEMPTION_ENABLED = true;
 
   @Private
   public void setQueueOrderingPolicy(String queue, String policy) {

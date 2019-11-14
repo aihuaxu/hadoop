@@ -172,6 +172,12 @@ public class FifoCandidatesSelector
       List<RMContainer> skippedAMContainerlist,
       Map<String, Resource> resToObtainByPartition, Resource skippedAMSize,
       Resource maxAMCapacityForThisQueue, Resource totalPreemptionAllowed) {
+
+    if (!preemptionContext.isAMPreemptionEnabled()) {
+      LOG.info("AM Preemption is disabled at cluster level");
+      return;
+    }
+
     for (RMContainer c : skippedAMContainerlist) {
       // Got required amount of resources for preemption, can stop now
       if (resToObtainByPartition.isEmpty()) {
