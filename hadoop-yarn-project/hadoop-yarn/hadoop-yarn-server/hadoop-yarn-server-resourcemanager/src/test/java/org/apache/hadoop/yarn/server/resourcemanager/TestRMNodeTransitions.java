@@ -736,7 +736,7 @@ public class TestRMNodeTransitions {
     nodeA.handle(new RMNodeStatusEvent(nodeA.getNodeID(), nodeStatus, null));
 
     // Node should become unhealthy
-    Assert.assertEquals(NodeState.UNHEALTHY, nodeA.getState());
+    Assert.assertEquals(NodeState.RUNNING, nodeA.getState());
     Assert.assertEquals(1, rmContext.getStressedRMNodes().size());
     Assert.assertTrue(nodeA.getHealthReport().contains("NODE_STRESSED"));
     Assert.assertTrue(nodeA.getHealthReport().contains("unhealthy"));
@@ -784,10 +784,10 @@ public class TestRMNodeTransitions {
             null);
     nodeA.handle(new RMNodeStatusEvent(nodeA.getNodeID(), nodeStatus, null));
 
-    // Threshold doesn't matter as this node was already stressed
+    // Unhealthy nodes should not have stressed signal
     Assert.assertEquals(NodeState.UNHEALTHY, nodeA.getState());
-    Assert.assertEquals(1, rmContext.getStressedRMNodes().size());
-    Assert.assertTrue(nodeA.getHealthReport().contains("NODE_STRESSED"));
+    Assert.assertEquals(0, rmContext.getStressedRMNodes().size());
+    Assert.assertTrue(!nodeA.getHealthReport().contains("NODE_STRESSED"));
     Assert.assertTrue(nodeA.getHealthReport().contains("unhealthy"));
 
     rmContext.getStressedRMNodes().clear();
@@ -867,7 +867,6 @@ public class TestRMNodeTransitions {
             null, null, status, null, null,
             null);
     nodeA.handle(new RMNodeStatusEvent(nodeA.getNodeID(), nodeStatus, null));
-    Assert.assertEquals(NodeState.UNHEALTHY, nodeA.getState());
     Assert.assertEquals(rmContext.getStressedRMNodes().size(), 1);
     Assert.assertTrue(nodeA.getHealthReport().contains("NODE_STRESSED"));
 
@@ -898,7 +897,6 @@ public class TestRMNodeTransitions {
             null, null, status, null, null,
             null);
     nodeA.handle(new RMNodeStatusEvent(nodeA.getNodeID(), nodeStatus, null));
-    Assert.assertEquals(NodeState.UNHEALTHY, nodeA.getState());
     Assert.assertEquals(1, rmContext.getStressedRMNodes().size());
 
     RMNodeImpl nodeB = getRunningNode("ver1", 4096);
@@ -913,7 +911,6 @@ public class TestRMNodeTransitions {
 
     // All of the nodes could be stressed
     // This node should  go to the UNHEALTHY state
-    Assert.assertEquals(NodeState.UNHEALTHY, nodeB.getState());
     Assert.assertEquals(2, rmContext.getStressedRMNodes().size());
 
     Assert.assertEquals("Stressed Nodes", initialStressed + 2,

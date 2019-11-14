@@ -177,6 +177,8 @@ public class CapacityScheduler extends
 
   private CSConfigurationProvider csConfProvider;
 
+  private boolean schedulingOnStressedNodesAllowed;
+
   @Override
   public void setConf(Configuration conf) {
       yarnConf = conf;
@@ -341,6 +343,7 @@ public class CapacityScheduler extends
 
       this.assignMultipleEnabled = this.conf.getAssignMultipleEnabled();
       this.maxAssignPerHeartbeat = this.conf.getMaxAssignPerHeartbeat();
+      this.schedulingOnStressedNodesAllowed = this.conf.getSchedulingOnStressedNodesAllowed();
 
       // number of threads for async scheduling
       int maxAsyncSchedulingThreads = this.conf.getInt(
@@ -1272,6 +1275,14 @@ public class CapacityScheduler extends
     // driven by node heartbeat works.
     if (getNode(node.getNodeID()) != node) {
       LOG.error("Trying to schedule on a removed node, please double check.");
+      return null;
+    }
+
+    // Check if node is stressed and scheduling on stressed node is not allowed
+    if (!schedulingOnStressedNodesAllowed &&
+        rmContext.getStressedRMNodes().containsKey(node.getNodeID())) {
+      LOG.error("Trying to schedule on a stressed node, when it is not allowed." +
+          " Stressed node : " + node.getNodeName());
       return null;
     }
 

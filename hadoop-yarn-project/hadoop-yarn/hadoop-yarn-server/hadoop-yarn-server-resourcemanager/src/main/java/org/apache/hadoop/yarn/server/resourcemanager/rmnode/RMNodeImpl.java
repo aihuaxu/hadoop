@@ -1140,17 +1140,13 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
    * @param finalState
    */
   public static void deactivateNode(RMNodeImpl rmNode, NodeState finalState) {
-    // If node is UNHEALTHY
-    if (rmNode.getState() == NodeState.UNHEALTHY) {
-      // Remove from stressed map if already present
-      cleanStressedSignalsFromNodeIfPresent(rmNode);
-    }
+    // If node is stressed, clean the stressed signals
+    cleanStressedSignalsFromNodeIfPresent(rmNode);
 
     if (rmNode.getNodeID().getPort() == -1) {
       rmNode.updateMetricsForDeactivatedNode(rmNode.getState(), finalState);
       return;
     }
-
     reportNodeUnusable(rmNode, finalState);
 
     // Deactivate the node
@@ -1206,10 +1202,8 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
     public void transition(RMNodeImpl rmNode, RMNodeEvent event) {
       Integer timeout = null;
 
-      // If node is unhealthy + stressed
-      if (initState == NodeState.UNHEALTHY) {
-        cleanStressedSignalsFromNodeIfPresent(rmNode);
-      }
+      // If node is stressed, clean the stressed signals
+      cleanStressedSignalsFromNodeIfPresent(rmNode);
 
       if (RMNodeDecommissioningEvent.class.isInstance(event)) {
         RMNodeDecommissioningEvent e = ((RMNodeDecommissioningEvent) event);
@@ -1295,20 +1289,18 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
         }
       }
 
-      // Remote node state is unhealthy or stressed
-      // (evaluated in updateRMNodeFromStatusEvents)
-      if (!remoteNodeHealthStatus.getIsNodeHealthy()
-          || rmNode.context.getStressedRMNodes().containsKey(rmNode.nodeId)) {
+      if (!remoteNodeHealthStatus.getIsNodeHealthy()) {
         LOG.info("Node " + rmNode.nodeId +
             " reported UNHEALTHY with details: " +
             remoteNodeHealthStatus.getHealthReport());
-
-        // If a node in decommissioning receives an unhealthy or stressed report,
+        // if a node in decommissioning receives an unhealthy report,
         // it will stay in decommissioning.
         if (isNodeDecommissioning) {
-          cleanStressedSignalsFromNodeIfPresent(rmNode);
           return NodeState.DECOMMISSIONING;
         } else {
+          // Node is becoming unhealthy
+          // No point in keeping stressed signal as node is going to become unusable anyways
+          cleanStressedSignalsFromNodeIfPresent(rmNode);
           reportNodeUnusable(rmNode, NodeState.UNHEALTHY);
           return NodeState.UNHEALTHY;
         }
@@ -1352,15 +1344,7 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
       // Switch the last heartbeatresponse.
       NodeHealthStatus remoteNodeHealthStatus = updateRMNodeFromStatusEvents(
           rmNode, statusEvent);
-
-      // Node can become unhealthy in two cases
-      // a) Remote node is stressed and RM threshold for stressed node has not reached
-      //    (evaluated in updateRMNodeFromStatusEvents)
-      // b) Remote node state is unhealthy
-      if (rmNode.context.getStressedRMNodes().containsKey(rmNode.nodeId)
-          || !remoteNodeHealthStatus.getIsNodeHealthy()) {
-        return NodeState.UNHEALTHY;
-      } else {
+      if (remoteNodeHealthStatus.getIsNodeHealthy()) {
         rmNode.context.getDispatcher().getEventHandler().handle(
             new NodeAddedSchedulerEvent(rmNode));
         rmNode.context.getDispatcher().getEventHandler().handle(
@@ -1373,6 +1357,11 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
         rmNode.updateMetricsForRejoinedNode(NodeState.UNHEALTHY);
         return NodeState.RUNNING;
       }
+
+      // Node is becoming unhealthy
+      // No point in keeping stressed signal as node is going to become unusable anyways
+      cleanStressedSignalsFromNodeIfPresent(rmNode);
+      return NodeState.UNHEALTHY;
     }
   }
 
