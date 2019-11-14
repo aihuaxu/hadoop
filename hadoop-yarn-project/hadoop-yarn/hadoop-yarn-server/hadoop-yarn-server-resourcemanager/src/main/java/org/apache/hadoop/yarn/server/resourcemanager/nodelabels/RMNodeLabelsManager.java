@@ -578,7 +578,7 @@ public class RMNodeLabelsManager extends CommonNodeLabelsManager {
 
       for (Entry<String, RMNodeLabel> entry : labelCollections.entrySet()) {
         RMNodeLabel label = entry.getValue();
-        infos.add(label);
+        infos.add(label.getCopy());
       }
 
       Collections.sort(infos);

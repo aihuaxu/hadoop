@@ -18,36 +18,22 @@
 
 package org.apache.hadoop.yarn.nodelabels;
 
-import static org.apache.hadoop.metrics2.lib.Interns.info;
-
 import java.util.HashSet;
 import java.util.Set;
 
 import org.apache.commons.lang.StringUtils;
-import org.apache.hadoop.metrics2.MetricsInfo;
-import org.apache.hadoop.metrics2.MetricsSystem;
-import org.apache.hadoop.metrics2.annotation.Metric;
-import org.apache.hadoop.metrics2.annotation.Metrics;
-import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
-import org.apache.hadoop.metrics2.lib.MetricsRegistry;
-import org.apache.hadoop.metrics2.lib.MutableGaugeInt;
 import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.api.records.NodeLabel;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.util.resource.Resources;
 
-@Metrics(context="yarn")
 public class RMNodeLabel implements Comparable<RMNodeLabel> {
   private Resource resource;
-  @Metric("# of active NMs") MutableGaugeInt numActiveNMs;
+  private int numActiveNMs;
   private String labelName;
   private Set<NodeId> nodeIds;
   private boolean exclusive;
   private NodeLabel nodeLabel;
-  private MetricsRegistry registry;
-  private final MetricsInfo RECORD_INFO = info("NodeLabelsMetrics",
-    "Metrics for the Yarn Cluster Node Labels");
-
 
   public RMNodeLabel(NodeLabel nodeLabel) {
     this(nodeLabel.getName(), Resource.newInstance(0, 0), 0,
@@ -63,23 +49,10 @@ public class RMNodeLabel implements Comparable<RMNodeLabel> {
       boolean exclusive) {
     this.labelName = labelName;
     this.resource = res;
+    this.numActiveNMs = activeNMs;
     this.nodeIds = new HashSet<NodeId>();
     this.exclusive = exclusive;
     this.nodeLabel = NodeLabel.newInstance(labelName, exclusive);
-
-    registerMetrics();
-    this.numActiveNMs.set(activeNMs);
-  }
-
-  private void registerMetrics() {
-    registry = new MetricsRegistry(RECORD_INFO);
-    registry.tag(RECORD_INFO, "ResourceManager");
-    MetricsSystem ms = DefaultMetricsSystem.instance();
-    if (ms != null) {
-      String partitionName = labelName == null || labelName.equals("") ? "default" : labelName;
-      ms.register("NodeLabelsMetrics,label=" + partitionName,
-          "Metrics for the Yarn Cluster Node Labels, label: " + partitionName, this);
-    }
   }
 
   public void addNodeId(NodeId node) {
@@ -96,12 +69,12 @@ public class RMNodeLabel implements Comparable<RMNodeLabel> {
 
   public void addNode(Resource nodeRes) {
     Resources.addTo(resource, nodeRes);
-    numActiveNMs.incr();
+    numActiveNMs++;
   }
   
   public void removeNode(Resource nodeRes) {
     Resources.subtractFrom(resource, nodeRes);
-    numActiveNMs.decr();
+    numActiveNMs--;
   }
 
   public Resource getResource() {
@@ -109,7 +82,7 @@ public class RMNodeLabel implements Comparable<RMNodeLabel> {
   }
 
   public int getNumActiveNMs() {
-    return numActiveNMs.value();
+    return numActiveNMs;
   }
   
   public String getLabelName() {
@@ -123,7 +96,11 @@ public class RMNodeLabel implements Comparable<RMNodeLabel> {
   public boolean getIsExclusive() {
     return this.exclusive;
   }
-
+  
+  public RMNodeLabel getCopy() {
+    return new RMNodeLabel(labelName, resource, numActiveNMs, exclusive);
+  }
+  
   public NodeLabel getNodeLabel() {
     return this.nodeLabel;
   }
@@ -147,7 +124,7 @@ public class RMNodeLabel implements Comparable<RMNodeLabel> {
       RMNodeLabel other = (RMNodeLabel) obj;
       return Resources.equals(resource, other.getResource())
           && StringUtils.equals(labelName, other.getLabelName())
-          && (other.getNumActiveNMs() == numActiveNMs.value());
+          && (other.getNumActiveNMs() == numActiveNMs); 
     }
     return false;
   }
@@ -156,6 +133,6 @@ public class RMNodeLabel implements Comparable<RMNodeLabel> {
   public int hashCode() {
     final int prime = 502357;
     return (int) ((((long) labelName.hashCode() << 8)
-        + (resource.hashCode() << 4) + numActiveNMs.value()) % prime);
+        + (resource.hashCode() << 4) + numActiveNMs) % prime);
   }
 }
