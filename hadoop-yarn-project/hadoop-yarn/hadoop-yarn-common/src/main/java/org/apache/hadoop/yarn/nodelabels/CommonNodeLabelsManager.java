@@ -448,6 +448,7 @@ public class CommonNodeLabelsManager extends AbstractService {
     // remove labels from node labels collection
     for (String label : labelsToRemove) {
       labelCollections.remove(label);
+      RMNodeLabelMetrics.removeNodeLabelMetrics(label);
     }
 
     // create event to remove labels

@@ -29,11 +29,11 @@ import org.apache.hadoop.yarn.util.resource.Resources;
 
 public class RMNodeLabel implements Comparable<RMNodeLabel> {
   private Resource resource;
-  private int numActiveNMs;
   private String labelName;
   private Set<NodeId> nodeIds;
   private boolean exclusive;
   private NodeLabel nodeLabel;
+  RMNodeLabelMetrics rmNodeLabelMetrics;
 
   public RMNodeLabel(NodeLabel nodeLabel) {
     this(nodeLabel.getName(), Resource.newInstance(0, 0), 0,
@@ -49,10 +49,10 @@ public class RMNodeLabel implements Comparable<RMNodeLabel> {
       boolean exclusive) {
     this.labelName = labelName;
     this.resource = res;
-    this.numActiveNMs = activeNMs;
     this.nodeIds = new HashSet<NodeId>();
     this.exclusive = exclusive;
     this.nodeLabel = NodeLabel.newInstance(labelName, exclusive);
+    rmNodeLabelMetrics = RMNodeLabelMetrics.getNodeLabelMetrics(labelName, activeNMs);
   }
 
   public void addNodeId(NodeId node) {
@@ -69,12 +69,12 @@ public class RMNodeLabel implements Comparable<RMNodeLabel> {
 
   public void addNode(Resource nodeRes) {
     Resources.addTo(resource, nodeRes);
-    numActiveNMs++;
+    rmNodeLabelMetrics.incrNumActiveNMs();
   }
   
   public void removeNode(Resource nodeRes) {
     Resources.subtractFrom(resource, nodeRes);
-    numActiveNMs--;
+    rmNodeLabelMetrics.decrNumActiveNMs();
   }
 
   public Resource getResource() {
@@ -82,7 +82,7 @@ public class RMNodeLabel implements Comparable<RMNodeLabel> {
   }
 
   public int getNumActiveNMs() {
-    return numActiveNMs;
+    return rmNodeLabelMetrics.getNumActiveNMs();
   }
   
   public String getLabelName() {
@@ -98,7 +98,7 @@ public class RMNodeLabel implements Comparable<RMNodeLabel> {
   }
   
   public RMNodeLabel getCopy() {
-    return new RMNodeLabel(labelName, resource, numActiveNMs, exclusive);
+    return new RMNodeLabel(labelName, resource, rmNodeLabelMetrics.getNumActiveNMs(), exclusive);
   }
   
   public NodeLabel getNodeLabel() {
@@ -123,8 +123,7 @@ public class RMNodeLabel implements Comparable<RMNodeLabel> {
     if (obj instanceof RMNodeLabel) {
       RMNodeLabel other = (RMNodeLabel) obj;
       return Resources.equals(resource, other.getResource())
-          && StringUtils.equals(labelName, other.getLabelName())
-          && (other.getNumActiveNMs() == numActiveNMs); 
+          && StringUtils.equals(labelName, other.getLabelName());
     }
     return false;
   }
@@ -133,6 +132,7 @@ public class RMNodeLabel implements Comparable<RMNodeLabel> {
   public int hashCode() {
     final int prime = 502357;
     return (int) ((((long) labelName.hashCode() << 8)
-        + (resource.hashCode() << 4) + numActiveNMs) % prime);
+        + (resource.hashCode() << 4) + rmNodeLabelMetrics.getNumActiveNMs()) % prime);
+
   }
 }
