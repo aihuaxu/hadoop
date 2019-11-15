@@ -38,6 +38,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerImpl
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.NodeType;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ResourceLimits;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerAppUtils;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CapacityScheduler;
 import org.apache.hadoop.yarn.server.scheduler.SchedulerRequestKey;
 
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.activities.ActivityDiagnosticConstant;
@@ -317,35 +318,47 @@ public class RegularContainerAllocator extends AbstractContainerAllocator {
       }
 
       // 'Delay' off-switch
-      long missedOpportunities =
-          application.getSchedulingOpportunities(schedulerKey);
+      long requiredContainers =
+          application.getOutstandingAsksCount(schedulerKey);
+      // Check if delay scheduling is enabled
+      if (rmContext.getScheduler().isDelaySchedulingEnabled()) {
+        long missedOpportunities =
+            application.getSchedulingOpportunities(schedulerKey);
 
-      // If rack locality additional delay parameter is enabled.
-      if (application.getCSLeafQueue().getRackLocalityAdditionalDelay() > -1) {
-        return missedOpportunities > getActualRackLocalityDelay();
+        // If rack locality additional delay parameter is enabled.
+        if (application.getCSLeafQueue().getRackLocalityAdditionalDelay() > -1) {
+          return missedOpportunities > getActualRackLocalityDelay();
+        } else {
+          float localityWaitFactor = getLocalityWaitFactor(uniqLocationAsks,
+              rmContext.getScheduler().getNumClusterNodes());
+          // Cap the delay by the number of nodes in the cluster.
+          return (Math.min(rmContext.getScheduler().getNumClusterNodes(),
+              (requiredContainers * localityWaitFactor)) < missedOpportunities);
+        }
       } else {
-        long requiredContainers =
-            application.getOutstandingAsksCount(schedulerKey);
-        float localityWaitFactor = getLocalityWaitFactor(uniqLocationAsks,
-            rmContext.getScheduler().getNumClusterNodes());
-        // Cap the delay by the number of nodes in the cluster.
-        return (Math.min(rmContext.getScheduler().getNumClusterNodes(),
-            (requiredContainers * localityWaitFactor)) < missedOpportunities);
+        // Don't delay assignment
+        return requiredContainers > 0;
       }
     }
 
     // Check if we need containers on this rack
-    if (application.getOutstandingAsksCount(schedulerKey, node.getRackName())
-        <= 0) {
+    long requiredContainers =
+        application.getOutstandingAsksCount(schedulerKey, node.getRackName());
+    if (requiredContainers <= 0) {
       return false;
     }
 
     // If we are here, we do need containers on this rack for RACK_LOCAL req
     if (type == NodeType.RACK_LOCAL) {
-      // 'Delay' rack-local just a little bit...
-      long missedOpportunities =
-          application.getSchedulingOpportunities(schedulerKey);
-      return getActualNodeLocalityDelay() < missedOpportunities;
+      if (rmContext.getScheduler().isDelaySchedulingEnabled()) {
+        // 'Delay' rack-local just a little bit...
+        long missedOpportunities =
+            application.getSchedulingOpportunities(schedulerKey);
+        return getActualNodeLocalityDelay() < missedOpportunities;
+      } else {
+        // Don't delay assignment
+        return requiredContainers > 0;
+      }
     }
 
     // Check if we need containers on this host
@@ -442,7 +455,9 @@ public class RegularContainerAllocator extends AbstractContainerAllocator {
     PendingAsk rackLocalAsk =
         application.getPendingAsk(schedulerKey, node.getRackName());
     if (rackLocalAsk.getCount() > 0) {
-      if (!appInfo.canDelayTo(schedulerKey, node.getRackName())) {
+      // If delay scheduling is disabled, don't allow strict locality from app side
+      if (rmContext.getScheduler().isDelaySchedulingEnabled() &&
+          !appInfo.canDelayTo(schedulerKey, node.getRackName())) {
         ActivitiesLogger.APP.recordSkippedAppActivityWithoutAllocation(
             activitiesManager, node, application, priority,
             ActivityDiagnosticConstant.SKIP_PRIORITY_BECAUSE_OF_RELAX_LOCALITY);
@@ -468,7 +483,9 @@ public class RegularContainerAllocator extends AbstractContainerAllocator {
     PendingAsk offSwitchAsk =
         application.getPendingAsk(schedulerKey, ResourceRequest.ANY);
     if (offSwitchAsk.getCount() > 0) {
-      if (!appInfo.canDelayTo(schedulerKey, ResourceRequest.ANY)) {
+      // If delay scheduling is disabled, don't allow strict locality from app side
+      if (rmContext.getScheduler().isDelaySchedulingEnabled() &&
+          !appInfo.canDelayTo(schedulerKey, ResourceRequest.ANY)) {
         ActivitiesLogger.APP.recordSkippedAppActivityWithoutAllocation(
             activitiesManager, node, application, priority,
             ActivityDiagnosticConstant.SKIP_PRIORITY_BECAUSE_OF_RELAX_LOCALITY);

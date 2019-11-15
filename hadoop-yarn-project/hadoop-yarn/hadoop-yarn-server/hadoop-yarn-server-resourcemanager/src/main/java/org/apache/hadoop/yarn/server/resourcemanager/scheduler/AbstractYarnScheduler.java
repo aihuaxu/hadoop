@@ -1412,4 +1412,13 @@ public abstract class AbstractYarnScheduler
       updateThreadMonitor.notify();
     }
   }
+
+  /**
+   * Delay scheduling enabled
+   * @return
+   */
+  @Override
+  public boolean isDelaySchedulingEnabled() {
+    return true;
+  }
 }

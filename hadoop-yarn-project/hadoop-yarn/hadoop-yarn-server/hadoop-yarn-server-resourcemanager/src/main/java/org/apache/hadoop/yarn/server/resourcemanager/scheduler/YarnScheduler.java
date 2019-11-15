@@ -414,4 +414,10 @@ public interface YarnScheduler extends EventHandler<SchedulerEvent> {
   @Public
   @Evolving
   long getMaximumApplicationLifetime(String queueName);
+
+  /**
+   * Returns if delay scheduling is enabled
+   * @return
+   */
+  boolean isDelaySchedulingEnabled();
 }
