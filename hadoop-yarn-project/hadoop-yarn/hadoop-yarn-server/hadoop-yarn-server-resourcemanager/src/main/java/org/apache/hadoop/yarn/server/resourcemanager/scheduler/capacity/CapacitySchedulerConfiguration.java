@@ -1192,14 +1192,6 @@ public class CapacitySchedulerConfiguration extends ReservationSchedulerConfigur
     return getBoolean(LAZY_PREEMPTION_ENABLED, DEFAULT_LAZY_PREEMPTION_ENABLED);
   }
 
-  /**
-   * Check if observe only preemption is enabled
-   * @return
-   */
-  public boolean getObserveOnlyPreemptionEnabled() {
-    return getBoolean(PREEMPTION_OBSERVE_ONLY, DEFAULT_PREEMPTION_OBSERVE_ONLY);
-  }
-
   private static final String PREEMPTION_CONFIG_PREFIX =
       "yarn.resourcemanager.monitor.capacity.preemption.";
 

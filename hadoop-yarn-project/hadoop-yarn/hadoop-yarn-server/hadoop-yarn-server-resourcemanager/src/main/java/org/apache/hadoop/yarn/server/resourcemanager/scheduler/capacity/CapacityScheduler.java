@@ -168,7 +168,6 @@ public class CapacityScheduler extends
   private PreemptionManager preemptionManager = new PreemptionManager();
 
   private volatile boolean isLazyPreemptionEnabled = false;
-  private volatile boolean observeOnlyPreemptionEnabled = false;
 
   private int offswitchPerHeartbeatLimit;
 
@@ -335,7 +334,6 @@ public class CapacityScheduler extends
       activitiesManager.init(conf);
       initializeQueues(this.conf);
       this.isLazyPreemptionEnabled = conf.getLazyPreemptionEnabled();
-      this.observeOnlyPreemptionEnabled = conf.getObserveOnlyPreemptionEnabled();
 
       scheduleAsynchronously = this.conf.getScheduleAynschronously();
       asyncScheduleInterval = this.conf.getLong(ASYNC_SCHEDULER_INTERVAL,
@@ -1422,17 +1420,12 @@ public class CapacityScheduler extends
    */
   private CSAssignment allocateContainersOnMultiNodes(
       PlacementSet<FiCaSchedulerNode> ps) {
-    Resource killableRes = Resources.none();
-
-    // In observeOnly preemption mode, don't account for kill-able resource
-    if (!observeOnlyPreemptionEnabled) {
-      killableRes = preemptionManager.getKillableResource(
-          CapacitySchedulerConfiguration.ROOT, ps.getPartition());
-    }
     // When this time look at multiple nodes, try schedule if the
     // partition has any available resource or killable resource
     if (getRootQueue().getQueueCapacities().getUsedCapacity(
-        ps.getPartition()) >= 1.0f && killableRes == Resources.none()) {
+        ps.getPartition()) >= 1.0f && preemptionManager.getKillableResource(
+        CapacitySchedulerConfiguration.ROOT, ps.getPartition()) == Resources
+        .none()) {
       if (LOG.isDebugEnabled()) {
         LOG.debug("This node or this node partition doesn't have available or"
             + "killable resource");
@@ -1749,7 +1742,7 @@ public class CapacityScheduler extends
     }
   }
 
-  public void updateQueuePreemptionMetrics(
+  private void updateQueuePreemptionMetrics(
       CSQueue queue, RMContainer rmc) {
     QueueMetrics qMetrics = queue.getMetrics();
     long usedMillis = rmc.getFinishTime() - rmc.getCreationTime();

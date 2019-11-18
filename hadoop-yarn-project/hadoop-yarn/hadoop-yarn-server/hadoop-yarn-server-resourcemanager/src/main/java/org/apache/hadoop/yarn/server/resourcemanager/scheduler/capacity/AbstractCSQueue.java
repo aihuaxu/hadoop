@@ -19,7 +19,6 @@
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity;
 
 import java.io.IOException;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -95,7 +94,6 @@ public abstract class AbstractCSQueue implements CSQueue {
       new HashMap<AccessType, AccessControlList>();
   volatile boolean reservationsContinueLooking;
   private volatile boolean preemptionDisabled;
-  private volatile boolean observeOnlyPremptionEnabled;
   // Indicates if the in-queue preemption setting is ever disabled within the
   // hierarchy of this queue.
   private boolean intraQueuePreemptionDisabledInHierarchy;
@@ -275,7 +273,6 @@ public abstract class AbstractCSQueue implements CSQueue {
       throws IOException {
     try {
       writeLock.lock();
-
       // get labels
       this.accessibleLabels =
           csContext.getConfiguration().getAccessibleNodeLabels(getQueuePath());
@@ -345,7 +342,6 @@ public abstract class AbstractCSQueue implements CSQueue {
           csContext.getConfiguration().getReservationContinueLook();
 
       this.preemptionDisabled = isQueueHierarchyPreemptionDisabled(this);
-      this.observeOnlyPremptionEnabled = csContext.getConfiguration().getObserveOnlyPreemptionEnabled();
       this.intraQueuePreemptionDisabledInHierarchy =
           isIntraQueueHierarchyPreemptionDisabled(this);
 
@@ -919,22 +915,13 @@ public abstract class AbstractCSQueue implements CSQueue {
   }
 
   public Resource getTotalKillableResource(String partition) {
-    Resource killableRes = Resources.none();
-    // if observeOnly mode is enabled set kill-able resource to none
-    if (!observeOnlyPremptionEnabled) {
-      killableRes = csContext.getPreemptionManager().getKillableResource(queueName, partition);
-    }
-    return killableRes;
+    return csContext.getPreemptionManager().getKillableResource(queueName,
+        partition);
   }
 
   public Iterator<RMContainer> getKillableContainers(String partition) {
-    Iterator<RMContainer> killableIter = Collections.emptyIterator();
-    // If observeOnlyPreemption is enabled set kill-able containers to empty
-    if (!observeOnlyPremptionEnabled) {
-      killableIter = csContext.getPreemptionManager().getKillableContainers(queueName,
-          partition);
-    }
-    return killableIter;
+    return csContext.getPreemptionManager().getKillableContainers(queueName,
+        partition);
   }
 
   @VisibleForTesting
