@@ -178,11 +178,6 @@ public class CapacityScheduler extends
 
   private CSConfigurationProvider csConfProvider;
 
-  /*
-    Flag to control delay scheduling feature in CS
-   */
-  private boolean delaySchedulingEnabled;
-
   @Override
   public void setConf(Configuration conf) {
       yarnConf = conf;
@@ -300,15 +295,6 @@ public class CapacityScheduler extends
     this.rmContext = rmContext;
   }
 
-  /**
-   * Returns if delay scheduling is enabled
-   * @return
-   */
-  @Override
-  public boolean isDelaySchedulingEnabled() {
-    return delaySchedulingEnabled;
-  }
-
   @VisibleForTesting
   void initScheduler(Configuration configuration) throws
       IOException {
@@ -374,9 +360,6 @@ public class CapacityScheduler extends
 
       // Setup how many containers we can allocate for each round
       offswitchPerHeartbeatLimit = this.conf.getOffSwitchPerHeartbeatLimit();
-
-      // delay scheduling enabled
-      delaySchedulingEnabled = this.conf.getDelaySchedulingEnabled();
 
       LOG.info("Initialized CapacityScheduler with " + "calculator="
           + getResourceCalculator().getClass() + ", " + "minimumAllocation=<"
@@ -1212,10 +1195,8 @@ public class CapacityScheduler extends
       return false;
     }
 
-    // Delay scheduling is enabled
     // offswitch assignment should be under threshold
-    if (delaySchedulingEnabled &&
-        offswitchCount >= offswitchPerHeartbeatLimit) {
+    if (offswitchCount >= offswitchPerHeartbeatLimit) {
       return false;
     }
 

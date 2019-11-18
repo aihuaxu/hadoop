@@ -326,13 +326,6 @@ public class CapacitySchedulerConfiguration extends ReservationSchedulerConfigur
   @Private
   public static final int DEFAULT_MAX_ASSIGN_PER_HEARTBEAT = -1;
 
-  @Private
-  public static final String DELAY_SCHEDULING_ENABLED =
-      PREFIX + "delay-scheduling-enabled";
-
-  @Private
-  public static final boolean DEFAULT_DELAY_SCHEDULING_ENABLED = true;
-
   AppPriorityACLConfigurationParser priorityACLConfig = new AppPriorityACLConfigurationParser();
 
   public CapacitySchedulerConfiguration() {
@@ -1573,12 +1566,5 @@ public class CapacitySchedulerConfiguration extends ReservationSchedulerConfigur
 
   public void setDefaultLifetimePerQueue(String queue, long defaultLifetime) {
     setLong(getQueuePrefix(queue) + DEFAULT_LIFETIME_SUFFIX, defaultLifetime);
-  }
-
-  public boolean getDelaySchedulingEnabled() {
-    return getBoolean(
-        DELAY_SCHEDULING_ENABLED,
-        DEFAULT_DELAY_SCHEDULING_ENABLED
-    );
   }
 }
