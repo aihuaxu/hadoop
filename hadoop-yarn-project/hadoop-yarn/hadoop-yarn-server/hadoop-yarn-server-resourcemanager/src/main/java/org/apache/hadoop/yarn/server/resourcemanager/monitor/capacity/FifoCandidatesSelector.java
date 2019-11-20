@@ -174,7 +174,7 @@ public class FifoCandidatesSelector
       Resource maxAMCapacityForThisQueue, Resource totalPreemptionAllowed) {
 
     if (!preemptionContext.isAMPreemptionEnabled()) {
-      LOG.info("AM Preemption is disabled at cluster level");
+      LOG.debug("AM Preemption is disabled at cluster level");
       return;
     }
 

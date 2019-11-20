@@ -2925,6 +2925,15 @@ public class TestCapacityScheduler {
     cs.reinitialize(conf, rmContext);
     assertFalse("queue " + B2 + " should have been preemptable",
         queueB2.getPreemptionDisabled());
+
+    // When preemption is disabled for root, but enabled for root.b(parent).
+    // root.b.b2 should inherit property from parent and be preemptable
+    conf.setPreemptionDisabled(rootQueue.getQueuePath(), true);
+    conf.setPreemptionDisabled(queueB.getQueuePath(), false);
+    cs.reinitialize(conf, rmContext);
+
+    assertFalse("queue " + B2 + " should have been preemptable",
+        queueB2.getPreemptionDisabled());
   }
 
   @Test
