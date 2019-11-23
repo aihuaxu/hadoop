@@ -435,33 +435,34 @@ public class FederationMetrics implements FederationMBean {
     float dev = 0;
 
     final Map<String, Map<String, Object>> info = new HashMap<>();
-    try {
-      RouterRpcServer rpcServer = this.router.getRpcServer();
-      DatanodeInfo[] live = rpcServer.getDatanodeReport(
-          DatanodeReportType.LIVE, false, TIME_OUT);
-
-      if (live.length > 0) {
-        float totalDfsUsed = 0;
-        float[] usages = new float[live.length];
-        int i = 0;
-        for (DatanodeInfo dn : live) {
-          usages[i++] = dn.getDfsUsedPercent();
-          totalDfsUsed += dn.getDfsUsedPercent();
-        }
-        totalDfsUsed /= live.length;
-        Arrays.sort(usages);
-        median = usages[usages.length / 2];
-        max = usages[usages.length - 1];
-        min = usages[0];
-
-        for (i = 0; i < usages.length; i++) {
-          dev += (usages[i] - totalDfsUsed) * (usages[i] - totalDfsUsed);
-        }
-        dev = (float) Math.sqrt(dev / usages.length);
-      }
-    } catch (IOException e) {
-      LOG.info("Cannot get the live nodes: {}", e.getMessage());
-    }
+    // This metric is expensive but not used, turn it off here
+//    try {
+//      RouterRpcServer rpcServer = this.router.getRpcServer();
+//      DatanodeInfo[] live = rpcServer.getDatanodeReport(
+//          DatanodeReportType.LIVE, false, TIME_OUT);
+//
+//      if (live.length > 0) {
+//        float totalDfsUsed = 0;
+//        float[] usages = new float[live.length];
+//        int i = 0;
+//        for (DatanodeInfo dn : live) {
+//          usages[i++] = dn.getDfsUsedPercent();
+//          totalDfsUsed += dn.getDfsUsedPercent();
+//        }
+//        totalDfsUsed /= live.length;
+//        Arrays.sort(usages);
+//        median = usages[usages.length / 2];
+//        max = usages[usages.length - 1];
+//        min = usages[0];
+//
+//        for (i = 0; i < usages.length; i++) {
+//          dev += (usages[i] - totalDfsUsed) * (usages[i] - totalDfsUsed);
+//        }
+//        dev = (float) Math.sqrt(dev / usages.length);
+//      }
+//    } catch (IOException e) {
+//      LOG.info("Cannot get the live nodes: {}", e.getMessage());
+//    }
 
     final Map<String, Object> innerInfo = new HashMap<>();
     innerInfo.put("min", StringUtils.format("%.2f%%", min));
