@@ -154,7 +154,7 @@ public class TestBalancerWithHANameNodes {
         // all other NameNodes should see 0 getBlocks calls
         int expectedCount = (i == 2) ? 2 : 0;
         verify(namesystemSpies.get(i), times(expectedCount))
-            .getBlocks(Matchers.<DatanodeID>any(), anyLong());
+            .getBlockManager().getBlocks(Matchers.<DatanodeID>any(), anyLong());
       }
     } finally {
       if (qjmhaCluster != null) {
