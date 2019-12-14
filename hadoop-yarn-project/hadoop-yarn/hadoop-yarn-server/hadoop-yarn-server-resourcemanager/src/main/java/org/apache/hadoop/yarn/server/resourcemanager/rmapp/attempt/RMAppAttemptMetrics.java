@@ -49,6 +49,10 @@ public class RMAppAttemptMetrics {
   
   private ReadLock readLock;
   private WriteLock writeLock;
+
+  private AtomicLong finishedMemory = new AtomicLong(0);
+  private AtomicInteger finishedVcores = new AtomicInteger(0);
+
   private AtomicLong finishedMemorySeconds = new AtomicLong(0);
   private AtomicLong finishedVcoreSeconds = new AtomicLong(0);
   private AtomicLong preemptedMemorySeconds = new AtomicLong(0);
@@ -122,6 +126,8 @@ public class RMAppAttemptMetrics {
   }
 
   public AggregateAppResourceUsage getAggregateAppResourceUsage() {
+    long memory = finishedMemory.get();
+    int vcores = finishedVcores.get();
     long memorySeconds = finishedMemorySeconds.get();
     long vcoreSeconds = finishedVcoreSeconds.get();
 
@@ -133,16 +139,23 @@ public class RMAppAttemptMetrics {
         ApplicationResourceUsageReport appResUsageReport = rmContext
                 .getScheduler().getAppResourceUsageReport(attemptId);
         if (appResUsageReport != null) {
+          memory += appResUsageReport.getUsedResources().getMemorySize();
+          vcores += appResUsageReport.getUsedResources().getVirtualCores();
           memorySeconds += appResUsageReport.getMemorySeconds();
           vcoreSeconds += appResUsageReport.getVcoreSeconds();
         }
       }
     }
-    return new AggregateAppResourceUsage(memorySeconds, vcoreSeconds);
+    return new AggregateAppResourceUsage(memory, vcores, memorySeconds, vcoreSeconds);
   }
 
-  public void updateAggregateAppResourceUsage(long finishedMemorySeconds,
-                                        long finishedVcoreSeconds) {
+  public void updateAggregateAppResourceUsage(
+          long finishedMemory,
+          int finishedVCores,
+          long finishedMemorySeconds,
+          long finishedVcoreSeconds) {
+    this.finishedMemory.addAndGet(finishedMemory);
+    this.finishedVcores.addAndGet(finishedVCores);
     this.finishedMemorySeconds.addAndGet(finishedMemorySeconds);
     this.finishedVcoreSeconds.addAndGet(finishedVcoreSeconds);
   }

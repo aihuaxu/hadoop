@@ -123,6 +123,10 @@ public class TestContainerResourceUsage {
     AggregateAppResourceUsage ru = calculateContainerResourceMetrics(rmContainer);
     rmAppMetrics = app0.getRMAppMetrics();
 
+    Assert.assertEquals("Unexpected Memory value",
+            ru.getMemory(), rmAppMetrics.getMemory());
+    Assert.assertEquals("Unexpected Vcores value",
+            ru.getVcores(), rmAppMetrics.getVcores());
     Assert.assertEquals("Unexpected MemorySeconds value",
         ru.getMemorySeconds(), rmAppMetrics.getMemorySeconds());
     Assert.assertEquals("Unexpected VcoreSeconds value",
@@ -131,7 +135,7 @@ public class TestContainerResourceUsage {
     rm.stop();
   }
 
-  @Test (timeout = 120000)
+  @Test //(timeout = 1200000000)
   public void testUsageWithMultipleContainersAndRMRestart() throws Exception {
     // Set max attempts to 1 so that when the first attempt fails, the app
     // won't try to start a new one.
@@ -214,15 +218,23 @@ public class TestContainerResourceUsage {
     rm0.waitForState(nm, cId, RMContainerState.COMPLETED);
 
     // Check that the container metrics match those from the app usage report.
+    long memory = 0;
+    int vcores = 0;
     long memorySeconds = 0;
     long vcoreSeconds = 0;
     for (RMContainer c : rmContainers) {
       AggregateAppResourceUsage ru = calculateContainerResourceMetrics(c);
+      memory += ru.getMemory();
+      vcores += ru.getVcores();
       memorySeconds += ru.getMemorySeconds();
       vcoreSeconds += ru.getVcoreSeconds();
     }
 
     RMAppMetrics metricsBefore = app0.getRMAppMetrics();
+    Assert.assertEquals("Unexpected Memory value",
+            memory, metricsBefore.getMemory());
+    Assert.assertEquals("Unexpected Vcores value",
+            vcores, metricsBefore.getVcores());
     Assert.assertEquals("Unexpected MemorySeconds value",
         memorySeconds, metricsBefore.getMemorySeconds());
     Assert.assertEquals("Unexpected VcoreSeconds value",
@@ -236,6 +248,10 @@ public class TestContainerResourceUsage {
 
     // Compare container resource usage metrics from before and after restart.
     RMAppMetrics metricsAfter = app0After.getRMAppMetrics();
+    Assert.assertEquals("Unexpected Memory value",
+            memory, metricsAfter.getMemory());
+    Assert.assertEquals("Unexpected Vcores value",
+            vcores, metricsAfter.getVcores());
     Assert.assertEquals("Vcore seconds were not the same after RM Restart",
         metricsBefore.getVcoreSeconds(), metricsAfter.getVcoreSeconds());
     Assert.assertEquals("Memory seconds were not the same after RM Restart",
@@ -424,6 +440,9 @@ public class TestContainerResourceUsage {
                           * usedMillis / DateUtils.MILLIS_PER_SECOND;
     long vcoreSeconds = resource.getVirtualCores()
                           * usedMillis / DateUtils.MILLIS_PER_SECOND;
-    return new AggregateAppResourceUsage(memorySeconds, vcoreSeconds);
+    return new AggregateAppResourceUsage(
+            resource.getMemorySize(),
+            resource.getVirtualCores(),
+            memorySeconds, vcoreSeconds);
   }
 }

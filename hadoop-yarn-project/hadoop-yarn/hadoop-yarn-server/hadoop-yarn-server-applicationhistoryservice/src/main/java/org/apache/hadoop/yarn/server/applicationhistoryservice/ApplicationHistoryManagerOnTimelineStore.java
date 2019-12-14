@@ -330,6 +330,7 @@ public class ApplicationHistoryManagerOnTimelineStore extends AbstractService
       }
 
       if (entityInfo.containsKey(ApplicationMetricsConstants.APP_CPU_METRICS)) {
+
         long vcoreSeconds = parseLong(entityInfo,
             ApplicationMetricsConstants.APP_CPU_METRICS);
         long memorySeconds = parseLong(entityInfo,
@@ -339,7 +340,7 @@ public class ApplicationHistoryManagerOnTimelineStore extends AbstractService
         long preemptedVcoreSeconds = parseLong(entityInfo,
             ApplicationMetricsConstants.APP_CPU_PREEMPT_METRICS);
         appResources = ApplicationResourceUsageReport.newInstance(0, 0, null,
-            null, null, memorySeconds, vcoreSeconds, 0, 0,
+            null, null, null, memorySeconds, vcoreSeconds, 0, 0,
             preemptedMemorySeconds, preemptedVcoreSeconds);
       }
 

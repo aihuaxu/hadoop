@@ -721,7 +721,10 @@ public class RMContainerImpl implements RMContainer {
         long vcoreSeconds = resource.getVirtualCores()
                              * usedMillis / DateUtils.MILLIS_PER_SECOND;
         rmAttempt.getRMAppAttemptMetrics()
-                  .updateAggregateAppResourceUsage(memorySeconds,vcoreSeconds);
+                  .updateAggregateAppResourceUsage(
+                          resource.getMemorySize(),
+                          resource.getVirtualCores(),
+                          memorySeconds,vcoreSeconds);
         // If this is a preempted container, update preemption metrics
         if (ContainerExitStatus.PREEMPTED == container.finishedStatus
                 .getExitStatus()) {

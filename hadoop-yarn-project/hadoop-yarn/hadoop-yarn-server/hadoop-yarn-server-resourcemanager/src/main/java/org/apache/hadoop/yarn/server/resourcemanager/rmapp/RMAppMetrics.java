@@ -24,6 +24,8 @@ public class RMAppMetrics {
   final Resource resourcePreempted;
   final int numNonAMContainersPreempted;
   final int numAMContainersPreempted;
+  final long memory;
+  final int vcores;
   final long memorySeconds;
   final long vcoreSeconds;
   private final long preemptedMemorySeconds;
@@ -31,11 +33,15 @@ public class RMAppMetrics {
 
   public RMAppMetrics(Resource resourcePreempted,
       int numNonAMContainersPreempted, int numAMContainersPreempted,
-      long memorySeconds, long vcoreSeconds, long preemptedMemorySeconds,
+      long memory, int vcores,
+      long memorySeconds, long vcoreSeconds,
+      long preemptedMemorySeconds,
       long preemptedVcoreSeconds) {
     this.resourcePreempted = resourcePreempted;
     this.numNonAMContainersPreempted = numNonAMContainersPreempted;
     this.numAMContainersPreempted = numAMContainersPreempted;
+    this.memory = memory;
+    this.vcores = vcores;
     this.memorySeconds = memorySeconds;
     this.vcoreSeconds = vcoreSeconds;
     this.preemptedMemorySeconds = preemptedMemorySeconds;
@@ -52,6 +58,14 @@ public class RMAppMetrics {
 
   public int getNumAMContainersPreempted() {
     return numAMContainersPreempted;
+  }
+
+  public long getMemory() {
+    return memory;
+  }
+
+  public long getVcores() {
+    return vcores;
   }
 
   public long getMemorySeconds() {

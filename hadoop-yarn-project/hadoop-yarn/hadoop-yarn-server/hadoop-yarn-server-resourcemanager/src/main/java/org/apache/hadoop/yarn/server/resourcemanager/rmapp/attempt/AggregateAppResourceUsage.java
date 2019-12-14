@@ -22,12 +22,45 @@ import org.apache.hadoop.classification.InterfaceAudience.Private;
 
 @Private
 public class AggregateAppResourceUsage {
+  long memory;
+  int vcores;
+
   long memorySeconds;
   long vcoreSeconds;
 
-  public AggregateAppResourceUsage(long memorySeconds, long vcoreSeconds) {
+  public AggregateAppResourceUsage(long memory, int vcores, long memorySeconds, long vcoreSeconds) {
+    this.memory = memory;
+    this.vcores = vcores;
     this.memorySeconds = memorySeconds;
     this.vcoreSeconds = vcoreSeconds;
+  }
+
+  /**
+   * @return the memory
+   */
+  public long getMemory() {
+    return memory;
+  }
+
+  /**
+   * @param memory the memory to set
+   */
+  public void setMemory(long memory) {
+    this.memory = memory;
+  }
+
+  /**
+   * @return the vcores
+   */
+  public int getVcores() {
+    return vcores;
+  }
+
+  /**
+   * @param vcores the vcores to set
+   */
+  public void setVcores(int vcores) {
+    this.vcores = vcores;
   }
 
   /**

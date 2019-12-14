@@ -108,6 +108,7 @@ import org.apache.hadoop.yarn.state.MultipleArcTransition;
 import org.apache.hadoop.yarn.state.SingleArcTransition;
 import org.apache.hadoop.yarn.state.StateMachine;
 import org.apache.hadoop.yarn.state.StateMachineFactory;
+import org.apache.hadoop.yarn.util.resource.Resources;
 import org.apache.hadoop.yarn.webapp.util.WebAppUtils;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -941,6 +942,7 @@ public class RMAppAttemptImpl implements RMAppAttempt, Recoverable {
       }
       AggregateAppResourceUsage resUsage =
           this.attemptMetrics.getAggregateAppResourceUsage();
+      report.setAggregatedUsedResources(Resources.createResource(resUsage.getMemory(), resUsage.getVcores()));
       report.setMemorySeconds(resUsage.getMemorySeconds());
       report.setVcoreSeconds(resUsage.getVcoreSeconds());
       report.setPreemptedMemorySeconds(
@@ -984,6 +986,7 @@ public class RMAppAttemptImpl implements RMAppAttempt, Recoverable {
     this.startTime = attemptState.getStartTime();
     this.finishTime = attemptState.getFinishTime();
     this.attemptMetrics.updateAggregateAppResourceUsage(
+        attemptState.getMemory(), attemptState.getVcores(),
         attemptState.getMemorySeconds(), attemptState.getVcoreSeconds());
     this.attemptMetrics.updateAggregatePreemptedAppResourceUsage(
         attemptState.getPreemptedMemorySeconds(),
@@ -1371,12 +1374,13 @@ public class RMAppAttemptImpl implements RMAppAttempt, Recoverable {
 
     ApplicationAttemptStateData attemptState =
         ApplicationAttemptStateData.newInstance(
-            applicationAttemptId,  getMasterContainer(),
-            rmStore.getCredentialsFromAppAttempt(this),
-            startTime, stateToBeStored, finalTrackingUrl, diags.toString(),
-            finalStatus, exitStatus,
-          getFinishTime(), resUsage.getMemorySeconds(),
-          resUsage.getVcoreSeconds(),
+          applicationAttemptId,  getMasterContainer(),
+          rmStore.getCredentialsFromAppAttempt(this),
+          startTime, stateToBeStored, finalTrackingUrl, diags.toString(),
+          finalStatus, exitStatus,
+          getFinishTime(),
+          resUsage.getMemory(), resUsage.getVcores(),
+          resUsage.getMemorySeconds(), resUsage.getVcoreSeconds(),
           this.attemptMetrics.getPreemptedMemory(),
           this.attemptMetrics.getPreemptedVcore());
     LOG.info("Updating application attempt " + applicationAttemptId

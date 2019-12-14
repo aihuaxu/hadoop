@@ -40,7 +40,8 @@ public abstract class ApplicationAttemptStateData {
       Credentials attemptTokens, long startTime, RMAppAttemptState finalState,
       String finalTrackingUrl, String diagnostics,
       FinalApplicationStatus amUnregisteredFinalStatus, int exitStatus,
-      long finishTime, long memorySeconds, long vcoreSeconds,
+      long finishTime, long memory, int vcores,
+      long memorySeconds, long vcoreSeconds,
       long preemptedMemorySeconds, long preemptedVcoreSeconds) {
     ApplicationAttemptStateData attemptStateData =
         Records.newRecord(ApplicationAttemptStateData.class);
@@ -54,6 +55,8 @@ public abstract class ApplicationAttemptStateData {
     attemptStateData.setFinalApplicationStatus(amUnregisteredFinalStatus);
     attemptStateData.setAMContainerExitStatus(exitStatus);
     attemptStateData.setFinishTime(finishTime);
+    attemptStateData.setMemory(memory);
+    attemptStateData.setVcores(vcores);
     attemptStateData.setMemorySeconds(memorySeconds);
     attemptStateData.setVcoreSeconds(vcoreSeconds);
     attemptStateData.setPreemptedMemorySeconds(preemptedMemorySeconds);
@@ -63,11 +66,14 @@ public abstract class ApplicationAttemptStateData {
 
   public static ApplicationAttemptStateData newInstance(
       ApplicationAttemptId attemptId, Container masterContainer,
-      Credentials attemptTokens, long startTime, long memorySeconds,
+      Credentials attemptTokens, long startTime,
+      long memory, int vcores,
+      long memorySeconds,
       long vcoreSeconds, long preemptedMemorySeconds,
       long preemptedVcoreSeconds) {
     return newInstance(attemptId, masterContainer, attemptTokens,
         startTime, null, "N/A", "", null, ContainerExitStatus.INVALID, 0,
+        memory, vcores,
         memorySeconds, vcoreSeconds,
         preemptedMemorySeconds, preemptedVcoreSeconds);
     }
@@ -163,6 +169,30 @@ public abstract class ApplicationAttemptStateData {
   public abstract long getFinishTime();
 
   public abstract void setFinishTime(long finishTime);
+
+  /**
+   * Get the <em>memory seconds</em> (in MB seconds) of the application.
+   * @return <em>memory seconds</em> (in MB seconds) of the application
+   */
+  @Public
+  @Unstable
+  public abstract long getMemory();
+
+  @Public
+  @Unstable
+  public abstract void setMemory(long memory);
+
+  /**
+   * Get the <em>vcores</em> of the application.
+   * @return <em>vcores</em> of the application
+   */
+  @Public
+  @Unstable
+  public abstract int getVcores();
+
+  @Public
+  @Unstable
+  public abstract void setVcores(int vcores);
 
   /**
   * Get the <em>memory seconds</em> (in MB seconds) of the application.

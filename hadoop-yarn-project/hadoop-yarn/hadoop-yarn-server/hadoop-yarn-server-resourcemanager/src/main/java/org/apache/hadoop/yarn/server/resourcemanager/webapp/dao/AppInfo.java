@@ -100,6 +100,8 @@ public class AppInfo {
   private String amRPCAddress;
   private long allocatedMB;
   private long allocatedVCores;
+  private long aggregatedAllocatedMB;
+  private long aggregatedAllocatedVCores;
   private long reservedMB;
   private long reservedVCores;
   private int runningContainers;
@@ -238,6 +240,8 @@ public class AppInfo {
       numNonAMContainerPreempted = appMetrics.getNumNonAMContainersPreempted();
       preemptedResourceVCores =
               appMetrics.getResourcePreempted().getVirtualCores();
+      aggregatedAllocatedMB = appMetrics.getMemory();
+      aggregatedAllocatedVCores = appMetrics.getVcores();
       memorySeconds = appMetrics.getMemorySeconds();
       vcoreSeconds = appMetrics.getVcoreSeconds();
       preemptedMemorySeconds = appMetrics.getPreemptedMemorySeconds();
@@ -452,6 +456,10 @@ public class AppInfo {
     return this.allocatedVCores;
   }
 
+  public long getAggregatedAllocatedMB() { return this.aggregatedAllocatedMB; }
+
+  public long getAggregatedAllocatedVCores() { return this.aggregatedAllocatedVCores; }
+
   public long getReservedMB() {
     return this.reservedMB;
   }
@@ -554,6 +562,14 @@ public class AppInfo {
 
   public void setAllocatedVCores(long allocatedVCores) {
     this.allocatedVCores = allocatedVCores;
+  }
+
+  public void setAggregatedAllocatedMB(long aggregatedAllocatedMB) {
+    this.aggregatedAllocatedMB = aggregatedAllocatedMB;
+  }
+
+  public void setAggregatedAllocatedVCores(long aggregatedAllocatedVCores) {
+    this.aggregatedAllocatedVCores = aggregatedAllocatedVCores;
   }
 
   public void setReservedMB(long reservedMB) {

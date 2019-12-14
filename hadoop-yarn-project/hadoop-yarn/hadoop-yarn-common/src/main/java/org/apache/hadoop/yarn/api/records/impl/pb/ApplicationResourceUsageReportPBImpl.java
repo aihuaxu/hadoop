@@ -38,6 +38,7 @@ extends ApplicationResourceUsageReport {
   boolean viaProto = false;
 
   Resource usedResources;
+  Resource aggregatedUsedResources;
   Resource reservedResources;
   Resource neededResources;
 
@@ -81,6 +82,10 @@ extends ApplicationResourceUsageReport {
   private void mergeLocalToBuilder() {
     if (this.usedResources != null) {
       builder.setUsedResources(convertToProtoFormat(this.usedResources));
+    }
+    if (this.aggregatedUsedResources != null) {
+      builder.setAggregatedUsedResources(convertToProtoFormat(this.aggregatedUsedResources));
+
     }
     if (this.reservedResources != null) {
       builder.setReservedResources(
@@ -192,6 +197,27 @@ extends ApplicationResourceUsageReport {
     if (reserved_resources == null)
       builder.clearNeededResources();
     this.neededResources = reserved_resources;
+  }
+
+  @Override
+  public synchronized Resource getAggregatedUsedResources() {
+    ApplicationResourceUsageReportProtoOrBuilder p = viaProto ? proto : builder;
+    if (this.aggregatedUsedResources != null) {
+      return this.aggregatedUsedResources;
+    }
+    if (!p.hasAggregatedUsedResources()) {
+      return null;
+    }
+    this.aggregatedUsedResources = convertFromProtoFormat(p.getAggregatedUsedResources());
+    return this.aggregatedUsedResources;
+  }
+
+  @Override
+  public synchronized void setAggregatedUsedResources(Resource resources) {
+    maybeInitBuilder();
+    if (resources == null)
+      builder.clearAggregatedUsedResources();
+    this.aggregatedUsedResources = resources;
   }
 
   @Override

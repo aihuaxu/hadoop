@@ -35,8 +35,9 @@ public abstract class ApplicationResourceUsageReport {
   @Unstable
   public static ApplicationResourceUsageReport newInstance(
       int numUsedContainers, int numReservedContainers, Resource usedResources,
-      Resource reservedResources, Resource neededResources, long memorySeconds,
-      long vcoreSeconds, float queueUsagePerc, float clusterUsagePerc,
+      Resource reservedResources, Resource neededResources,
+      Resource aggregatedUsedResources,
+      long memorySeconds, long vcoreSeconds, float queueUsagePerc, float clusterUsagePerc,
       long preemptedMemorySeconds, long preemptedVcoresSeconds) {
     ApplicationResourceUsageReport report =
         Records.newRecord(ApplicationResourceUsageReport.class);
@@ -45,6 +46,7 @@ public abstract class ApplicationResourceUsageReport {
     report.setUsedResources(usedResources);
     report.setReservedResources(reservedResources);
     report.setNeededResources(neededResources);
+    report.setAggregatedUsedResources(aggregatedUsedResources);
     report.setMemorySeconds(memorySeconds);
     report.setVcoreSeconds(vcoreSeconds);
     report.setQueueUsagePercentage(queueUsagePerc);
@@ -97,6 +99,18 @@ public abstract class ApplicationResourceUsageReport {
   @Private
   @Unstable
   public abstract void setUsedResources(Resource resources);
+
+  /**
+   * Get the aggregated used <code>Resource</code>.
+   * @return the aggregated used <code>Resource</code>
+   */
+  @Public
+  @Stable
+  public abstract Resource getAggregatedUsedResources();
+
+  @Private
+  @Unstable
+  public abstract void setAggregatedUsedResources(Resource resources);
 
   /**
    * Get the reserved <code>Resource</code>.  -1 for invalid/inaccessible reports.

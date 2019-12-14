@@ -107,6 +107,9 @@ public class SchedulerApplicationAttempt implements SchedulableEntity {
 
   private static final long MEM_AGGREGATE_ALLOCATION_CACHE_MSECS = 3000;
   protected long lastMemoryAggregateAllocationUpdateTime = 0;
+
+  private long lastMemory = 0;
+  private int lastVcores = 0;
   private long lastMemorySeconds = 0;
   private long lastVcoreSeconds = 0;
 
@@ -1011,11 +1014,15 @@ public class SchedulerApplicationAttempt implements SchedulableEntity {
     // recently.
     if ((currentTimeMillis - lastMemoryAggregateAllocationUpdateTime)
         > MEM_AGGREGATE_ALLOCATION_CACHE_MSECS) {
+      long memory = 0;
+      int vcores = 0;
       long memorySeconds = 0;
       long vcoreSeconds = 0;
       for (RMContainer rmContainer : this.liveContainers.values()) {
         long usedMillis = currentTimeMillis - rmContainer.getCreationTime();
         Resource resource = rmContainer.getContainer().getResource();
+        memory += resource.getMemorySize();
+        vcores += resource.getVirtualCores();
         memorySeconds += resource.getMemorySize() * usedMillis /
             DateUtils.MILLIS_PER_SECOND;
         vcoreSeconds += resource.getVirtualCores() * usedMillis  
@@ -1023,10 +1030,12 @@ public class SchedulerApplicationAttempt implements SchedulableEntity {
       }
 
       lastMemoryAggregateAllocationUpdateTime = currentTimeMillis;
+      lastMemory = memory;
+      lastVcores = vcores;
       lastMemorySeconds = memorySeconds;
       lastVcoreSeconds = vcoreSeconds;
     }
-    return new AggregateAppResourceUsage(lastMemorySeconds, lastVcoreSeconds);
+    return new AggregateAppResourceUsage(lastMemory, lastVcores, lastMemorySeconds, lastVcoreSeconds);
   }
 
   public ApplicationResourceUsageReport getResourceUsageReport() {
@@ -1056,6 +1065,7 @@ public class SchedulerApplicationAttempt implements SchedulableEntity {
       return ApplicationResourceUsageReport.newInstance(liveContainers.size(),
           reservedContainers.size(), usedResourceClone, reservedResourceClone,
           Resources.add(usedResourceClone, reservedResourceClone),
+          Resources.createResource(runningResourceUsage.getMemory(), runningResourceUsage.getVcores()),
           runningResourceUsage.getMemorySeconds(),
           runningResourceUsage.getVcoreSeconds(), queueUsagePerc,
           clusterUsagePerc, 0, 0);
