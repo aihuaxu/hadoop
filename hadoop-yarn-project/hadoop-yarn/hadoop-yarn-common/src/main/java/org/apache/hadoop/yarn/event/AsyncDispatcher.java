@@ -79,6 +79,8 @@ public class AsyncDispatcher extends AbstractService implements Dispatcher {
    */
   private String dispatcherThreadName = "AsyncDispatcher event handler";
 
+  private DispatcherMetrics metrics;
+
   public AsyncDispatcher() {
     this(new LinkedBlockingQueue<Event>());
   }
@@ -124,7 +126,13 @@ public class AsyncDispatcher extends AbstractService implements Dispatcher {
             return;
           }
           if (event != null) {
-            dispatch(event);
+            if (metrics != null) {
+              long startTime = System.nanoTime();
+              dispatch(event);
+              metrics.incrementEventType(event, (System.nanoTime() - startTime) / 1000);
+            } else {
+              dispatch(event);
+            }
           }
         }
       }
@@ -325,5 +333,9 @@ public class AsyncDispatcher extends AbstractService implements Dispatcher {
 
   protected boolean isStopped() {
     return stopped;
+  }
+
+  public void setMetrics(DispatcherMetrics metrics) {
+    this.metrics =  metrics;
   }
 }
