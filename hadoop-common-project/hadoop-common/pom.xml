@@ -249,6 +249,11 @@
       <artifactId>sshd-core</artifactId>
       <scope>test</scope>
     </dependency>
+    <dependency>
+      <groupId>com.uber.m3</groupId>
+      <artifactId>java-m3-client</artifactId>
+      <version>3.1.2</version>
+    </dependency>
 
     <dependency>
       <groupId>org.apache.htrace</groupId>
