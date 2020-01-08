@@ -139,14 +139,13 @@ RUN pip install python-dateutil
 ENV MAVEN_OPTS -Xms256m -Xmx1536m
 
 ###
-# Install node js tools for web UI frameowkr
+# Install node js tools for web UI framework
 ###
 RUN apt-get -y install nodejs && \
     ln -s /usr/bin/nodejs /usr/bin/node && \
     apt-get -y install npm && \
     npm config set ca "" && \
-    npm install -g bower && \
-    npm install -g ember-cli@3.0.0
+    npm install -g bower 
 
 ###
 # Everything past this point is either not needed for testing or breaks Yetus.
