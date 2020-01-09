@@ -52,9 +52,11 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.ipc.StandbyException;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.delegation.web.DelegationTokenManager;
+import org.apache.hadoop.util.Time;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.KeeperException.NoNodeException;
@@ -136,6 +138,9 @@ public abstract class ZKDelegationTokenSecretManager<TokenIdent extends Abstract
   private ExecutorService listenerThreadPool;
   private final long shutdownTimeout;
 
+  private final long backoffSeedMillis;
+  private final int maxRetries;
+
   public ZKDelegationTokenSecretManager(Configuration conf) {
     super(conf.getLong(DelegationTokenManager.UPDATE_INTERVAL,
         DelegationTokenManager.UPDATE_INTERVAL_DEFAULT) * 1000,
@@ -147,6 +152,12 @@ public abstract class ZKDelegationTokenSecretManager<TokenIdent extends Abstract
             DelegationTokenManager.REMOVAL_SCAN_INTERVAL_DEFAULT) * 1000);
     shutdownTimeout = conf.getLong(ZK_DTSM_ZK_SHUTDOWN_TIMEOUT,
         ZK_DTSM_ZK_SHUTDOWN_TIMEOUT_DEFAULT);
+
+    backoffSeedMillis = conf.getLong(DelegationTokenManager.BACKOFF_INTERVAL_SEED,
+        DelegationTokenManager.BACKOFF_INTERVAL_SEED_DEFAULT);
+    maxRetries = conf.getInt(DelegationTokenManager.MAX_RETRY,
+        DelegationTokenManager.MAX_RETRY_DEFAULT);
+
     if (CURATOR_TL.get() != null) {
       zkClient =
           CURATOR_TL.get().usingNamespace(
@@ -563,13 +574,21 @@ public abstract class ZKDelegationTokenSecretManager<TokenIdent extends Abstract
   }
 
   private void incrSharedCount(SharedCount sharedCount) throws Exception {
-    while (true) {
+    int loop = 0;
+    long startMillis = Time.now();
+    for (; loop < maxRetries; loop++) {
       // Loop until we successfully increment the counter
       VersionedValue<Integer> versionedValue = sharedCount.getVersionedValue();
       if (sharedCount.trySetCount(versionedValue, versionedValue.getValue() + 1)) {
-        break;
+        return;
       }
+      long backoffMillis = backoffSeedMillis + (long)(Math.random() * backoffSeedMillis);
+      LOG.info("Token generation backoff {} millisecond", backoffMillis);
+      Thread.sleep(backoffMillis);
     }
+    long duration = Time.now() - startMillis;
+    LOG.info("Sequence number sharedcount took {} times to retry after {} millis", loop, duration);
+    throw new RuntimeException("Zookeeper is slow generating tokens");
   }
 
   @Override
