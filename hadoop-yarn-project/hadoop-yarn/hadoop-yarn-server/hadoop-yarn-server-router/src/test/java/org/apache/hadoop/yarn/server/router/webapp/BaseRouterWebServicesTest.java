@@ -48,6 +48,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.ClusterMetricsIn
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.LabelsToNodesInfo;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.NodeInfo;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.NodeLabelsInfo;
+import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.NodeLabelsMetricsInfo;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.NodeToLabelsInfo;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.NodesInfo;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.SchedulerTypeInfo;
@@ -243,9 +244,15 @@ public abstract class BaseRouterWebServicesTest {
   }
 
   protected NodeLabelsInfo getLabelsOnNode(String user)
-      throws IOException, InterruptedException {
+          throws IOException, InterruptedException {
     return routerWebService.getLabelsOnNode(
-        createHttpServletRequest(user), null);
+            createHttpServletRequest(user), null);
+  }
+
+  protected NodeLabelsMetricsInfo getLabelsMetrics(String user)
+          throws IOException, InterruptedException {
+    return routerWebService.getLabelsMetrics(
+            createHttpServletRequest(user));
   }
 
   protected AppPriority getAppPriority(String user)

@@ -40,6 +40,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.ClusterMetricsIn
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.LabelsToNodesInfo;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.NodeInfo;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.NodeLabelsInfo;
+import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.NodeLabelsMetricsInfo;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.NodeToLabelsInfo;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.NodesInfo;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.SchedulerTypeInfo;
@@ -130,6 +131,9 @@ public class TestRouterWebServices extends BaseRouterWebServicesTest {
 
     NodeLabelsInfo nodeLabelsInfo2 = getLabelsOnNode(user);
     Assert.assertNotNull(nodeLabelsInfo2);
+
+    NodeLabelsMetricsInfo nodeLabelsMetricsInfo = getLabelsMetrics(user);
+    Assert.assertNotNull(nodeLabelsMetricsInfo);
 
     AppPriority appPriority = getAppPriority(user);
     Assert.assertNotNull(appPriority);

@@ -53,6 +53,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.NodeLabelsInfo;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.NodeToLabelsEntryList;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.NodeToLabelsInfo;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.NodesInfo;
+import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.NodeLabelsMetricsInfo;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.ReservationDeleteRequestInfo;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.ReservationSubmissionRequestInfo;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.ReservationUpdateRequestInfo;
@@ -294,6 +295,15 @@ public class DefaultRequestInterceptorREST
         NodeLabelsInfo.class, HTTPMethods.GET, RMWSConsts.RM_WEB_SERVICE_PATH
             + RMWSConsts.NODES + "/" + nodeId + "/get-labels",
         null, null);
+  }
+
+  @Override
+  public NodeLabelsMetricsInfo getLabelsMetrics(HttpServletRequest hsr)
+    throws IOException {
+    return RouterWebServiceUtil.genericForward(webAppAddress, hsr,
+      NodeLabelsMetricsInfo.class, HTTPMethods.GET, RMWSConsts.RM_WEB_SERVICE_PATH
+        + RMWSConsts.NODES + "/labels-metrics",
+      null, null);
   }
 
   @Override

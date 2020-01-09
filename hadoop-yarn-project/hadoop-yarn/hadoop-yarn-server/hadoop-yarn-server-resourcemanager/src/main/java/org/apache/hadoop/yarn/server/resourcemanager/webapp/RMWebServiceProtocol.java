@@ -53,6 +53,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.NodeLabelsInfo;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.NodeToLabelsEntryList;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.NodeToLabelsInfo;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.NodesInfo;
+import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.NodeLabelsMetricsInfo;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.ReservationDeleteRequestInfo;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.ReservationSubmissionRequestInfo;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.ReservationUpdateRequestInfo;
@@ -357,6 +358,18 @@ public interface RMWebServiceProtocol {
    */
   NodeLabelsInfo getLabelsOnNode(HttpServletRequest hsr, String nodeId)
       throws IOException;
+
+  /**
+   * This method retrieves the metrics information such as total resource
+   * for all the node labels including the default, and it is reachable by using
+   * {@link RMWSConsts#NODE_LABELS_METRICS}.
+   *
+   * @param hsr the servlet request
+   * @return metrics information for all the node labels
+   * @throws IOException if an IOException happened
+   */
+  NodeLabelsMetricsInfo getLabelsMetrics(HttpServletRequest hsr)
+    throws IOException;
 
   /**
    * This method retrieves the priority for a specific app, and it is reachable

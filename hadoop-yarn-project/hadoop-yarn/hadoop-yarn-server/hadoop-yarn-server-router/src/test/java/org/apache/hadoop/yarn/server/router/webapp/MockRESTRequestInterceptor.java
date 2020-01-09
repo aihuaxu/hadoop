@@ -47,6 +47,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.DelegationToken;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.LabelsToNodesInfo;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.NodeInfo;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.NodeLabelsInfo;
+import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.NodeLabelsMetricsInfo;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.NodeToLabelsEntryList;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.NodeToLabelsInfo;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.NodesInfo;
@@ -199,6 +200,12 @@ public class MockRESTRequestInterceptor extends AbstractRESTRequestInterceptor {
   public NodeLabelsInfo getLabelsOnNode(HttpServletRequest hsr, String nodeId)
       throws IOException {
     return new NodeLabelsInfo();
+  }
+
+  @Override
+  public NodeLabelsMetricsInfo getLabelsMetrics(HttpServletRequest hsr)
+          throws IOException {
+    return new NodeLabelsMetricsInfo();
   }
 
   @Override

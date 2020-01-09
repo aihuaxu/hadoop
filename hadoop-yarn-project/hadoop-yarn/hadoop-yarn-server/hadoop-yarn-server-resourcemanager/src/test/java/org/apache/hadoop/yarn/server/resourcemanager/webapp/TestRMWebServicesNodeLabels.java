@@ -40,6 +40,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.NodeLabelsInfo;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.NodeToLabelsEntry;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.NodeToLabelsInfo;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.NodeToLabelsEntryList;
+import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.NodeLabelsMetricsInfo;
 import org.apache.hadoop.yarn.webapp.GenericExceptionHandler;
 import org.apache.hadoop.yarn.webapp.JerseyTestBase;
 import org.apache.hadoop.yarn.webapp.WebServicesTestUtils;
@@ -249,7 +250,17 @@ public class TestRMWebServicesNodeLabels extends JerseyTestBase {
     nlsifo = response.getEntity(NodeLabelsInfo.class);
     assertTrue(nlsifo.getNodeLabelsInfo().contains(new NodeLabelInfo("a")));
 
-    
+    // get LabelsMetrics
+    response =
+            r.path("ws").path("v1").path("cluster")
+                    .path("labels-metrics")
+                    .queryParam("user.name", userName)
+                    .accept(MediaType.APPLICATION_JSON)
+                    .get(ClientResponse.class);
+    assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
+    NodeLabelsMetricsInfo labelsMetricsInfo = response.getEntity(NodeLabelsMetricsInfo.class);
+    assertEquals(3, labelsMetricsInfo.getNodeLabelsMetricsInfo().size());
+
     // Replace
     params = new MultivaluedMapImpl();
     params.add("labels", "b");

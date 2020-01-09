@@ -108,6 +108,9 @@ public final class RMWSConsts {
   public static final String NODES_NODEID_GETLABELS =
       "/nodes/{nodeId}/get-labels";
 
+  /** Path for {@code RMWebServiceProtocol#getLabelsMetrics}. */
+  public static final String NODE_LABELS_METRICS = "/labels-metrics";
+
   /**
    * Path for {@code RMWebServiceProtocol#getAppPriority} and
    * {@code RMWebServiceProtocol#updateApplicationPriority}.
