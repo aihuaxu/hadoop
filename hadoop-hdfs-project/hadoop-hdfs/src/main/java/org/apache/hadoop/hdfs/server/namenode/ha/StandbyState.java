@@ -24,6 +24,7 @@ import org.apache.hadoop.ha.ServiceFailedException;
 import org.apache.hadoop.ha.HAServiceProtocol.HAServiceState;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.hdfs.server.namenode.NameNode.OperationCategory;
+import org.apache.hadoop.ipc.ObserverRetryOnActiveException;
 import org.apache.hadoop.ipc.StandbyException;
 
 /**
@@ -94,9 +95,18 @@ public class StandbyState extends HAState {
     }
     String faq = ". Visit http://t.uber.com/hdfs_faq";
     String msg = "Operation category " + op + " is not supported in state "
-        + context.getState() + ". An automatic client failover should be " +
-        "followed" + faq;
-    throw new StandbyException(msg);
+        + context.getState() + faq;
+    if (op == OperationCategory.WRITE && isObserver) {
+      // If observer receives a write call, return active retry
+      // exception to inform client to retry on active.
+      // A write should never happen on Observer. Except that,
+      // if access time is enabled. A open call can transition
+      // to a write operation. In this case, Observer
+      // should inform the client to retry this open on Active.
+      throw new ObserverRetryOnActiveException(msg);
+    } else {
+      throw new StandbyException(msg);
+    }
   }
 
   @Override
