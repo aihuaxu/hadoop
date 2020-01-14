@@ -901,7 +901,19 @@ public abstract class ZKDelegationTokenSecretManager<TokenIdent extends Abstract
           + ident.getSequenceNumber());
     }
     try {
-      if (zkClient.checkExists().forPath(nodeRemovePath) != null) {
+      DelegationTokenInformation dtInfo = getTokenInfoFromZK(ident, true);
+      if (dtInfo != null) {
+        // For the case there is no sync or watch miss, it is possible that the
+        // local storage has expired tokens which have been renewed by others
+        // (in the case of router, where more than one machines are talking to
+        // zk dt), so double check again to avoid accidental delete
+        // It is not necessary to sync since later calls of this token will
+        // force this machine to hit zk due to a local cache miss
+        if (dtInfo.getRenewDate() > Time.now()) {
+          LOG.info("Node already renewed by peer " + nodeRemovePath +
+              " so this token should not be deleted");
+          return;
+        }
         while(zkClient.checkExists().forPath(nodeRemovePath) != null){
           try {
             zkClient.delete().guaranteed().forPath(nodeRemovePath);
