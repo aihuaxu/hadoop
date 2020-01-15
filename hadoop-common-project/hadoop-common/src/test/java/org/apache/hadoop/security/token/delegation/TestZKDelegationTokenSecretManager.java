@@ -219,6 +219,53 @@ public class TestZKDelegationTokenSecretManager {
 
   @SuppressWarnings("unchecked")
   @Test
+  public void testMultiNodeCompeteForSeqNum() throws Exception {
+    DelegationTokenManager tm1, tm2 = null;
+    String connectString = zkServer.getConnectString();
+    Configuration conf = getSecretConf(connectString);
+    tm1 = new DelegationTokenManager(conf, new Text("bla"));
+    tm1.init();
+
+    Token<DelegationTokenIdentifier> token1 =
+        (Token<DelegationTokenIdentifier>) tm1.createToken(
+            UserGroupInformation.getCurrentUser(), "foo");
+    Assert.assertNotNull(token1);
+    AbstractDelegationTokenIdentifier id1 =
+        tm1.getDelegationTokenSecretManager().decodeTokenIdentifier(token1);
+    Assert.assertEquals(
+        "Token seq should be the same", 1, id1.getSequenceNumber());
+    Token<DelegationTokenIdentifier> token2 =
+        (Token<DelegationTokenIdentifier>) tm1.createToken(
+            UserGroupInformation.getCurrentUser(), "foo");
+    Assert.assertNotNull(token2);
+    AbstractDelegationTokenIdentifier id2 =
+        tm1.getDelegationTokenSecretManager().decodeTokenIdentifier(token2);
+    Assert.assertEquals(
+        "Token seq should be the same", 2, id2.getSequenceNumber());
+
+    tm2 = new DelegationTokenManager(conf, new Text("bla"));
+    tm2.init();
+
+    Token<DelegationTokenIdentifier> token3 =
+        (Token<DelegationTokenIdentifier>) tm2.createToken(
+            UserGroupInformation.getCurrentUser(), "foo");
+    Assert.assertNotNull(token3);
+    AbstractDelegationTokenIdentifier id3 =
+        tm2.getDelegationTokenSecretManager().decodeTokenIdentifier(token3);
+    Assert.assertEquals(
+        "Token seq should be the same", 1001, id3.getSequenceNumber());
+    Token<DelegationTokenIdentifier> token4 =
+        (Token<DelegationTokenIdentifier>) tm2.createToken(
+            UserGroupInformation.getCurrentUser(), "foo");
+    Assert.assertNotNull(token4);
+    AbstractDelegationTokenIdentifier id4 =
+        tm2.getDelegationTokenSecretManager().decodeTokenIdentifier(token4);
+    Assert.assertEquals(
+        "Token seq should be the same", 1002, id4.getSequenceNumber());
+  }
+
+  @SuppressWarnings("unchecked")
+  @Test
   public void testRenewTokenSingleManager() throws Exception {
     for (int i = 0; i < TEST_RETRIES; i++) {
       DelegationTokenManager tm1 = null;
