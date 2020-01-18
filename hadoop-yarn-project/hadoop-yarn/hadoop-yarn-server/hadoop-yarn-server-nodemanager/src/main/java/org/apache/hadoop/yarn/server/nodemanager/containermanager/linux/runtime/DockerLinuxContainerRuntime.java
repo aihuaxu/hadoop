@@ -541,9 +541,19 @@ public class DockerLinuxContainerRuntime implements LinuxContainerRuntime {
     String imageName = environment.get(ENV_DOCKER_CONTAINER_IMAGE);
     String network = environment.get(ENV_DOCKER_CONTAINER_NETWORK);
     String hostname = environment.get(ENV_DOCKER_CONTAINER_HOSTNAME);
+    String defaultDockerMount = conf.get(YarnConfiguration.NM_DOCKER_CONTAINER_DEFAULT_MOUNT, null);
+    String baseDockerImageName = conf.get(YarnConfiguration.NM_DOCKER_CONTAINER_BASE_IMAGE_NAME, null);
+    String baseDockerImageTag = conf.get(YarnConfiguration.NM_DOCKER_CONTAINER_BASE_IMAGE_TAG, null);
 
     if(network == null || network.isEmpty()) {
       network = defaultNetwork;
+    }
+
+    if (imageName == null || imageName.isEmpty()) {
+      if (baseDockerImageName == null || baseDockerImageTag == null) {
+        throw new ContainerExecutionException("Invalid base image, base image cannot be null");
+      }
+      imageName = baseDockerImageName + baseDockerImageTag;
     }
 
     validateContainerNetworkType(network);
@@ -632,6 +642,10 @@ public class DockerLinuxContainerRuntime implements LinuxContainerRuntime {
           runCommand.addReadOnlyMountLocation(src, dst, true);
         }
       }
+    }
+
+    if (!environment.containsKey(ENV_DOCKER_CONTAINER_MOUNTS) && defaultDockerMount != null) {
+      environment.put(ENV_DOCKER_CONTAINER_MOUNTS, defaultDockerMount);
     }
 
     if (environment.containsKey(ENV_DOCKER_CONTAINER_MOUNTS)) {

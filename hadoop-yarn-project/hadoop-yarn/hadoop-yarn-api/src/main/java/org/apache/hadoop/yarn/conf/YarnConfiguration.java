@@ -1589,6 +1589,16 @@ public class YarnConfiguration extends Configuration {
       "runtime.linux.";
 
   /**
+   * The Docker default config(For DockerContainerExecutor)
+   */
+  public static final String NM_DOCKER_CONTAINER_BASE_IMAGE_NAME = NM_PREFIX +
+          "docker.baseimage.name";
+  public static final String NM_DOCKER_CONTAINER_BASE_IMAGE_TAG = NM_PREFIX +
+          "docker.baseimage.tag";
+  public static final String NM_DOCKER_CONTAINER_DEFAULT_MOUNT= NM_PREFIX +
+          "docker.mount.default";
+
+  /**
    * Comma separated list of runtimes that are allowed when using
    * LinuxContainerExecutor. The allowed values are:
    * <ul>
