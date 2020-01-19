@@ -98,7 +98,7 @@ RUN apt-get -q install --no-install-recommends -y openjdk-7-jdk
 ######
 RUN mkdir -p /opt/spotbugs && \
     curl -L -s -S \
-         http://repo.maven.apache.org/maven2/com/github/spotbugs/spotbugs/3.1.2/spotbugs-3.1.2.tgz \
+         https://repo.maven.apache.org/maven2/com/github/spotbugs/spotbugs/3.1.2/spotbugs-3.1.2.tgz \
          -o /opt/spotbugs.tar.gz && \
     tar xzf /opt/spotbugs.tar.gz --strip-components 1 -C /opt/spotbugs
 # Hadoop uses FINDBUGS_HOME to run spotbugs
