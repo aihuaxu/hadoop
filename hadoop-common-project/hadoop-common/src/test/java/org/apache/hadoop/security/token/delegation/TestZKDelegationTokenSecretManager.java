@@ -146,41 +146,6 @@ public class TestZKDelegationTokenSecretManager {
 
   @SuppressWarnings("unchecked")
   @Test
-  public void testMultiNodeWatchMiss() throws Exception {
-    for (int i = 0; i < TEST_RETRIES; i++) {
-      DelegationTokenManager tm1, tm2 = null;
-      String connectString = zkServer.getConnectString();
-      Configuration conf = getSecretConf(connectString);
-      tm1 = new DelegationTokenManager(conf, new Text("bla"));
-      tm1.init();
-      tm2 = new DelegationTokenManager(conf, new Text("bla"));
-      tm2.init();
-
-      Token<DelegationTokenIdentifier> token =
-          (Token<DelegationTokenIdentifier>) tm1.createToken(
-              UserGroupInformation.getCurrentUser(), "foo");
-      Assert.assertNotNull(token);
-      tm2.verifyToken(token);
-      tm2.renewToken(token, "foo");
-      // if for some reason tm1 has the token expired in its memory, the
-      // ExpiredTokenRemover will try to remove it from both local as well
-      // as ZK, the ZK part should be stopped
-      tm1.verifyToken(token);
-      AbstractDelegationTokenSecretManager manager =
-          tm1.getDelegationTokenSecretManager();
-      AbstractDelegationTokenIdentifier id =
-          manager.decodeTokenIdentifier(token);
-      tm1.getDelegationTokenSecretManager().removeStoredToken(id);
-      try {
-        tm1.verifyToken(token);
-      } catch (SecretManager.InvalidToken it) {
-        fail("Expected Valid Token");
-      }
-    }
-  }
-
-  @SuppressWarnings("unchecked")
-  @Test
   public void testNodeUpAferAWhile() throws Exception {
     for (int i = 0; i < TEST_RETRIES; i++) {
       String connectString = zkServer.getConnectString();
