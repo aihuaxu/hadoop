@@ -2663,10 +2663,7 @@ public class CapacityScheduler extends
       // and proposal queue was not be consumed in time
       if (app != null && attemptId.equals(app.getApplicationAttemptId())) {
         if (app.accept(cluster, request) && app.apply(cluster, request)) {
-          LOG.info("Allocation proposal accepted");
           isSuccess = true;
-        } else{
-          LOG.info("Failed to accept allocation proposal");
         }
 
         if (LOG.isDebugEnabled()) {

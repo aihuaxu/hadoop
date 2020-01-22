@@ -126,12 +126,14 @@ public abstract class AbstractContainerAllocator {
       } else if (result.getAllocationState() == AllocationState.ALLOCATED){
         // This is a new container
         // Inform the ordering policy
-        LOG.info("assignedContainer" + " application attempt=" + application
-            .getApplicationAttemptId() + " container=" + updatedContainer
-            .getContainerId() + " queue=" + this + " clusterResource="
-            + clusterResource + " type=" + assignment.getType()
-            + " requestedPartition="
-            + updatedContainer.getNodeLabelExpression());
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("assignedContainer" + " application attempt=" + application
+                  .getApplicationAttemptId() + " container=" + updatedContainer
+                  .getContainerId() + " queue=" + appInfo.getQueueName()
+                  + " clusterResource=" + clusterResource
+                  + " type=" + assignment.getType() + " requestedPartition="
+                  + updatedContainer.getNodeLabelExpression());
+        }
 
         assignment.getAssignmentInformation().addAllocationDetails(
             updatedContainer, application.getCSLeafQueue().getQueuePath());
