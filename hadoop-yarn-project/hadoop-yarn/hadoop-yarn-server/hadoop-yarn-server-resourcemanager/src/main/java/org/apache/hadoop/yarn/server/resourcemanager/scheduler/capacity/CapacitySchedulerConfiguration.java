@@ -82,11 +82,19 @@ public class CapacitySchedulerConfiguration extends ReservationSchedulerConfigur
   @Private
   public static final String MAXIMUM_APPLICATIONS_SUFFIX =
     "maximum-applications";
-  
+
+  @Private
+  public static final String MINIMUM_APPLICATIONS_LEAFQUEUE_THRESHOLD_SUFFIX =
+      "minimum-applications-leafqueue-threshold";
+
   @Private
   public static final String MAXIMUM_SYSTEM_APPLICATIONS =
     PREFIX + MAXIMUM_APPLICATIONS_SUFFIX;
-  
+
+  @Private
+  public static final String MINIMUM_APPLICATIONS_LEAFQUEUE_THRESHOLD =
+      PREFIX + MINIMUM_APPLICATIONS_LEAFQUEUE_THRESHOLD_SUFFIX;
+
   @Private
   public static final String MAXIMUM_AM_RESOURCE_SUFFIX =
     "maximum-am-resource-percent";
@@ -343,6 +351,9 @@ public class CapacitySchedulerConfiguration extends ReservationSchedulerConfigur
   @Private
   public static final boolean DEFAULT_SCHEDULING_STRESSED_NODES_ALLOWED = true;
 
+  @Private
+  public static final int DEFAULT_MINIMUM_LEAF_QUEUE_APPLICATIONS_THRESHOLD = 50;
+
   AppPriorityACLConfigurationParser priorityACLConfig = new AppPriorityACLConfigurationParser();
 
   public CapacitySchedulerConfiguration() {
@@ -382,6 +393,13 @@ public class CapacitySchedulerConfiguration extends ReservationSchedulerConfigur
     int maxApplications = 
       getInt(MAXIMUM_SYSTEM_APPLICATIONS, DEFAULT_MAXIMUM_SYSTEM_APPLICATIIONS);
     return maxApplications;
+  }
+
+  public int getMinimumAppsLeafQueueThreshold() {
+    int minimumApplicationsThreshold =
+        getInt(MINIMUM_APPLICATIONS_LEAFQUEUE_THRESHOLD,
+            DEFAULT_MINIMUM_LEAF_QUEUE_APPLICATIONS_THRESHOLD);
+    return minimumApplicationsThreshold;
   }
   
   public float getMaximumApplicationMasterResourcePercent() {

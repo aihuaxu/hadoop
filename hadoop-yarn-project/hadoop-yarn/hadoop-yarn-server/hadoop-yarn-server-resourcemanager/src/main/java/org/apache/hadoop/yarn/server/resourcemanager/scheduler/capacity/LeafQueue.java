@@ -181,8 +181,11 @@ public class LeafQueue extends AbstractCSQueue {
                     maxApplications = maxGlobalPerQueueApps;
                 } else {
                     int maxSystemApps = conf.getMaximumSystemApplications();
-                    maxApplications =
-                            (int) (maxSystemApps * queueCapacities.getAbsoluteCapacity());
+                    // If max_applications of a leaf_queue is not configured &&
+                    // < DEFAULT_MINIMUM_LEAF_QUEUE_APPLICATIONS_THRESHOLD
+                    // Then, make max_applications = DEFAULT_MINIMUM_LEAF_QUEUE_APPLICATIONS_THRESHOLD
+                    maxApplications = Math.max((int) (maxSystemApps * queueCapacities.getAbsoluteCapacity()),
+                        conf.getMinimumAppsLeafQueueThreshold());
                 }
             }
             maxApplicationsPerUser = Math.min(maxApplications,

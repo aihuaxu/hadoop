@@ -5301,5 +5301,38 @@ public class TestCapacityScheduler {
     spyCs.handle(new NodeUpdateSchedulerEvent(
         spyCs.getNode(nm.getNodeId()).getRMNode()));
   }
+
+  @Test
+  public void testMaximumApplications() throws Exception {
+    CapacityScheduler cs = new CapacityScheduler();
+    cs.setConf(new YarnConfiguration());
+    cs.setRMContext(resourceManager.getRMContext());
+    CapacitySchedulerConfiguration conf = new CapacitySchedulerConfiguration();
+    setupQueueConfiguration(conf);
+
+    conf.set(conf.MAXIMUM_SYSTEM_APPLICATIONS, "100");
+
+    cs.init(conf);
+
+    CSQueue rootQueue = cs.getRootQueue();
+    CSQueue queueA1 = findQueue(rootQueue, A1);
+
+    // If max_app is not configured and evaluated_max_apps < MINIMUM_APPLICATIONS_LEAFQUEUE_THRESHOLD,
+    // then max_app = MINIMUM_APPLICATIONS_LEAFQUEUE_THRESHOLD
+    int maxAppsLesserThanThreshold =
+        ((LeafQueue)queueA1).getMaxApplications();
+    assertEquals("Max apps lesser than threshold", conf.getMinimumAppsLeafQueueThreshold(),
+        maxAppsLesserThanThreshold);
+
+    // If max_app is configured and less than MINIMUM_APPLICATIONS_LEAFQUEUE_THRESHOLD
+    // then max_app should not change
+    String queueMaxAppPath = conf.PREFIX + queueA1.getQueuePath() + conf.DOT + conf.MAXIMUM_APPLICATIONS_SUFFIX;
+    conf.set(queueMaxAppPath, "10");
+    cs.init(conf);
+    cs.reinitialize(conf, mockContext);
+
+    int maxAppsConfigured = ((LeafQueue)queueA1).getMaxApplications();
+    assertEquals("Max apps when configured should not change", 10, maxAppsConfigured);
+  }
 }
 
