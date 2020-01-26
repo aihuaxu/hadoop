@@ -135,7 +135,7 @@ public class TestContainerResourceUsage {
     rm.stop();
   }
 
-  @Test //(timeout = 1200000000)
+  @Test (timeout = 120000)
   public void testUsageWithMultipleContainersAndRMRestart() throws Exception {
     // Set max attempts to 1 so that when the first attempt fails, the app
     // won't try to start a new one.
