@@ -262,6 +262,33 @@ public class TestZKDelegationTokenSecretManager {
         tm2.getDelegationTokenSecretManager().decodeTokenIdentifier(token4);
     Assert.assertEquals(
         "Token seq should be the same", 1002, id4.getSequenceNumber());
+
+    // since we set the batch to be 1000, let's exhaust this number and see how
+    // tm1 takes its next batch, which should be start from 2000
+    Token<DelegationTokenIdentifier> token;
+    AbstractDelegationTokenIdentifier id;
+    for (int i = 3; i <= 1000; i++) {
+      token =
+          (Token<DelegationTokenIdentifier>) tm1.createToken(
+              UserGroupInformation.getCurrentUser(), "foo");
+      id = tm1.getDelegationTokenSecretManager().decodeTokenIdentifier(token);
+      Assert.assertEquals(
+          "Token seq should be the same", i, id.getSequenceNumber());
+    }
+    // keep creating more tokens
+    token =
+        (Token<DelegationTokenIdentifier>) tm1.createToken(
+            UserGroupInformation.getCurrentUser(), "foo");
+    id = tm1.getDelegationTokenSecretManager().decodeTokenIdentifier(token);
+    Assert.assertEquals(
+        "Token seq should be the same", 2001, id.getSequenceNumber());
+
+    token =
+        (Token<DelegationTokenIdentifier>) tm1.createToken(
+            UserGroupInformation.getCurrentUser(), "foo");
+    id = tm1.getDelegationTokenSecretManager().decodeTokenIdentifier(token);
+    Assert.assertEquals(
+        "Token seq should be the same", 2002, id.getSequenceNumber());
   }
 
   @SuppressWarnings("unchecked")

@@ -146,6 +146,7 @@ public abstract class ZKDelegationTokenSecretManager<TokenIdent extends Abstract
 
   private final int seqNumBatchSize;
   private int currentSeqNum;
+  private int currentMaxSeqNum;
 
   private ZKDelegationTokenSecretManagerMetrics metric =
       new ZKDelegationTokenSecretManagerMetrics();;
@@ -348,8 +349,10 @@ public abstract class ZKDelegationTokenSecretManager<TokenIdent extends Abstract
       // the first batch range should be allocated during this starting window
       // by calling the incrSharedCount so the first batch of token seq range
       // is allocated to this thread
-      incrSharedCount(delTokSeqCounter, seqNumBatchSize);
-      currentSeqNum = delTokSeqCounter.getCount() - seqNumBatchSize;
+      currentSeqNum = incrSharedCount(delTokSeqCounter, seqNumBatchSize);
+      currentMaxSeqNum = currentSeqNum + seqNumBatchSize;
+      LOG.info("Fetched new range of seq num, from {} to {} ",
+          currentSeqNum+1, currentMaxSeqNum);
     } catch (Exception e) {
       throw new IOException("Could not start Sequence Counter", e);
     }
@@ -591,7 +594,7 @@ public abstract class ZKDelegationTokenSecretManager<TokenIdent extends Abstract
     return delTokSeqCounter.getCount();
   }
 
-  private void incrSharedCount(SharedCount sharedCount, int batchSize)
+  private int incrSharedCount(SharedCount sharedCount, int batchSize)
       throws Exception {
     int loop = 0;
     long startMillis = Time.now();
@@ -599,7 +602,7 @@ public abstract class ZKDelegationTokenSecretManager<TokenIdent extends Abstract
       // Loop until we successfully increment the counter
       VersionedValue<Integer> versionedValue = sharedCount.getVersionedValue();
       if (sharedCount.trySetCount(versionedValue, versionedValue.getValue() + batchSize)) {
-        return;
+        return versionedValue.getValue();
       }
       long backoffMillis = backoffSeedMillis + (long)(Math.random() * backoffSeedMillis);
       LOG.info("Token generation backoff {} millisecond", backoffMillis);
@@ -615,9 +618,13 @@ public abstract class ZKDelegationTokenSecretManager<TokenIdent extends Abstract
     // The secret manager will keep a local range of seq num which won't be
     // seen by peers, so only when the range is exhausted it will ask zk for
     // another range again
-    if (currentSeqNum + 1 > delTokSeqCounter.getCount()) {
+    if (currentSeqNum >= currentMaxSeqNum) {
       try {
-        incrSharedCount(delTokSeqCounter, seqNumBatchSize);
+        // after a successful batch request, we can get the range starting point
+        currentSeqNum = incrSharedCount(delTokSeqCounter, seqNumBatchSize);
+        currentMaxSeqNum = currentSeqNum + seqNumBatchSize;
+        LOG.info("Fetched new range of seq num, from {} to {} ",
+            currentSeqNum+1, currentMaxSeqNum);
       } catch (InterruptedException e) {
         // The ExpirationThread is just finishing.. so dont do anything..
         LOG.debug("Thread interrupted while performing token counter increment", e);
@@ -625,10 +632,6 @@ public abstract class ZKDelegationTokenSecretManager<TokenIdent extends Abstract
       } catch (Exception e) {
         throw new RuntimeException("Could not increment shared counter !!", e);
       }
-
-      // after a successful batch request, we can only get the range starting
-      // point by substracting batch size from the max value we successfully set
-      currentSeqNum = delTokSeqCounter.getCount() - seqNumBatchSize;
     }
 
     return ++currentSeqNum;
