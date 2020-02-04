@@ -19,6 +19,11 @@ if [ -z "${ARTIFACT_NAME}" ]; then
   exit 1
 fi
 
+if [ -z "${HADOOP_VERSION_FILE_NAME}" ]; then
+  echo 'ERROR: Env HADOOP_VERSION_FILE not set.'
+  exit 1
+fi
+
 #######################################################################################################################
 # Build the Hadoop Binary.                                                                                            #
 #######################################################################################################################
@@ -35,6 +40,10 @@ mvn -X -B clean package \
     -Dtar \
     -DskipTests \
     -Dmaven.javadoc.skip=true
+
+HADOOP_VERSION=$(mvn org.apache.maven.plugins:maven-help-plugin:3.1.0:evaluate \
+                     -Dexpression=project.version \
+                     -q -DforceStdout)
 popd
 
 #######################################################################################################################
@@ -62,3 +71,4 @@ tar -czf ${ARTIFACTS_DIR}/${ARTIFACT_NAME} ${required_tar_file_name}
 popd
 
 chmod 777 ${ARTIFACTS_DIR}/${ARTIFACT_NAME}
+echo "${HADOOP_VERSION}" > ${ARTIFACTS_DIR}/${HADOOP_VERSION_FILE_NAME}

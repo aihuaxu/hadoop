@@ -148,8 +148,10 @@ echo "INFO: Building docker image ${BUILD_IMAGE_NAME} ..."
 docker build ${BUILD_DOCKERFILE_DIR} --build-arg GIT_HASH=${SRC_CODE_GIT_HASH} -t ${BUILD_IMAGE_NAME}
 
 echo "INFO: Building Hadoop tar with docker container ${CONTAINER_NAME} ..."
+HADOOP_VERSION_FILE_NAME='hadoop_version'
 docker run --rm -i --name ${CONTAINER_NAME} \
            -e ARTIFACT_NAME=${ARTIFACT_NAME} \
+           -e HADOOP_VERSION_FILE_NAME=${HADOOP_VERSION_FILE_NAME} \
            -v ${SRC_CODE}:/hadoop:ro \
            -v ${ARTIFACTS_DIR}:/artifacts:rw \
            ${BUILD_IMAGE_NAME}
@@ -172,8 +174,9 @@ curl --user "${ARTIFACTORY_AUTH}" \
 #######################################################################################################################
 
 PROPERTIES_FILE="${WORKSPACE}/build.properties"
-rm -f  ${PROPERTIES_FILE}
+rm -f ${PROPERTIES_FILE}
 echo "HADOOP_TAR_URL=${ARTIFACTORY_URL}" >> ${PROPERTIES_FILE}
+echo "HADOOP_VERSION=$(cat ${ARTIFACTS_DIR}/${HADOOP_VERSION_FILE_NAME})" >> ${PROPERTIES_FILE}
 
 echo 'INFO: Properties file contents:'
 cat ${PROPERTIES_FILE}
