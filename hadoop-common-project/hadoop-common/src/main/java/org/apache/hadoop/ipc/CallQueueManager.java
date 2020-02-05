@@ -25,6 +25,7 @@ import java.util.AbstractQueue;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -485,6 +486,21 @@ public class CallQueueManager<E extends Schedulable>
   @Override
   public Iterator<E> iterator() {
     return takeRef.get().iterator();
+  }
+
+  public void blackListUser(String identity) {
+    LOG.info("Received a new blacklisted user " + identity);
+    this.scheduler.addToBlackList(identity);
+  }
+
+  public void unBlacklistUser(String identity) {
+    LOG.info("Removing a user from blacklist: " + identity);
+    this.scheduler.deleteFromBlackList(identity);
+  }
+
+  public List<String> listBlackList() {
+    LOG.info("Listing all users in the blacklist");
+    return this.scheduler.listBlackList();
   }
 
   // exception that mimics the standard ISE thrown by blocking queues but

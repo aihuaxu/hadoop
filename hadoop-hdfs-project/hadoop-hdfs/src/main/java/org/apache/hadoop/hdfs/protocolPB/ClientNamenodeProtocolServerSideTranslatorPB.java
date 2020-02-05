@@ -72,6 +72,8 @@ import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.AllowS
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.AllowSnapshotResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.AppendRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.AppendResponseProto;
+import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.BlackListUserRequestProto;
+import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.BlackListUserResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.CheckAccessRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.CheckAccessResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.CompleteRequestProto;
@@ -1580,6 +1582,21 @@ public class ClientNamenodeProtocolServerSideTranslatorPB implements
       for (int i = 0; i < entries.size(); i++) {
         builder.addEntries(PBHelperClient.convert(entries.get(i)));
       }
+      return builder.build();
+    } catch (IOException e) {
+      throw new ServiceException(e);
+    }
+  }
+
+  @Override
+  public BlackListUserResponseProto blackListUser(RpcController controller,
+      BlackListUserRequestProto req) throws ServiceException {
+    try {
+      List<String> users = server.blackListUser(
+          PBHelperClient.convert(req.getAction()), req.getUser());
+      BlackListUserResponseProto.Builder builder = BlackListUserResponseProto
+          .newBuilder();
+      builder.addAllUser(users);
       return builder.build();
     } catch (IOException e) {
       throw new ServiceException(e);

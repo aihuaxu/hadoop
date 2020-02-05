@@ -18,6 +18,9 @@
 
 package org.apache.hadoop.ipc;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.apache.hadoop.conf.Configuration;
 
 /**
@@ -45,5 +48,18 @@ public class DefaultRpcScheduler implements RpcScheduler {
 
   @Override
   public void stop() {
+  }
+
+  @Override
+  public void addToBlackList(String identity) {
+  }
+
+  @Override
+  public void deleteFromBlackList(String identity) {
+  }
+
+  @Override
+  public List<String> listBlackList(){
+    return new ArrayList<String>();
   }
 }

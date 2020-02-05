@@ -33,6 +33,7 @@ import static org.apache.hadoop.util.Time.now;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.EnumSet;
@@ -97,6 +98,7 @@ import org.apache.hadoop.hdfs.protocol.EncryptionZone;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.FSLimitException;
 import org.apache.hadoop.hdfs.protocol.LastBlockWithStatus;
+import org.apache.hadoop.hdfs.protocol.HdfsConstants.BlackListAction;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.DatanodeReportType;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.RollingUpgradeAction;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.SafeModeAction;
@@ -1192,6 +1194,27 @@ public class NameNodeRpcServer implements NamenodeProtocols {
   public void refreshNodes() throws IOException {
     checkNNStartup();
     namesystem.refreshNodes();
+  }
+
+  @Override // ClientProtocol
+  public List<String> blackListUser(BlackListAction action, String user)
+      throws IOException {
+    checkNNStartup();
+    namesystem.checkSuperuserPrivilege();
+    switch (action) {
+      case BLACKLIST_ADD:
+        clientRpcServer.addToBlackList(user);
+        break;
+      case BLACKLIST_REMOVE:
+        clientRpcServer.deleteFromBlackList(user);
+        break;
+      case BLACKLIST_GET:
+        return clientRpcServer.listBlackList();
+      default:
+        throw new IllegalArgumentException(
+            "Invalid BlackList action: " + action);
+    }
+    return new ArrayList<>();
   }
 
   @Override // NamenodeProtocol

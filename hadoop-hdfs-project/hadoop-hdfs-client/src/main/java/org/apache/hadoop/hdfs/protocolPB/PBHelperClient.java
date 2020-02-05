@@ -78,6 +78,7 @@ import org.apache.hadoop.hdfs.protocol.EncryptionZone;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.FsPermissionExtension;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
+import org.apache.hadoop.hdfs.protocol.HdfsConstants.BlackListAction;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.DatanodeReportType;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.RollingUpgradeAction;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.SafeModeAction;
@@ -99,6 +100,7 @@ import org.apache.hadoop.hdfs.protocol.proto.AclProtos.AclEntryProto.FsActionPro
 import org.apache.hadoop.hdfs.protocol.proto.AclProtos.AclStatusProto;
 import org.apache.hadoop.hdfs.protocol.proto.AclProtos.GetAclStatusResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.AddBlockFlagProto;
+import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.BlackListUserRequestAction;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.CacheDirectiveEntryProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.CacheDirectiveInfoExpirationProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.CacheDirectiveInfoProto;
@@ -1985,6 +1987,32 @@ public class PBHelperClient {
       return  SafeModeAction.SAFEMODE_FORCE_EXIT;
     default:
       throw new IllegalArgumentException("Unexpected SafeModeAction :" + a);
+    }
+  }
+
+  public static BlackListAction convert(BlackListUserRequestAction a) {
+    switch (a) {
+      case BLACKLIST_ADD:
+        return BlackListAction.BLACKLIST_ADD;
+      case BLACKLIST_REMOVE:
+        return BlackListAction.BLACKLIST_REMOVE;
+      case BLACKLIST_GET:
+        return BlackListAction.BLACKLIST_GET;
+      default:
+        throw new IllegalArgumentException("Unexpected BlackListAction : " + a);
+    }
+  }
+
+  public static BlackListUserRequestAction convert(BlackListAction a) {
+    switch (a) {
+      case BLACKLIST_ADD :
+        return BlackListUserRequestAction.BLACKLIST_ADD;
+      case  BLACKLIST_REMOVE :
+        return BlackListUserRequestAction.BLACKLIST_REMOVE;
+      case BLACKLIST_GET :
+        return BlackListUserRequestAction.BLACKLIST_GET;
+      default:
+        throw new IllegalArgumentException("Unexpected BlackListAction : " + a);
     }
   }
 

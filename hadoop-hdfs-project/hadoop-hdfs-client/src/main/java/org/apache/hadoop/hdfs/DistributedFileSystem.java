@@ -2566,4 +2566,15 @@ public class DistributedFileSystem extends FileSystem {
   public RemoteIterator<OpenFileEntry> listOpenFiles() throws IOException {
     return dfs.listOpenFiles();
   }
+
+  /**
+   * All actions regarding to the blacklist, including add, delete and get
+   * @param action
+   * @param user
+   * @throws IOException
+   */
+  public List<String> blackListUser(HdfsConstants.BlackListAction action,
+    String user) throws IOException {
+    return dfs.blackListUser(action, user);
+  }
 }

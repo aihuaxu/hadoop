@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.ipc;
 
+import java.util.List;
+
 /**
  * Implement this interface to be used for RPC scheduling and backoff.
  *
@@ -41,4 +43,8 @@ public interface RpcScheduler {
       ProcessingDetails details);
 
   void stop();
+
+  void addToBlackList(String identity);
+  void deleteFromBlackList(String identity);
+  List<String> listBlackList();
 }

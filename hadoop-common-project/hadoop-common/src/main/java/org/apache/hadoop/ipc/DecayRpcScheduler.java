@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
@@ -36,6 +37,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import javax.management.ObjectName;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.AtomicDoubleArray;
 import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.hadoop.conf.Configuration;
@@ -127,6 +129,16 @@ public class DecayRpcScheduler implements RpcScheduler,
       "decay-scheduler.metrics.top.user.count";
   public static final int DECAYSCHEDULER_METRICS_TOP_USER_COUNT_DEFAULT = 10;
 
+  // (POC) Blacklisted users to they will be actually put into the queue with
+  // lower weights
+  public static final String DECAYSCHEDULER_BLACKLISTED_USERS_ENABLED =
+      "decay-scheduler.blacklisted.users.enabled";
+  public static final boolean DECAYSCHEDULER_BLACKLISTED_USERS_ENABLED_DEFAULT
+      = false;
+  public static final String DECAYSCHEDULER_BLACKLISTED_USERS =
+      "decay-scheduler.blacklisted.users";
+  public static final String DECAYSCHEDULER_BLACKLISTED_USERS_DEFAULT = "";
+
   public static final Logger LOG =
       LoggerFactory.getLogger(DecayRpcScheduler.class);
 
@@ -167,6 +179,8 @@ public class DecayRpcScheduler implements RpcScheduler,
   private final int topUsersCount; // e.g., report top 10 users' metrics
   private static final double PRECISION = 0.0001;
   private MetricsProxy metricsProxy;
+  private boolean blacklistEnabled;
+  private Set<String> blacklistedUsers;
 
   /**
    * This TimerTask will call decayCurrentCounts until
@@ -217,6 +231,10 @@ public class DecayRpcScheduler implements RpcScheduler,
         conf);
     this.backOffResponseTimeThresholds =
         parseBackOffResponseTimeThreshold(ns, conf, numLevels);
+    this.blacklistEnabled = conf.getBoolean(
+        ns + "." + DECAYSCHEDULER_BLACKLISTED_USERS_ENABLED,
+        DECAYSCHEDULER_BLACKLISTED_USERS_ENABLED_DEFAULT);
+    this.blacklistedUsers = parseBlacklistedUsers(ns, conf);
 
     // Setup response time metrics
     responseTimeTotalInCurrWindow = new AtomicLongArray(numLevels);
@@ -253,6 +271,21 @@ public class DecayRpcScheduler implements RpcScheduler,
     }
 
     return providers.get(0); // use the first
+  }
+
+  private static Set<String> parseBlacklistedUsers(String ns,
+     Configuration conf) {
+    Set<String> blacklist = Collections.newSetFromMap(
+      new ConcurrentHashMap<String, Boolean>());
+    String users = conf.getTrimmed(ns + "." +
+      DECAYSCHEDULER_BLACKLISTED_USERS,
+      DECAYSCHEDULER_BLACKLISTED_USERS_DEFAULT);
+    String[] allUsers = users.split(",");
+    for (String s : allUsers) {
+      blacklist.add(s.trim());
+    }
+
+    return blacklist;
   }
 
   private static double parseDecayFactor(String ns, Configuration conf) {
@@ -560,7 +593,36 @@ public class DecayRpcScheduler implements RpcScheduler,
       identity = DECAYSCHEDULER_UNKNOWN_IDENTITY;
     }
 
-    return getPriorityLevel(identity);
+    // make all callers leave records in decay scheduler
+    int computedPriority = getPriorityLevel(identity);
+
+    // (POC feature flag) if this user is not in the blacklist,
+    // always put it into the first queue as if there is no fair call queue
+    if (this.blacklistEnabled && !this.blacklistedUsers.contains(identity)) {
+      return 0;
+    }
+    return computedPriority;
+  }
+
+  @Override
+  public void addToBlackList(String identity) {
+    LOG.info("User {} is added to the blacklist", identity);
+    this.blacklistedUsers.add(identity);
+  }
+
+  @Override
+  public void deleteFromBlackList(String identity) {
+    if (this.blacklistedUsers.remove(identity)) {
+      LOG.info("User {} is removed from the blacklist", identity);
+    } else {
+      LOG.info("Noop since user {} is not in the blacklist.", identity);
+    }
+  }
+
+  @Override
+  public List<String> listBlackList() {
+    LOG.info("Listing all users in the blacklist");
+    return Lists.newArrayList(this.blacklistedUsers);
   }
 
   protected int getPriorityLevel(String identity) {

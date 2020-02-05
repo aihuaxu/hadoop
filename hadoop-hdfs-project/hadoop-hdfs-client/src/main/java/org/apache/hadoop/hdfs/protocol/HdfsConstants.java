@@ -121,6 +121,10 @@ public class HdfsConstants {
     SAFEMODE_LEAVE, SAFEMODE_ENTER, SAFEMODE_GET, SAFEMODE_FORCE_EXIT
   }
 
+  public enum BlackListAction {
+    BLACKLIST_ADD, BLACKLIST_REMOVE, BLACKLIST_GET,
+  }
+
   public enum RollingUpgradeAction {
     QUERY, PREPARE, FINALIZE;
 

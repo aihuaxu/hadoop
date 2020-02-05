@@ -112,6 +112,21 @@ message SetStoragePolicyRequestProto {
 message SetStoragePolicyResponseProto { // void response
 }
 
+enum BlackListUserRequestAction {
+    BLACKLIST_ADD = 1;
+    BLACKLIST_REMOVE = 2;
+    BLACKLIST_GET = 3;
+}
+
+message BlackListUserRequestProto {
+  required BlackListUserRequestAction action = 1;
+  optional string user = 2;
+}
+
+message BlackListUserResponseProto {
+  repeated string user = 1;
+}
+
 message UnsetStoragePolicyRequestProto {
   required string src = 1;
 }
@@ -913,4 +928,6 @@ service ClientNamenodeProtocol {
       returns(GetQuotaUsageResponseProto);
   rpc listOpenFiles(ListOpenFilesRequestProto)
       returns(ListOpenFilesResponseProto);
+  rpc blackListUser(BlackListUserRequestProto)
+      returns(BlackListUserResponseProto);
 }

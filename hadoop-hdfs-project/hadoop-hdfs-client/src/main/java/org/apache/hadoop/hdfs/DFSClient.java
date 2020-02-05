@@ -2955,4 +2955,15 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
     checkOpen();
     return new OpenFilesIterator(namenode, tracer);
   }
+
+  /**
+   * Actions to deal with blacklist
+   *
+   * @throws IOException
+   */
+  public List<String> blackListUser(HdfsConstants.BlackListAction action, String user)
+      throws IOException {
+    checkOpen();
+    return namenode.blackListUser(action, user);
+  }
 }

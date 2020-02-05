@@ -49,6 +49,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FsShell;
 import org.apache.hadoop.fs.FsStatus;
 import org.apache.hadoop.fs.FsTracer;
+import org.apache.hadoop.fs.Hdfs;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.shell.Command;
@@ -860,6 +861,76 @@ public class DFSAdmin extends FsShell {
     exitCode = 0;
    
     return exitCode;
+  }
+
+  /**
+   * Command to read/edit the blacklist of the call queue in namenode.
+   *
+   * @return nothing for write calls and list of users for read calls
+   * @throws IOException
+   */
+  public int blackListUser(String[] argv, int i)
+      throws IOException {
+    int exitCode = -1;
+
+    String cmd = argv[i];
+    HdfsConstants.BlackListAction action;
+    String user = "";
+    if (cmd.equalsIgnoreCase("add")) {
+      if (i >= argv.length-1) {
+        System.err.println("a user name must be followed to add to blacklist");
+        return exitCode;
+      }
+      user = argv[i+1];
+      action = HdfsConstants.BlackListAction.BLACKLIST_ADD;
+    } else if (cmd.equalsIgnoreCase("delete")) {
+      if (i >= argv.length-1) {
+        System.err.println("a user name must " +
+            "be followed to remove from blacklist");
+        return exitCode;
+      }
+      user = argv[i+1];
+      action = HdfsConstants.BlackListAction.BLACKLIST_REMOVE;
+    } else if (cmd.equalsIgnoreCase("get")) {
+      action = HdfsConstants.BlackListAction.BLACKLIST_GET;
+    } else {
+      System.out.println("Unsupported blacklist action!");
+      return exitCode;
+    }
+
+    DistributedFileSystem dfs = getDFS();
+    Configuration dfsConf = dfs.getConf();
+    URI dfsUri = dfs.getUri();
+    boolean isHaEnabled = HAUtilClient.isLogicalUri(dfsConf, dfsUri);
+
+    List<String> users = new ArrayList<>();
+    if (isHaEnabled) {
+      String nsId = dfsUri.getHost();
+      List<ProxyAndInfo<ClientProtocol>> proxies =
+          HAUtil.getProxiesForAllNameNodesInNameservice(dfsConf,
+              nsId, ClientProtocol.class);
+      for (ProxyAndInfo<ClientProtocol> proxy: proxies) {
+        users = proxy.getProxy().blackListUser(action, user);
+        System.out.println("Blacklist successful for " +
+            proxy.getAddress());
+      }
+    } else {
+      users = dfs.blackListUser(action, user);
+      System.out.println("Blacklist user successful");
+    }
+
+    if (action == HdfsConstants.BlackListAction.BLACKLIST_GET) {
+      if (users.size() == 0) {
+        System.out.println("No blacklisted users right now!");
+      } else {
+        System.out.println("All blacklisted users are:");
+        for (String u : users) {
+          System.out.println(u);
+        }
+      }
+    }
+
+    return 0;
   }
 
   /**
@@ -1811,6 +1882,9 @@ public class DFSAdmin extends FsShell {
           + " [-triggerBlockReport [-incremental] <datanode_host:ipc_port> [-namenode <namenode_host:ipc_port>]]");
     } else if ("-listOpenFiles".equals(cmd)) {
       System.err.println("Usage: hdfs dfsadmin [-listOpenFiles]");
+    } else if ("-fairCallQueueBlackList".equals(cmd)) {
+      System.err.println("Usage: hdfs dfsadmin " +
+          "-fairCallQueueBlackList [add <user> | delete <user> | get]");
     } else {
       System.err.println("Usage: hdfs dfsadmin");
       System.err.println("Note: Administrative commands can only be run as the HDFS superuser.");
@@ -1964,6 +2038,11 @@ public class DFSAdmin extends FsShell {
         printUsage(cmd);
         return exitCode;
       }
+    } else if ("-fairCallQueueBlackList".equals(cmd)) {
+      if (argv.length < 2) {
+        printUsage(cmd);
+        return exitCode;
+      }
     }
     
     // initialize DFSAdmin
@@ -2045,6 +2124,8 @@ public class DFSAdmin extends FsShell {
         exitCode = triggerBlockReport(argv);
       } else if ("-listOpenFiles".equals(cmd)) {
         exitCode = listOpenFiles();
+      } else if ("-fairCallQueueBlackList".equals(cmd)) {
+        exitCode = blackListUser(argv, i);
       } else if ("-help".equals(cmd)) {
         if (i < argv.length) {
           printHelp(argv[i]);
@@ -2120,7 +2201,7 @@ public class DFSAdmin extends FsShell {
     dnProxy.deleteBlockPool(argv[i+1], force);
     return 0;
   }
-  
+
   private int refreshNamenodes(String[] argv, int i) throws IOException {
     String datanode = argv[i];
     ClientDatanodeProtocol refreshProtocol = getDataNodeProxy(datanode);

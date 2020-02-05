@@ -681,6 +681,18 @@ public abstract class Server {
         getQueueClass(prefix, conf), maxQueueSize, prefix, conf);
   }
 
+  public synchronized void addToBlackList(String identity) {
+    callQueue.blackListUser(identity);
+  }
+
+  public synchronized void deleteFromBlackList(String identity) {
+    callQueue.unBlacklistUser(identity);
+  }
+
+  public synchronized List<String> listBlackList() {
+    return callQueue.listBlackList();
+  }
+
   /**
    * Get from config if client backoff is enabled on that port.
    */

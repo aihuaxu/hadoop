@@ -228,6 +228,80 @@ public class TestDecayRpcScheduler {
         cvs2.equals("{\"A\":3,\"B\":1,\"C\":1}"));
   }
 
+
+  @Test
+  @SuppressWarnings("deprecation")
+  public void testPriorityInBlacklist() throws Exception {
+    Configuration conf = new Configuration();
+    final String namespace = "ns";
+    conf.set(namespace + "." + DecayRpcScheduler
+        .IPC_FCQ_DECAYSCHEDULER_PERIOD_KEY, "99999999"); // Never flush
+    conf.set(namespace + "." + DecayRpcScheduler
+        .IPC_FCQ_DECAYSCHEDULER_THRESHOLDS_KEY, "50");
+    conf.set(namespace + "." + DecayRpcScheduler
+        .DECAYSCHEDULER_BLACKLISTED_USERS_ENABLED, "true");
+    conf.set(namespace + "." + DecayRpcScheduler
+        .DECAYSCHEDULER_BLACKLISTED_USERS, "A");
+    scheduler = new DecayRpcScheduler(2, namespace, conf);
+
+    assertEquals(0, scheduler.getPriorityLevel(mockCall("A")));
+    assertEquals(1, scheduler.getPriorityLevel(mockCall("A")));
+    assertEquals(0, scheduler.getPriorityLevel(mockCall("B")));
+    assertEquals(0, scheduler.getPriorityLevel(mockCall("B")));
+    assertEquals(0, scheduler.getPriorityLevel(mockCall("C")));
+    assertEquals(0, scheduler.getPriorityLevel(mockCall("C")));
+    assertEquals(0, scheduler.getPriorityLevel(mockCall("A")));
+    assertEquals(0, scheduler.getPriorityLevel(mockCall("A")));
+    assertEquals(0, scheduler.getPriorityLevel(mockCall("A")));
+    assertEquals(1, scheduler.getPriorityLevel(mockCall("A")));
+
+    MBeanServer mbs = ManagementFactory.getPlatformMBeanServer();
+    ObjectName mxbeanName = new ObjectName(
+        "Hadoop:service="+ namespace + ",name=DecayRpcScheduler");
+
+    String cvs1 = (String) mbs.getAttribute(mxbeanName, "CallVolumeSummary");
+    assertTrue("Get expected JMX of CallVolumeSummary before decay",
+        cvs1.equals("{\"A\":6,\"B\":2,\"C\":2}"));
+
+    scheduler.forceDecay();
+
+    String cvs2 = (String) mbs.getAttribute(mxbeanName, "CallVolumeSummary");
+    assertTrue("Get expected JMX for CallVolumeSummary after decay",
+        cvs2.equals("{\"A\":3,\"B\":1,\"C\":1}"));
+  }
+
+  @Test
+  @SuppressWarnings("deprecation")
+  public void testPriorityAfterBlacklist() throws Exception {
+    Configuration conf = new Configuration();
+    final String namespace = "ns";
+    conf.set(namespace + "." + DecayRpcScheduler
+        .IPC_FCQ_DECAYSCHEDULER_PERIOD_KEY, "99999999"); // Never flush
+    conf.set(namespace + "." + DecayRpcScheduler
+        .IPC_FCQ_DECAYSCHEDULER_THRESHOLDS_KEY, "50");
+    conf.set(namespace + "." + DecayRpcScheduler
+        .DECAYSCHEDULER_BLACKLISTED_USERS_ENABLED, "true");
+    conf.set(namespace + "." + DecayRpcScheduler
+        .DECAYSCHEDULER_BLACKLISTED_USERS, "A");
+    scheduler = new DecayRpcScheduler(2, namespace, conf);
+
+    assertEquals(0, scheduler.getPriorityLevel(mockCall("A")));
+    assertEquals(1, scheduler.getPriorityLevel(mockCall("A")));
+    assertEquals(0, scheduler.getPriorityLevel(mockCall("B")));
+    assertEquals(0, scheduler.getPriorityLevel(mockCall("B")));
+    assertEquals(0, scheduler.getPriorityLevel(mockCall("C")));
+    assertEquals(0, scheduler.getPriorityLevel(mockCall("C")));
+    assertEquals(0, scheduler.getPriorityLevel(mockCall("A")));
+    assertEquals(0, scheduler.getPriorityLevel(mockCall("A")));
+    assertEquals(0, scheduler.getPriorityLevel(mockCall("A")));
+    assertEquals(1, scheduler.getPriorityLevel(mockCall("A")));
+
+    scheduler.deleteFromBlackList("A");
+    assertEquals(0, scheduler.getPriorityLevel(mockCall("A")));
+    assertEquals(0, scheduler.getPriorityLevel(mockCall("A")));
+    assertEquals(0, scheduler.getPriorityLevel(mockCall("A")));
+  }
+
   @Test(timeout=2000)
   @SuppressWarnings("deprecation")
   public void testPeriodic() throws InterruptedException {

@@ -899,6 +899,18 @@ public interface ClientProtocol {
   void refreshNodes() throws IOException;
 
   /**
+   * Blacklist actions, including add, remove and get.
+   *
+   * @param action BlackListAction as ADD, REMOVE and GET.
+   * @param user the actual user who will be added or deleted from the blacklist
+   *             when the action is GET, this param is ignored
+   * @throws IOException
+   */
+  @Idempotent
+  List<String> blackListUser(HdfsConstants.BlackListAction action, String user)
+      throws IOException;
+
+  /**
    * Finalize previous upgrade.
    * Remove file system state saved during the upgrade.
    * The upgrade will become irreversible.
