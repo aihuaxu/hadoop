@@ -71,7 +71,7 @@ echo "starting $component, logging to $log"
 case $component in
   (namenode|datanode|journalnode|zkfc)
     hdfsScript="$HADOOP_HDFS_HOME"/bin/hdfs
-    $hdfsScript $component > "$log" 2>&1
+    exec $hdfsScript $component > "$log" 2>&1
   ;;
   (*)
     echo "$component should be one of namenode,datanode,journalnode,zkfc"

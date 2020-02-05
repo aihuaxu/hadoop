@@ -6,10 +6,9 @@ custom:
   base_image: 'uber-uai/java8'
   post_build_cmds:
     - RUN echo hdfs hadoop supergroup | xargs -n 1 groupadd -r && useradd -r -m -s /bin/bash -g hadoop -g hdfs hdfs && usermod -a -G sudo,supergroup udocker && sed -i -e 's/%sudo\s\+ALL=(ALL:ALL)\s\+ALL/%sudo ALL=(ALL) NOPASSWD:ALL/g' /etc/sudoers
-    - RUN mkdir -p /opt/hdfs/binary /opt/hdfs/scripts /opt/hdfs/conf /opt/hdfs/hosts /var/log/hadoop /opt/hadoop/pids /opt/hadoop/keytabs
-    - RUN chmod 1777 /opt/hadoop/pids && chmod 777 /var/log/hadoop && chown -R udocker:udocker /opt/hdfs && chown -R udocker:udocker /opt/hadoop && chown -R udocker:udocker /run && chown -R udocker:udocker /opt/hdfs/scripts
-    - RUN wget -O /tmp/hadoop.tar.gz http://artifactory.uber.internal:4587/artifactory/pub/hadoop/binary/dev/hadoop-mmathew-2.8.2-hadoop_process-d21265dac6f8-2.tar.gz && tar -zxf /tmp/hadoop.tar.gz -C /opt/hdfs/binary --strip 1 && rm -f /tmp/hadoop.tar.gz
-    - RUN bash ./udeploy/build_target.sh 1
+    - RUN mkdir -p /opt/hdfs/binary /opt/hdfs/conf /var/log/hadoop /opt/hadoop/keytabs /var/log/hadoop
+    - RUN chmod 777 /var/log/hadoop && chown -R udocker:udocker /opt/hdfs && chown -R udocker:udocker /opt/hadoop && chown -R udocker:udocker /run
+    - RUN wget -O /tmp/hadoop.tar.gz http://artifactory.uber.internal:4587/artifactory/pub/hadoop/binary/${GIT_REF}/hadoop.tar.gz && tar -zxf /tmp/hadoop.tar.gz -C /opt/hdfs/binary --strip 1 && rm -f /tmp/hadoop.tar.gz
     - RUN echo '* * * * * root /opt/hdfs/scripts/nn_refresh_nodes.sh > /var/log/cron.log 2>/var/log/cron.log' > /etc/cron.d/nn_refresh_nodes
     - RUN echo '' >> /etc/cron.d/nn_refresh_nodes
     - RUN chmod 0644 /etc/cron.d/nn_refresh_nodes
@@ -23,6 +22,9 @@ debian_packages_for_build:
   - name: tar
   - name: wget
   - name: vim
+
+debian_packages_for_runtime:
+  - name: rsync
 
 applications:
   - udeploy_app_id: hdfs
