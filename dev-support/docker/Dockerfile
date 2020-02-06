@@ -42,7 +42,6 @@ RUN apt-get -q update && apt-get -q install --no-install-recommends -y \
     git \
     gnupg-agent \
     make \
-    maven \
     libbz2-dev \
     libcurl4-openssl-dev \
     libfuse-dev \
@@ -65,9 +64,19 @@ RUN apt-get -q update && apt-get -q install --no-install-recommends -y \
     snappy \
     zlib1g-dev
 
-# Fixing the Apache commons / Maven dependency problem under Ubuntu:
-# See http://wiki.apache.org/commons/VfsProblems
-RUN cd /usr/share/maven/lib && ln -s ../../java/commons-lang.jar .
+######
+# Install Apache Maven
+######
+RUN mkdir -p /opt/maven && \
+    curl -L -s -S \
+         http://www-us.apache.org/dist/maven/maven-3/3.3.9/binaries/apache-maven-3.3.9-bin.tar.gz \
+         -o /opt/maven.tar.gz && \
+    tar xzf /opt/maven.tar.gz --strip-components 1 -C /opt/maven
+
+ENV M2_HOME /opt/maven
+ENV PATH "/opt/maven/bin:${PATH}"
+
+ENV JAVA_HOME /usr/lib/jvm/java-1.7.0-openjdk-amd64
 
 #######
 # Java OpenJDK
