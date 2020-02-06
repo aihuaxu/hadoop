@@ -145,7 +145,7 @@ echo "INFO: Building docker image ${DEV_IMAGE_NAME} ..."
 docker build ${DEV_DOCKERFILE_DIR} -t ${DEV_IMAGE_NAME}
 
 echo "INFO: Building docker image ${BUILD_IMAGE_NAME} ..."
-docker build ${BUILD_DOCKERFILE_DIR} --build-arg GIT_HASH=${SRC_CODE_GIT_HASH} -t ${BUILD_IMAGE_NAME}
+docker build ${BUILD_DOCKERFILE_DIR} -t ${BUILD_IMAGE_NAME}
 
 echo "INFO: Building Hadoop tar with docker container ${CONTAINER_NAME} ..."
 HADOOP_VERSION_FILE_NAME='hadoop_version'
