@@ -1,22 +1,28 @@
 #!/bin/bash
 
+set -e
+set -x
+set -o pipefail
+
 # Exit Code Chart
 #  
-# 1 - system checking failure
+# 1 - system/env check failure
 # 2 - ZKFC container failure
 # 4 - Unknown container type
 
+# Find current directory.
+SCRIPTS_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
 # start datanode process.
 function start_datanode() {
-  source /opt/hdfs/conf/hadoop-env.sh; exec hdfs datanode
+  source ${HADOOP_ENV}; exec ${HDFS_SCRIPT} datanode
 }
 
 # start namenode process.
 function start_namenode() {
   # INIT == true -> active NN in initialization and do the format.
   if [ "${INIT}" == "true" ]; then
-    source /opt/hdfs/conf/hadoop-env.sh; exec hdfs namenode -format ${init_option}
+    source ${HADOOP_ENV}; exec ${HDFS_SCRIPT} namenode -format ${init_option}
     if [ $? -ne 0 ]; then
       echo "ERROR: Failed to format namenode."
       # Not exit on error as it is expected if NN is already formatted.
@@ -26,7 +32,7 @@ function start_namenode() {
   # INIT not set -> standby NN in initialization,
   # INIT == false -> maybe a replacement standby NN in running cluster.
   else
-    source /opt/hdfs/conf/hadoop-env.sh; exec hdfs namenode -bootstrapStandby ${init_option}
+    source ${HADOOP_ENV}; exec ${HDFS_SCRIPT} namenode -bootstrapStandby ${init_option}
     if [ $? -ne 0 ]; then
       echo "ERROR: Failed to bootstrap standby namenode."
       # Not exit on error as it is expected for NN restart.
@@ -36,18 +42,18 @@ function start_namenode() {
   fi
 
   sudo service cron start
-  source /opt/hdfs/conf/hadoop-env.sh; exec hdfs namenode
+  source ${HADOOP_ENV}; exec ${HDFS_SCRIPT} namenode
 }
 
 # start journalnode process.
 function start_journalnode() {
-  source /opt/hdfs/conf/hadoop-env.sh; exec hdfs journalnode
+  source ${HADOOP_ENV}; exec ${HDFS_SCRIPT} journalnode
 }
 
 # start zkfc process.
 function start_zkfc() {
   if [ "${INIT}" == "true" ]; then
-    source /opt/hdfs/conf/hadoop-env.sh; exec hdfs zkfc -formatZK ${init_option}
+    source ${HADOOP_ENV}; exec ${HDFS_SCRIPT} zkfc -formatZK ${init_option}
     if [ $? -ne 0 ]; then
       echo "ERROR: Failed to format ZKFC."
       # Not exit on error as it is expected if znode already exist.
@@ -56,16 +62,7 @@ function start_zkfc() {
     fi
   fi
 
-  source /opt/hdfs/conf/hadoop-env.sh; exec hdfs zkfc
-}
-
-# check if container type is valid.
-function check_env() {
-  # check container type.
-  if [ -z "${container_type}" ]; then
-    echo "ERROR: env CONTAINER_TYPE is empty."
-    exit 1
-  fi
+  source ${HADOOP_ENV}; exec ${HDFS_SCRIPT} hdfs zkfc
 }
 
 # setup system files/dirs.
@@ -78,9 +75,9 @@ function setup_system() {
 
 # entry point for this script.
 function main() {
-  check_env
+  source "${SCRIPTS_DIR}/env.sh"
   setup_system
-  bash config.sh
+  bash "${SCRIPTS_DIR}/config.sh"
 
   # Not consider router and observer for now.
   case ${container_type} in
