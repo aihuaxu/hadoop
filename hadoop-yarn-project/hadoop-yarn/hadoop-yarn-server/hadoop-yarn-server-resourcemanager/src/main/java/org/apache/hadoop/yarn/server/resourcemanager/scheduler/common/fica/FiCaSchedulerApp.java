@@ -883,6 +883,12 @@ public class FiCaSchedulerApp extends SchedulerApplicationAttempt {
         LOG.error("node to unreserve doesn't exist, nodeid: " + idToUnreserve);
         return null;
       }
+
+      if (nodeToUnreserve.getReservedContainer() == null) {
+        LOG.error("node is not reserved, nodeid: " + idToUnreserve);
+        return null;
+      }
+
       if (LOG.isDebugEnabled()) {
         LOG.debug("unreserving for app: " + getApplicationId() + " on nodeId: "
             + idToUnreserve

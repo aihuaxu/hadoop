@@ -531,6 +531,9 @@ public class CapacityScheduler extends
         } catch (InterruptedException ie) {
           // keep interrupt signal
           Thread.currentThread().interrupt();
+        } catch (Exception e) {
+          // Ignore exception to avoid scheduling thread crash
+          LOG.fatal("Thread " + Thread.currentThread() + " threw an Exception.", e);
         }
       }
       LOG.info("AsyncScheduleThread[" + getName() + "] exited!");
