@@ -62,7 +62,21 @@ function start_zkfc() {
     fi
   fi
 
-  source ${HADOOP_ENV}; exec ${HDFS_SCRIPT} hdfs zkfc
+  source ${HADOOP_ENV}; exec ${HDFS_SCRIPT} zkfc
+}
+
+# start balancer process.
+function start_balancer() {
+  # TODO: Move balancer params as env and inject from Odin or DSC configs.
+  source ${HADOOP_ENV}; ${HDFS_SCRIPT} dfsadmin -setBalancerBandwidth 419430400
+  source ${HADOOP_ENV}; exec ${HDFS_SCRIPT} balancer -Ddfs.balancer.getBlocks.min-block-size=100000000 \
+                                                     -Ddfs.balancer.max-size-to-move=26843545600 \
+                                                     -Ddfs.balancer.getBlocks.size=22949672960 \
+                                                     -Ddfs.datanode.balance.max.concurrent.moves=10 \
+                                                     -threshold 7 \
+                                                     -asService \
+                                                     -include \
+                                                     -f /opt/hdfs/hosts/include
 }
 
 # setup system files/dirs.
@@ -92,6 +106,9 @@ function main() {
       ;;
     zkfc)
       start_zkfc
+      ;;
+    balancer)
+      start_balancer
       ;;
     *)
       echo "ERROR: Unknown HDFS service container type: ${container_type}"
