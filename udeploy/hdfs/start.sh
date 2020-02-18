@@ -42,7 +42,9 @@ function start_namenode() {
   fi
 
   sudo service cron start
-  source ${HADOOP_ENV}; exec ${HDFS_SCRIPT} namenode
+  # Observer namenode requires -observer flag to start.
+  [[ "${container_type}" == "ob" ]] && observer_opt="-observer" || observer_opt=""
+  source ${HADOOP_ENV}; exec ${HDFS_SCRIPT} namenode ${observer_opt}
 }
 
 # start journalnode process.
@@ -95,7 +97,7 @@ function main() {
 
   # Not consider router and observer for now.
   case ${container_type} in
-    nn)
+    nn | ob)
       start_namenode
       ;;
     dn)
