@@ -22,6 +22,22 @@ function start_datanode() {
 function start_namenode() {
   # INIT == true -> active NN in initialization and do the format.
   if [ "${INIT}" == "true" ]; then
+
+    # Setup required directories through idempotent operations.
+    if [ -z "${DYNAMIC_NAMENODE_NAME_DIR}" ]; then
+      echo "ERROR: env DYNAMIC_NAMENODE_NAME_DIR is empty."
+      exit 1
+    fi
+    if [ -z "${DYNAMIC_NAMENODE_LEGACY_OIV_DIR}" ]; then
+      echo "ERROR: env DYNAMIC_NAMENODE_LEGACY_OIV_DIR is empty."
+      exit 1
+    fi
+    namenode_name_dir_parent=$(dirname "${DYNAMIC_NAMENODE_NAME_DIR}")
+    namenode_legacy_oiv_dir_parent=$(dirname "${DYNAMIC_NAMENODE_LEGACY_OIV_DIR}")
+    sudo mkdir -p  "${DYNAMIC_NAMENODE_NAME_DIR}" "${DYNAMIC_NAMENODE_LEGACY_OIV_DIR}"
+    sudo chmod -R 750 "${namenode_name_dir_parent}" "${namenode_legacy_oiv_dir_parent}"
+    sudo chown -R udocker:udocker "${namenode_name_dir_parent}" "${namenode_legacy_oiv_dir_parent}"
+
     source ${HADOOP_ENV}; exec ${HDFS_SCRIPT} namenode -format ${init_option}
     if [ $? -ne 0 ]; then
       echo "ERROR: Failed to format namenode."

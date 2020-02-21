@@ -1,10 +1,15 @@
 #!/bin/bash
 
 set -e
-set -x
 set -o pipefail
 
 mkdir -p ${HDFS_CONF_PATH}
+
+# Copy over dsc configs to target path.
+bash ${DSC_SETUP_SCRIPT} ${DSC_TARGET_DIR}
+rsync --exclude *.sha -av ${DSC_TARGET_DIR}/${DSC_SUB_PATH}/* ${HDFS_CONF_PATH}/
+cp ./udeploy/hdfs/topology.py ${HDFS_CONF_PATH}/
+
 # Update ssl-server.xml and ssl-client.xml with passwords
 if [ -f ${TRUSTSTORE_PSD} ] ; then
   truststore_passwd=$(sudo cat ${TRUSTSTORE_PSD})
@@ -30,7 +35,3 @@ if [ -f ${KEYSTORE_FILE} ] ; then
 fi
 
 sudo chown -R udocker:udocker ${SECURE_STORE_PATH}
-
-bash ${DSC_SETUP_SCRIPT} ${DSC_TARGET_DIR}
-rsync --exclude *.sha -av ${DSC_TARGET_DIR}/${DSC_SUB_PATH}/* ${HDFS_CONF_PATH}/
-cp ./udeploy/hdfs/topology.py ${HDFS_CONF_PATH}/
