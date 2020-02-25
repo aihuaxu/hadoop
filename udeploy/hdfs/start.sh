@@ -85,16 +85,9 @@ function start_zkfc() {
 
 # start balancer process.
 function start_balancer() {
-  # TODO: Move balancer params as env and inject from Odin or DSC configs.
-  source "${HADOOP_ENV}"; "${HDFS_SCRIPT}" dfsadmin -setBalancerBandwidth 419430400
-  source "${HADOOP_ENV}"; exec "${HDFS_SCRIPT}" balancer -Ddfs.balancer.getBlocks.min-block-size=100000000 \
-                                                     -Ddfs.balancer.max-size-to-move=26843545600 \
-                                                     -Ddfs.balancer.getBlocks.size=22949672960 \
-                                                     -Ddfs.datanode.balance.max.concurrent.moves=10 \
-                                                     -threshold 7 \
-                                                     -asService \
-                                                     -include \
-                                                     -f /opt/hdfs/hosts/include
+  # Run balancer with default threshold of 7.
+  source "${HADOOP_ENV}"; exec "${HDFS_SCRIPT}" balancer -threshold 7 \
+                                                         -asService
 }
 
 # setup system files/dirs.
@@ -111,7 +104,6 @@ function main() {
   setup_system
   bash "${SCRIPTS_DIR}/config.sh"
 
-  # Not consider router and observer for now.
   case ${container_type} in
     nn | ob)
       start_namenode
