@@ -15,7 +15,7 @@ SCRIPTS_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
 # start datanode process.
 function start_datanode() {
-  source ${HADOOP_ENV}; exec ${HDFS_SCRIPT} datanode
+  source "${HADOOP_ENV}"; exec "${HDFS_SCRIPT}" datanode
 }
 
 # start namenode process.
@@ -38,7 +38,7 @@ function start_namenode() {
     sudo chmod -R 750 "${namenode_name_dir_parent}" "${namenode_legacy_oiv_dir_parent}"
     sudo chown -R udocker:udocker "${namenode_name_dir_parent}" "${namenode_legacy_oiv_dir_parent}"
 
-    source ${HADOOP_ENV}; exec ${HDFS_SCRIPT} namenode -format ${init_option}
+    source "${HADOOP_ENV}"; "${HDFS_SCRIPT}" namenode -format ${init_option}
     if [ $? -ne 0 ]; then
       echo "ERROR: Failed to format namenode."
       # Not exit on error as it is expected if NN is already formatted.
@@ -48,7 +48,7 @@ function start_namenode() {
   # INIT not set -> standby NN in initialization,
   # INIT == false -> maybe a replacement standby NN in running cluster.
   else
-    source ${HADOOP_ENV}; exec ${HDFS_SCRIPT} namenode -bootstrapStandby ${init_option}
+    source "${HADOOP_ENV}"; "${HDFS_SCRIPT}" namenode -bootstrapStandby ${init_option}
     if [ $? -ne 0 ]; then
       echo "ERROR: Failed to bootstrap standby namenode."
       # Not exit on error as it is expected for NN restart.
@@ -60,18 +60,18 @@ function start_namenode() {
   sudo service cron start
   # Observer namenode requires -observer flag to start.
   [[ "${container_type}" == "ob" ]] && observer_opt="-observer" || observer_opt=""
-  source ${HADOOP_ENV}; exec ${HDFS_SCRIPT} namenode ${observer_opt}
+  source "${HADOOP_ENV}"; exec "${HDFS_SCRIPT}" namenode ${observer_opt}
 }
 
 # start journalnode process.
 function start_journalnode() {
-  source ${HADOOP_ENV}; exec ${HDFS_SCRIPT} journalnode
+  source "${HADOOP_ENV}"; exec "${HDFS_SCRIPT}" journalnode
 }
 
 # start zkfc process.
 function start_zkfc() {
   if [ "${INIT}" == "true" ]; then
-    source ${HADOOP_ENV}; exec ${HDFS_SCRIPT} zkfc -formatZK ${init_option}
+    source "${HADOOP_ENV}"; "${HDFS_SCRIPT}" zkfc -formatZK ${init_option}
     if [ $? -ne 0 ]; then
       echo "ERROR: Failed to format ZKFC."
       # Not exit on error as it is expected if znode already exist.
@@ -80,14 +80,14 @@ function start_zkfc() {
     fi
   fi
 
-  source ${HADOOP_ENV}; exec ${HDFS_SCRIPT} zkfc
+  source "${HADOOP_ENV}"; exec "${HDFS_SCRIPT}" zkfc
 }
 
 # start balancer process.
 function start_balancer() {
   # TODO: Move balancer params as env and inject from Odin or DSC configs.
-  source ${HADOOP_ENV}; ${HDFS_SCRIPT} dfsadmin -setBalancerBandwidth 419430400
-  source ${HADOOP_ENV}; exec ${HDFS_SCRIPT} balancer -Ddfs.balancer.getBlocks.min-block-size=100000000 \
+  source "${HADOOP_ENV}"; "${HDFS_SCRIPT}" dfsadmin -setBalancerBandwidth 419430400
+  source "${HADOOP_ENV}"; exec "${HDFS_SCRIPT}" balancer -Ddfs.balancer.getBlocks.min-block-size=100000000 \
                                                      -Ddfs.balancer.max-size-to-move=26843545600 \
                                                      -Ddfs.balancer.getBlocks.size=22949672960 \
                                                      -Ddfs.datanode.balance.max.concurrent.moves=10 \
