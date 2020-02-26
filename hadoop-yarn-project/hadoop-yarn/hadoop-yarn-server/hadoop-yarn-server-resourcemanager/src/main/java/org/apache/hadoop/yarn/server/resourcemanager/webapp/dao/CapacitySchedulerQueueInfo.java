@@ -30,6 +30,7 @@ import javax.xml.bind.annotation.XmlTransient;
 import org.apache.hadoop.yarn.api.records.QueueState;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ResourceUsage;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CSQueue;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CapacityScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.PlanQueue;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.QueueCapacities;
 
@@ -66,7 +67,7 @@ public class CapacitySchedulerQueueInfo {
   CapacitySchedulerQueueInfo() {
   };
 
-  CapacitySchedulerQueueInfo(CSQueue q) {
+  CapacitySchedulerQueueInfo(CapacityScheduler cs, CSQueue q) {
 
     queuePath = q.getQueuePath();
     capacity = q.getCapacity() * 100;
@@ -101,7 +102,7 @@ public class CapacitySchedulerQueueInfo {
       Collections.sort(nodeLabels);
     }
     QueueCapacities qCapacities = q.getQueueCapacities();
-    populateQueueCapacities(qCapacities);
+    populateQueueCapacities(cs, qCapacities);
 
     ResourceUsage queueResourceUsage = q.getQueueResourceUsage();
     populateQueueResourceUsage(queueResourceUsage);
@@ -111,8 +112,8 @@ public class CapacitySchedulerQueueInfo {
     resources = new ResourcesInfo(queueResourceUsage, false);
   }
 
-  protected void populateQueueCapacities(QueueCapacities qCapacities) {
-    capacities = new QueueCapacitiesInfo(qCapacities, false);
+  protected void populateQueueCapacities(CapacityScheduler cs, QueueCapacities qCapacities) {
+    capacities = new QueueCapacitiesInfo(cs, qCapacities, false);
   }
 
   public float getCapacity() {

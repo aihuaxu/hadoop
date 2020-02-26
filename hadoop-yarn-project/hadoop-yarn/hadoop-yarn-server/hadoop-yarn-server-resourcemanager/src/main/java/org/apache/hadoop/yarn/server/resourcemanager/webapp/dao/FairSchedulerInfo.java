@@ -44,9 +44,19 @@ public class FairSchedulerInfo extends SchedulerInfo {
   public FairSchedulerInfo(FairScheduler fs) {
     scheduler = fs;
     rootQueue = new FairSchedulerQueueInfo(scheduler.getQueueManager().
-        getRootQueue(), scheduler);
+              getRootQueue(), scheduler);
   }
 
+  /**
+   *
+   * @param fs
+   * @param queueName
+   */
+  public FairSchedulerInfo(FairScheduler fs, String queueName) {
+    scheduler = fs;
+    rootQueue = new FairSchedulerQueueInfo(scheduler.getQueueManager().
+              getQueue(queueName), scheduler);
+  }
   /**
    * Get the fair share assigned to the appAttemptId.
    * @param appAttemptId

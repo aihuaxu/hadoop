@@ -58,6 +58,7 @@ import javax.ws.rs.core.Response.Status;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.directory.api.util.Strings;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.io.Text;
@@ -142,6 +143,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.YarnScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CSQueue;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CapacityScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerNode;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.FSQueue;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.FairScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fifo.FifoScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.ActivitiesInfo;
@@ -302,17 +304,24 @@ public class RMWebServices extends WebServices implements RMWebServiceProtocol {
   @Path(RMWSConsts.SCHEDULER)
   @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
   @Override
-  public SchedulerTypeInfo getSchedulerInfo() {
+  public SchedulerTypeInfo getSchedulerInfo(@QueryParam(RMWSConsts.QUEUE) String queue) {
     init();
+
     ResourceScheduler rs = rm.getResourceScheduler();
     SchedulerInfo sinfo;
     if (rs instanceof CapacityScheduler) {
       CapacityScheduler cs = (CapacityScheduler) rs;
-      CSQueue root = cs.getRootQueue();
-      sinfo = new CapacitySchedulerInfo(root, cs);
+      CSQueue csQueue = queue == null ? cs.getRootQueue() : cs.getQueue(queue);
+      sinfo = csQueue == null ? null : new CapacitySchedulerInfo(csQueue, cs);
     } else if (rs instanceof FairScheduler) {
       FairScheduler fs = (FairScheduler) rs;
-      sinfo = new FairSchedulerInfo(fs);
+
+      if (queue == null) {
+        sinfo = new FairSchedulerInfo(fs);
+      } else {
+        FSQueue fsQueue = fs.getQueueManager().getQueue(queue);
+        sinfo = fsQueue == null ? null : new FairSchedulerInfo(fs, queue);
+      }
     } else if (rs instanceof FifoScheduler) {
       sinfo = new FifoSchedulerInfo(this.rm);
     } else {

@@ -339,10 +339,10 @@ public class RouterWebServices implements RMWebServiceProtocol {
   @Path(RMWSConsts.SCHEDULER)
   @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
   @Override
-  public SchedulerTypeInfo getSchedulerInfo() {
+  public SchedulerTypeInfo getSchedulerInfo(@QueryParam(RMWSConsts.QUEUE) String queue) {
     init();
     RequestInterceptorChainWrapper pipeline = getInterceptorChain(null);
-    return pipeline.getRootInterceptor().getSchedulerInfo();
+    return pipeline.getRootInterceptor().getSchedulerInfo(queue);
   }
 
   @POST

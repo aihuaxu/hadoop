@@ -546,6 +546,16 @@ public class TestRMWebServices extends JerseyTestBase {
     verifySchedulerFifoXML(xml);
   }
 
+  @Test
+  public void testClusterSchedulerFifoQueueJSON() throws JSONException, Exception {
+    WebResource r = resource();
+    ClientResponse response = r.path("ws").path("v1").path("cluster")
+            .path("scheduler").path("queue=test").get(ClientResponse.class);
+    assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getType());
+    JSONObject json = response.getEntity(JSONObject.class);
+    verifyClusterSchedulerFifo(json);
+  }
+
   public void verifySchedulerFifoXML(String xml) throws JSONException,
       Exception {
     DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();

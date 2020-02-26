@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.yarn.server.resourcemanager.webapp.dao;
 
+import org.apache.hadoop.yarn.api.records.Resource;
+
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlRootElement;
@@ -29,6 +31,7 @@ import javax.xml.bind.annotation.XmlRootElement;
 public class PartitionQueueCapacitiesInfo {
   private String partitionName;
 
+  private ResourceInfo partitionResource;
   private float capacity;
   private float usedCapacity;
   private float maxCapacity = 100;
@@ -40,11 +43,14 @@ public class PartitionQueueCapacitiesInfo {
   public PartitionQueueCapacitiesInfo() {
   }
 
-  public PartitionQueueCapacitiesInfo(String partitionName, float capacity,
+  public PartitionQueueCapacitiesInfo(String partitionName,
+                                      ResourceInfo partitionResource,
+                                      float capacity,
       float usedCapacity, float maxCapacity, float absCapacity,
       float absUsedCapacity, float absMaxCapacity, float maxAMLimitPercentage) {
     super();
     this.partitionName = partitionName;
+    this.partitionResource = partitionResource;
     this.capacity = capacity;
     this.usedCapacity = usedCapacity;
     this.maxCapacity = maxCapacity;
@@ -116,5 +122,13 @@ public class PartitionQueueCapacitiesInfo {
 
   public void setMaxAMLimitPercentage(float maxAMLimitPercentage) {
     this.maxAMLimitPercentage = maxAMLimitPercentage;
+  }
+
+  public ResourceInfo getPartitionResource() {
+    return partitionResource;
+  }
+
+  public void setPartitionResource(ResourceInfo partitionResource) {
+    this.partitionResource = partitionResource;
   }
 }

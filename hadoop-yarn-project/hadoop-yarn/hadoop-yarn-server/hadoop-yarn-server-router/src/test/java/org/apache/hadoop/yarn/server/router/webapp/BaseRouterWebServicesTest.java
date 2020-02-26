@@ -148,7 +148,7 @@ public abstract class BaseRouterWebServicesTest {
   protected SchedulerTypeInfo getSchedulerInfo(String user)
       throws IOException, InterruptedException {
     // HSR is not used here
-    return routerWebService.getSchedulerInfo();
+    return routerWebService.getSchedulerInfo(null);
   }
 
   protected String dumpSchedulerLogs(String user)

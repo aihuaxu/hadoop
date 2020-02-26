@@ -43,6 +43,8 @@ public class CapacitySchedulerInfo extends SchedulerInfo {
   protected CapacitySchedulerQueueInfoList queues;
   protected QueueCapacitiesInfo capacities;
   protected CapacitySchedulerHealthInfo health;
+  @XmlTransient
+  protected CapacityScheduler cs;
 
   @XmlTransient
   static final float EPSILON = 1e-8f;
@@ -50,17 +52,18 @@ public class CapacitySchedulerInfo extends SchedulerInfo {
   public CapacitySchedulerInfo() {
   } // JAXB needs this
 
-  public CapacitySchedulerInfo(CSQueue parent, CapacityScheduler cs) {
-    this.queueName = parent.getQueueName();
-    this.usedCapacity = parent.getUsedCapacity() * 100;
-    this.capacity = parent.getCapacity() * 100;
-    float max = parent.getMaximumCapacity();
+  public CapacitySchedulerInfo(CSQueue queue, CapacityScheduler cs) {
+    this.queueName = queue.getQueueName();
+    this.usedCapacity = queue.getUsedCapacity() * 100;
+    this.capacity = queue.getCapacity() * 100;
+    float max = queue.getMaximumCapacity();
     if (max < EPSILON || max > 1f)
       max = 1f;
     this.maxCapacity = max * 100;
 
-    capacities = new QueueCapacitiesInfo(parent.getQueueCapacities(), false);
-    queues = getQueues(parent);
+    this.cs = cs;
+    capacities = new QueueCapacitiesInfo(cs, queue.getQueueCapacities(), false);
+    queues = getQueues(queue);
     health = new CapacitySchedulerHealthInfo(cs);
   }
 
@@ -88,9 +91,17 @@ public class CapacitySchedulerInfo extends SchedulerInfo {
     return this.queues;
   }
 
-  protected CapacitySchedulerQueueInfoList getQueues(CSQueue parent) {
+  protected CapacitySchedulerQueueInfoList getQueues(CSQueue queue) {
     CapacitySchedulerQueueInfoList queuesInfo =
         new CapacitySchedulerQueueInfoList();
+
+    // Include the current leaf queue
+    if (queue instanceof LeafQueue) {
+      queuesInfo.addToQueueInfoList(
+              new CapacitySchedulerLeafQueueInfo(cs, (LeafQueue) queue));
+      return queuesInfo;
+    }
+
     // JAXB marashalling leads to situation where the "type" field injected
     // for JSON changes from string to array depending on order of printing
     // Issue gets fixed if all the leaf queues are marshalled before the
@@ -98,23 +109,27 @@ public class CapacitySchedulerInfo extends SchedulerInfo {
     List<CSQueue> childQueues = new ArrayList<>();
     List<CSQueue> childLeafQueues = new ArrayList<>();
     List<CSQueue> childNonLeafQueues = new ArrayList<>();
-    for (CSQueue queue : parent.getChildQueues()) {
-      if (queue instanceof LeafQueue) {
-        childLeafQueues.add(queue);
-      } else {
-        childNonLeafQueues.add(queue);
+
+    List<CSQueue> queues = queue.getChildQueues();
+    if (queues != null) {
+      for (CSQueue childQueue : queues) {
+        if (childQueue instanceof LeafQueue) {
+          childLeafQueues.add(childQueue);
+        } else {
+          childNonLeafQueues.add(childQueue);
+        }
       }
     }
     childQueues.addAll(childLeafQueues);
     childQueues.addAll(childNonLeafQueues);
 
-    for (CSQueue queue : childQueues) {
+    for (CSQueue childQueue : childQueues) {
       CapacitySchedulerQueueInfo info;
-      if (queue instanceof LeafQueue) {
-        info = new CapacitySchedulerLeafQueueInfo((LeafQueue) queue);
+      if (childQueue instanceof LeafQueue) {
+        info = new CapacitySchedulerLeafQueueInfo(cs, (LeafQueue) childQueue);
       } else {
-        info = new CapacitySchedulerQueueInfo(queue);
-        info.queues = getQueues(queue);
+        info = new CapacitySchedulerQueueInfo(cs, childQueue);
+        info.queues = getQueues(childQueue);
       }
       queuesInfo.addToQueueInfoList(info);
     }

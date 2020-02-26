@@ -23,10 +23,12 @@ import java.util.Set;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Response;
 
 import org.apache.hadoop.security.authorize.AuthorizationException;
 import org.apache.hadoop.yarn.exceptions.YarnException;
+import org.apache.hadoop.yarn.server.resourcemanager.webapp.RMWSConsts;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.ActivitiesInfo;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.AppActivitiesInfo;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.AppAttemptsInfo;
@@ -105,8 +107,8 @@ public class PassThroughRESTRequestInterceptor
   }
 
   @Override
-  public SchedulerTypeInfo getSchedulerInfo() {
-    return getNextInterceptor().getSchedulerInfo();
+  public SchedulerTypeInfo getSchedulerInfo(@QueryParam(RMWSConsts.QUEUE) String queue) {
+    return getNextInterceptor().getSchedulerInfo(queue);
   }
 
   @Override

@@ -25,6 +25,7 @@ import java.util.Set;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Response;
 
 import org.apache.hadoop.security.authorize.AuthorizationException;
@@ -111,10 +112,15 @@ public class DefaultRequestInterceptorREST
   }
 
   @Override
-  public SchedulerTypeInfo getSchedulerInfo() {
+  public SchedulerTypeInfo getSchedulerInfo(@QueryParam(RMWSConsts.QUEUE) String queue) {
+    // queue will be part of additionalParam
+    Map<String, String[]> additionalParam = new HashMap<String, String[]>();
+    if (queue != null && !queue.isEmpty()) {
+      additionalParam.put(RMWSConsts.QUEUE, new String[] {queue});
+    }
     return RouterWebServiceUtil.genericForward(webAppAddress, null,
         SchedulerTypeInfo.class, HTTPMethods.GET,
-        RMWSConsts.RM_WEB_SERVICE_PATH + RMWSConsts.SCHEDULER, null, null);
+        RMWSConsts.RM_WEB_SERVICE_PATH + RMWSConsts.SCHEDULER, null, additionalParam);
   }
 
   @Override

@@ -101,10 +101,10 @@ public interface RMWebServiceProtocol {
    * This method retrieves the current scheduler status, and it is reachable by
    * using {@link RMWSConsts#SCHEDULER}.
    *
+   * @param queue  the queue to request scheduler info. It's query param.
    * @return the current scheduler status
    */
-  SchedulerTypeInfo getSchedulerInfo();
-
+  SchedulerTypeInfo getSchedulerInfo(String queue);
   /**
    * This method dumps the scheduler logs for the time got in input, and it is
    * reachable by using {@link RMWSConsts#SCHEDULER_LOGS}.

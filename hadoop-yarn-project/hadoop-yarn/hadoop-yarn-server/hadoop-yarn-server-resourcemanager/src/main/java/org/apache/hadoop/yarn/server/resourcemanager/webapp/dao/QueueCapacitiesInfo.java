@@ -24,6 +24,8 @@ import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlRootElement;
 
+import org.apache.hadoop.yarn.api.records.Resource;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CapacityScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.QueueCapacities;
 
 /**
@@ -38,8 +40,8 @@ public class QueueCapacitiesInfo {
   public QueueCapacitiesInfo() {
   }
 
-  public QueueCapacitiesInfo(QueueCapacities capacities,
-      boolean considerAMUsage) {
+  public QueueCapacitiesInfo(CapacityScheduler cs, QueueCapacities capacities,
+                             boolean considerAMUsage) {
     if (capacities == null) {
       return;
     }
@@ -50,7 +52,11 @@ public class QueueCapacitiesInfo {
     float absUsedCapacity;
     float absMaxCapacity;
     float maxAMLimitPercentage;
+
     for (String partitionName : capacities.getExistingNodeLabels()) {
+      Resource partitionResource = cs.getRMContext().getNodeLabelManager()
+              .getResourceByLabel(partitionName, null);
+
       usedCapacity = capacities.getUsedCapacity(partitionName) * 100;
       capacity = capacities.getCapacity(partitionName) * 100;
       maxCapacity = capacities.getMaximumCapacity(partitionName);
@@ -66,14 +72,15 @@ public class QueueCapacitiesInfo {
         maxCapacity = 1f;
       maxCapacity = maxCapacity * 100;
       queueCapacitiesByPartition.add(new PartitionQueueCapacitiesInfo(
-          partitionName, capacity, usedCapacity, maxCapacity, absCapacity,
+          partitionName, new ResourceInfo(partitionResource), capacity,
+          usedCapacity, maxCapacity, absCapacity,
           absUsedCapacity, absMaxCapacity,
           considerAMUsage ? maxAMLimitPercentage : 0f));
     }
   }
 
-  public QueueCapacitiesInfo(QueueCapacities capacities) {
-    this(capacities, true);
+  public QueueCapacitiesInfo(CapacityScheduler cs, QueueCapacities capacities) {
+    this(cs, capacities, true);
   }
 
   public void add(PartitionQueueCapacitiesInfo partitionQueueCapacitiesInfo) {
