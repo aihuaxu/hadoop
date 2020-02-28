@@ -439,19 +439,32 @@ public class ProtobufRpcEngine implements RpcEngine {
         Message param = request.getValue(prototype);
 
         Message result;
-        Call currentCall = Server.getCurCall().get();
+        long startTime = Time.now();
+        int qTime = (int) (startTime - receiveTime);
+        Exception exception = null;
         try {
           server.rpcDetailedMetrics.init(protocolImpl.protocolClass);
-          currentCall.setDetailedMetricsName(methodName);
           result = service.callBlockingMethod(methodDescriptor, null, param);
         } catch (ServiceException e) {
-          Exception exception = (Exception) e.getCause();
-          currentCall.setDetailedMetricsName(
-              exception.getClass().getSimpleName());
+          exception = (Exception) e.getCause();
           throw (Exception) e.getCause();
         } catch (Exception e) {
-          currentCall.setDetailedMetricsName(e.getClass().getSimpleName());
+          exception = e;
           throw e;
+        } finally {
+          int processingTime = (int) (Time.now() - startTime);
+          if (LOG.isDebugEnabled()) {
+            String msg = "Served: " + methodName + " queueTime= " + qTime +
+                " procesingTime= " + processingTime;
+            if (exception != null) {
+              msg += " exception= " + exception.getClass().getSimpleName();
+            }
+            LOG.debug(msg);
+          }
+          String detailedMetricsName = (exception == null) ?
+              methodName :
+              exception.getClass().getSimpleName();
+          server.updateMetrics(detailedMetricsName, qTime, processingTime);
         }
         return RpcWritable.wrap(result);
       }
