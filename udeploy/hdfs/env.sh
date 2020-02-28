@@ -42,5 +42,6 @@ export KEYSTORE_PSD="${LANGLEY_PATH}/hadoop_secure_webhdfs_keystore/password"
 
 export SECURE_STORE_PATH='/opt/hadoop/keytabs'
 
-export HDFS_SCRIPT="${HDFS_PATH}/binary/sbin/hadoop-start.sh"
+export HDFS_START_SCRIPT="${HDFS_PATH}/binary/sbin/hadoop-start.sh"
+export HDFS_CMD="${HDFS_PATH}/binary/bin/hdfs"
 export HADOOP_ENV="${HDFS_CONF_PATH}/hadoop-env.sh"
