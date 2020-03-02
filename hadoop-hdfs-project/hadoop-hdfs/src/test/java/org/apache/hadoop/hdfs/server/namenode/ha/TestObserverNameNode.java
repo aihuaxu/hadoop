@@ -18,10 +18,7 @@
 package org.apache.hadoop.hdfs.server.namenode.ha;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FSDataInputStream;
-import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileEncryptionInfo;
-import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
@@ -33,6 +30,7 @@ import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
+import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.qjournal.MiniQJMHACluster;
@@ -382,47 +380,6 @@ public class TestObserverNameNode {
     dfsCluster.getFileSystem(2).setSafeMode(SafeModeAction.SAFEMODE_LEAVE);
     dfs.open(testPath);
     assertSentTo(2);
-  }
-
-  @Test
-  public void testBlockMissingRetry() throws Exception {
-    setUpCluster(1);
-    setObserverRead(true);
-
-    FSDataOutputStream out = dfs.create(testPath);
-    out.writeUTF("hello world");
-    out.close();
-
-    assertSentTo(0);
-
-    rollEditLogAndTail(0);
-    final FileStatus status = dfs.getFileStatus(testPath);
-    assertSentTo(2);
-
-    // Mock block manager for observer to generate some fake blocks which
-    // will trigger the block missing exception.
-    final LocatedBlocks blocks = namenodes[0].getRpcServer()
-        .getBlockLocations(testPath.toString(), 0, status.getLen());
-    BlockManager bmSpy = NameNodeAdapter.spyOnBlockManager(namenodes[2]);
-    doAnswer(new Answer<LocatedBlocks>() {
-      @Override
-      public LocatedBlocks answer(InvocationOnMock invocation) {
-        List<LocatedBlock> fakeBlocks = new ArrayList<>();
-        // Remove the datanode info for the only block so it will throw
-        // BlockMissingException and retry.
-        LocatedBlock b = blocks.get(0);
-        fakeBlocks.add(new LocatedBlock(b.getBlock(), new DatanodeInfo[0],
-            null, null, b.getStartOffset(), false, null));
-        return new LocatedBlocks(status.getLen(), false, fakeBlocks, null,
-            true, null);
-      }
-    }).when(bmSpy).createLocatedBlocks(Mockito.<BlockInfo[]> any(), anyLong(),
-        anyBoolean(), anyLong(), anyLong(), anyBoolean(), anyBoolean(),
-        Mockito.<FileEncryptionInfo> any());
-
-    FSDataInputStream in = dfs.open(testPath);
-    assertEquals("hello world", in.readUTF());
-    assertSentTo(0);
   }
 
   @Test

@@ -102,20 +102,6 @@ public class Client implements AutoCloseable {
         }
       };
 
-  /**
-   * A variable to add additional control whether a RPC request should go to
-   * observer or not. This is initialized to true and should ONLY be used
-   * together with "dfs.client.observer.reads.enabled". This is set to false
-   * in some particular cases to make RPC retries go to active.
-   */
-  private static final ThreadLocal<Boolean> observerRead =
-      new ThreadLocal<Boolean>() {
-        @Override
-        protected Boolean initialValue() {
-          return true;
-        }
-      };
-
   @SuppressWarnings("unchecked")
   @Unstable
   public static <T extends Writable> AsyncGet<T, IOException>
@@ -1465,14 +1451,6 @@ public class Client implements AutoCloseable {
   @Unstable
   public static void setAsynchronousMode(boolean async) {
     asynchronousMode.set(async);
-  }
-
-  public static boolean getObserverRead() {
-    return observerRead.get();
-  }
-
-  public static void setObserverRead(boolean flag) {
-    observerRead.set(flag);
   }
 
   private void releaseAsyncCall() {
