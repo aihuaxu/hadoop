@@ -42,7 +42,6 @@ import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.hdfs.server.namenode.NameNodeAdapter;
 import org.apache.hadoop.io.retry.FailoverProxyProvider;
 import org.apache.hadoop.io.retry.RetryInvocationHandler;
-import org.apache.hadoop.ipc.RetriableException;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Ignore;
@@ -57,9 +56,7 @@ import java.io.IOException;
 import java.lang.reflect.Proxy;
 import java.net.URI;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -76,7 +73,6 @@ public class TestObserverNameNode {
   private MiniQJMHACluster qjmhaCluster;
   private MiniDFSCluster dfsCluster;
   private NameNode[] namenodes;
-  private Map<String, Integer> namenodeIndex;
   private Path testPath;
   private Path testPath2;
   private Path testPath3;
@@ -430,60 +426,6 @@ public class TestObserverNameNode {
   }
 
   @Test
-  public void testActiveRetriableException() throws Exception {
-    // When observer is disabled, client should keep retrying the active NN.
-    testRetriableExceptionHelper(false, 0, 0);
-  }
-
-  @Test
-  public void testObserverRetriableException() throws Exception {
-    // When observer is enabled, client should retry the next observer and
-    // finally active.
-    testRetriableExceptionHelper(true, 2, 3);
-  }
-
-  /**
-   * Helper method for testing RetriableException when either observer is
-   * enabled or disabled.
-   *
-   * @param observer whether to enable or disable observer read.
-   * @param spyIdx the NN index to spy and throw RetriableException
-   * @param expectedIdx the NN index that the RPC should succeed in the end.
-   */
-  private void testRetriableExceptionHelper(
-      boolean observer, int spyIdx, int expectedIdx) throws Exception {
-    setUpCluster(2);
-    setObserverRead(observer);
-
-    dfs.createNewFile(testPath);
-    rollEditLogAndTail(0);
-
-    final Cell cell = new Cell();
-    BlockManager bmSpy = NameNodeAdapter.spyOnBlockManager(namenodes[spyIdx]);
-    doAnswer(new Answer<LocatedBlocks>() {
-      @Override
-      public LocatedBlocks answer(InvocationOnMock invocation)
-          throws Throwable {
-        if (cell.count == 0) {
-          cell.count++;
-          throw new RetriableException("Should retry");
-        }
-        return new LocatedBlocks(0, false, new ArrayList<LocatedBlock>(),
-            null, true, null);
-      }
-    }).when(bmSpy).createLocatedBlocks(Mockito.<BlockInfo[]> any(), anyLong(),
-        anyBoolean(), anyLong(), anyLong(), anyBoolean(), anyBoolean(),
-        Mockito.<FileEncryptionInfo> any());
-
-    dfs.open(testPath);
-    assertSentTo(expectedIdx);
-  }
-
-  private static class Cell {
-    int count;
-  }
-
-  @Test
   public void testTransition() throws Exception {
     try {
       dfsCluster.transitionToActive(2);
@@ -522,20 +464,18 @@ public class TestObserverNameNode {
     dfsCluster = qjmhaCluster.getDfsCluster();
 
     namenodes = new NameNode[2 + numObservers];
-    namenodeIndex = new HashMap<>();
     for (int i = 0; i < namenodes.length; i++) {
       namenodes[i] = dfsCluster.getNameNode(i);
-      namenodeIndex.put(namenodes[i].getNameNodeAddress().toString(), i);
     }
 
     dfsCluster.transitionToActive(0);
     dfsCluster.waitActive(0);
   }
 
-  private void assertSentTo(int expectedIdx) {
+  private void assertSentTo(int nnIdx) {
     FailoverProxyProvider.ProxyInfo pi = provider.getLastProxy();
-    int actualIdx = namenodeIndex.get(pi.proxyInfo);
-    assertEquals(expectedIdx, actualIdx);
+    assertEquals(pi.proxyInfo,
+        getNameNode(nnIdx).getNameNodeAddress().toString());
   }
 
   private void assertSentToOne(int... nnIndices) {

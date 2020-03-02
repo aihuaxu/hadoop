@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdfs.server.namenode.ha;
 
 import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -27,6 +28,7 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -37,10 +39,12 @@ import org.apache.hadoop.hdfs.HAUtilClient;
 import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
 import org.apache.hadoop.io.retry.AtMostOnce;
 import org.apache.hadoop.io.retry.Idempotent;
+import org.apache.hadoop.io.retry.MultiException;
 import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.ipc.Client;
 import org.apache.hadoop.ipc.RemoteException;
+import org.apache.hadoop.ipc.StandbyException;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.slf4j.Logger;
@@ -188,6 +192,46 @@ public class ObserverReadProxyProvider<T> extends ConfiguredFailoverProxyProvide
     return new ProxyInfo<>(wrappedProxy, combinedInfo.toString());
   }
 
+  /**
+   * Check the exception returned by the proxy log a warning message if it's
+   * not a StandbyException (expected exception).
+   * @param ex exception to evaluate.
+   * @param proxyInfo information of the proxy reporting the exception.
+   */
+  private void logProxyException(Exception ex, String proxyInfo) {
+    StandbyException se = unwrapStandbyException(ex);
+    if (se != null) {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Invocation returned standby exception on [" +
+            proxyInfo + "]");
+      }
+    } else {
+      LOG.warn("Invocation returned exception on [" + proxyInfo + "]", ex);
+    }
+  }
+
+  /**
+   * Check if the returned exception is caused by an standby namenode. If so,
+   * return the wrapped StandbyException.
+   * @param ex exception to check.
+   * @return a non-null StandbyException wrapped in the input exception,
+   *         or null if none found.
+   */
+  private StandbyException unwrapStandbyException(Exception ex) {
+    Throwable cause = ex.getCause();
+    while (cause != null) {
+      if (cause instanceof RemoteException) {
+        RemoteException remoteException = (RemoteException) cause;
+        IOException unwrapRemoteException = remoteException.unwrapRemoteException();
+        if (unwrapRemoteException instanceof StandbyException) {
+          return (StandbyException) unwrapRemoteException;
+        }
+      }
+      cause = cause.getCause();
+    }
+    return null;
+  }
+
   // Check if the exception 'ex' wraps a FileNotFoundException.
   private boolean isFNFException(Exception ex) {
     Throwable e = ex.getCause();
@@ -243,6 +287,13 @@ public class ObserverReadProxyProvider<T> extends ConfiguredFailoverProxyProvide
       this.usableProxyIndex = new AtomicInteger(0);
     }
 
+    void handleInvokeException(Map<String, Exception> badResults,
+        Exception e, String proxyInfo) {
+      logProxyException(e, proxyInfo);
+      StandbyException se = unwrapStandbyException(e);
+      badResults.put(proxyInfo, se != null ? se : e);
+    }
+
     /**
      * Sends read operations to the first observer NN (if enabled), and
      * send write operations to the active NN. If a observer NN fails, it is sent
@@ -252,13 +303,13 @@ public class ObserverReadProxyProvider<T> extends ConfiguredFailoverProxyProvide
     @Override
     public Object invoke(Object proxy, final Method method, final Object[] args)
         throws Throwable {
+      Map<String, Exception> badResults = new HashMap<>();
       lastProxy = null;
       boolean isFNFError = false;
       Object retVal;
 
       if (useObserver(method)) {
         int start = usableProxyIndex.get();
-        int failedObserverCount = 0;
 
         // Loop through all the proxies, starting from the current index.
         for (int i = 0; i < observerProxies.size(); i++, start++) {
@@ -295,12 +346,8 @@ public class ObserverReadProxyProvider<T> extends ConfiguredFailoverProxyProvide
                     || method.isAnnotationPresent(AtMostOnce.class));
             if (retryInfo.action == RetryAction.RetryDecision.FAIL) {
               throw e;
-            } else {
-              failedObserverCount++;
-              LOG.warn(
-                  "Invocation returned exception on [{}]; {} failure(s) so far",
-                  current.proxyInfo, failedObserverCount, e);
             }
+            handleInvokeException(badResults, ite, current.proxyInfo);
           }
         }
       }
@@ -309,14 +356,22 @@ public class ObserverReadProxyProvider<T> extends ConfiguredFailoverProxyProvide
       // write request. At this point we'll try to fail over to the active NN.
       try {
         if (!isFNFError && useObserver(method)) {
-          LOG.warn("All observers have failed for read request {}. Fall back "
-              + "to active at: {}", method.getName(), activeProxy);
+          LOG.warn("All ONNs have failed for read request " + method.getName() + ". "
+              + "Fall back on active NN: " + activeProxy);
         }
         retVal = method.invoke(activeProxy.proxy, args);
         lastProxy = activeProxy;
         return retVal;
-      } catch (InvocationTargetException e) {
-        throw e.getCause();
+      } catch (Exception e) {
+        handleInvokeException(badResults, e, activeProxy.proxyInfo);
+      }
+
+      // At this point we should have ALL bad results (Exceptions)
+      // Or should have returned with successful result.
+      if (badResults.size() == 1) {
+        throw badResults.values().iterator().next();
+      } else {
+        throw new MultiException(badResults);
       }
     }
   }
