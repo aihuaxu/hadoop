@@ -105,28 +105,6 @@ public class TestObserverNameNode {
   }
 
   @Test
-  public void testConfigChange() throws Exception {
-    setObserverRead(true);
-
-    dfs.mkdir(testPath, FsPermission.getDefault());
-    assertSentTo(0);
-
-    rollEditLogAndTail(0);
-    dfs.getFileStatus(testPath);
-    assertSentTo(2);
-
-    // Change the flag. Now request should go not to observer.
-    setObserverRead(false);
-    dfs.getFileStatus(testPath);
-    assertSentTo(0);
-
-    // Re-enable observer read, request should go to observer again.
-    setObserverRead(true);
-    dfs.getFileStatus(testPath);
-    assertSentTo(2);
-  }
-
-  @Test
   public void testFNF() throws Exception {
     setObserverRead(true);
 

@@ -2963,7 +2963,6 @@ public abstract class FileSystem extends Configured implements Closeable {
       final String authority;
       final UserGroupInformation ugi;
       final long unique;   // an artificial way to make a key unique
-      final boolean observerRead; // whether observer read is enabled
 
       Key(URI uri, Configuration conf) throws IOException {
         this(uri, conf, 0);
@@ -2975,16 +2974,13 @@ public abstract class FileSystem extends Configured implements Closeable {
         authority = uri.getAuthority()==null ?
             "" : StringUtils.toLowerCase(uri.getAuthority());
         this.unique = unique;
-        this.observerRead =
-            conf.getBoolean("dfs.client.observer.reads.enabled", false);
         
         this.ugi = UserGroupInformation.getCurrentUser();
       }
 
       @Override
       public int hashCode() {
-        return (scheme + authority).hashCode() + ugi.hashCode()
-              + (int)unique + (observerRead ? 0 : 1);
+        return (scheme + authority).hashCode() + ugi.hashCode() + (int)unique;
       }
 
       static boolean isEqual(Object a, Object b) {
@@ -3001,10 +2997,9 @@ public abstract class FileSystem extends Configured implements Closeable {
           return isEqual(this.scheme, that.scheme)
                  && isEqual(this.authority, that.authority)
                  && isEqual(this.ugi, that.ugi)
-                 && (this.unique == that.unique)
-                 && (this.observerRead == that.observerRead);
+                 && (this.unique == that.unique);
         }
-        return false;
+        return false;        
       }
 
       @Override
