@@ -33,7 +33,6 @@ import org.apache.hadoop.metrics2.lib.MutableGaugeInt;
 import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 import org.apache.hadoop.metrics2.lib.MutableQuantiles;
 import org.apache.hadoop.metrics2.lib.MutableRate;
-import org.apache.hadoop.metrics2.lib.MutableStat;
 import org.apache.hadoop.metrics2.source.JvmMetrics;
 
 /**
@@ -127,18 +126,6 @@ public class NameNodeMetrics {
   @Metric("Time loading FS Image at startup in msec")
   MutableGaugeInt fsImageLoadTime;
 
-  @Metric("Time tailing edit logs in msec")
-  MutableRate editLogTailTime;
-  private final MutableQuantiles[] editLogTailTimeQuantiles;
-  @Metric MutableRate editLogFetchTime;
-  private final MutableQuantiles[] editLogFetchTimeQuantiles;
-  @Metric(value = "Number of edits loaded", valueName = "Count")
-  MutableStat numEditLogLoaded;
-  private final MutableQuantiles[] numEditLogLoadedQuantiles;
-  @Metric("Time between edit log tailing in msec")
-  MutableRate editLogTailInterval;
-  private final MutableQuantiles[] editLogTailIntervalQuantiles;
-
   @Metric("GetImageServlet getEdit")
   MutableRate getEdit;
   @Metric("GetImageServlet getImage")
@@ -159,12 +146,7 @@ public class NameNodeMetrics {
     cacheReportQuantiles = new MutableQuantiles[len];
     generateEDEKTimeQuantiles = new MutableQuantiles[len];
     warmUpEDEKTimeQuantiles = new MutableQuantiles[len];
-
-    editLogTailTimeQuantiles = new MutableQuantiles[len];
-    editLogFetchTimeQuantiles = new MutableQuantiles[len];
-    numEditLogLoadedQuantiles = new MutableQuantiles[len];
-    editLogTailIntervalQuantiles = new MutableQuantiles[len];
-
+    
     for (int i = 0; i < len; i++) {
       int interval = intervals[i];
       syncsQuantiles[i] = registry.newQuantiles(
@@ -182,18 +164,6 @@ public class NameNodeMetrics {
       warmUpEDEKTimeQuantiles[i] = registry.newQuantiles(
           "warmupEDEKTime" + interval + "s",
           "Warm up EDEK time", "ops", "latency", interval);
-      editLogTailTimeQuantiles[i] = registry.newQuantiles(
-          "editLogTailTime" + interval + "s",
-          "Edit log tailing time", "ops", "latency", interval);
-      editLogFetchTimeQuantiles[i] = registry.newQuantiles(
-          "editLogFetchTime" + interval + "s",
-          "Edit log fetch time", "ops", "latency", interval);
-      numEditLogLoadedQuantiles[i] = registry.newQuantiles(
-          "numEditLogLoaded" + interval + "s",
-          "Number of edits loaded", "ops", "count", interval);
-      editLogTailIntervalQuantiles[i] = registry.newQuantiles(
-          "editLogTailInterval" + interval + "s",
-          "Edit log tailing interval", "ops", "latency", interval);
     }
   }
 
@@ -382,34 +352,6 @@ public class NameNodeMetrics {
     warmUpEDEKTime.add(latency);
     for (MutableQuantiles q : warmUpEDEKTimeQuantiles) {
       q.add(latency);
-    }
-  }
-
-  public void addEditLogTailTime(long elapsed) {
-    editLogTailTime.add(elapsed);
-    for (MutableQuantiles q : editLogTailTimeQuantiles) {
-      q.add(elapsed);
-    }
-  }
-
-  public void addEditLogFetchTime(long elapsed) {
-    editLogFetchTime.add(elapsed);
-    for (MutableQuantiles q : editLogFetchTimeQuantiles) {
-      q.add(elapsed);
-    }
-  }
-
-  public void addNumEditLogLoaded(long loaded) {
-    numEditLogLoaded.add(loaded);
-    for (MutableQuantiles q : numEditLogLoadedQuantiles) {
-      q.add(loaded);
-    }
-  }
-
-  public void addEditLogTailInterval(long elapsed) {
-    editLogTailInterval.add(elapsed);
-    for (MutableQuantiles q : editLogTailIntervalQuantiles) {
-      q.add(elapsed);
     }
   }
 }
