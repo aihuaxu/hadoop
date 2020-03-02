@@ -510,9 +510,7 @@ public class QuorumJournalManager implements JournalManager {
 
         // If it's bounded by durable Txns, endTxId could not be larger
         // than committedTxnId. This ensures the consistency.
-        // We don't do the following for finalized log segments, since all
-        // edits in those are guaranteed to be committed.
-        if (onlyDurableTxns && inProgressOk && remoteLog.isInProgress()) {
+        if (onlyDurableTxns && inProgressOk) {
           endTxId = Math.min(endTxId, committedTxnId);
           if (endTxId < remoteLog.getStartTxId()) {
             LOG.warn("Found endTxId (" + endTxId + ") that is less than " +
