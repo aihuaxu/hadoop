@@ -105,7 +105,6 @@ import org.apache.hadoop.util.ChunkedArrayList;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
-import org.apache.hadoop.util.Time;
 
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
@@ -120,11 +119,6 @@ public class FSEditLogLoader {
   // TODO: for observer case this (along with other log messages) may make
   // the log very verbose. Fix this.
   private static final long REPLAY_TRANSACTION_LOG_INTERVAL = 1000; // 1sec
-
-  // Maximum number of retries, and sleep interval for initializing edit log
-  // input stream.
-  private static final int INIT_EDIT_STREAM_RETRY_MAX = 3;
-  private static final long INIT_EDIT_STREAM_RETRY_SLEEP_MS = 1000;
 
   /** Whether this edit log loader is for observer NN */
   private boolean isObserver;
@@ -238,11 +232,6 @@ public class FSEditLogLoader {
     if (LOG.isTraceEnabled()) {
       LOG.trace("Acquiring write lock to replay edit log");
     }
-
-    // Fetch the edit log input stream from remote JNs.
-    // Doing this outside the lock since sometimes there could be network
-    // issue, and we don't want to hold lock for that.
-    initEditLogStream(in);
 
     fsNamesys.writeLock();
     fsDir.writeLock();
@@ -381,34 +370,6 @@ public class FSEditLogLoader {
       this.numEdits = numEdits;
       this.expectedTxId = expectedTxId;
       this.hasNext = hasNext;
-    }
-  }
-
-  // Initialize the edit log input stream by making the dummy call 'getVersion'.
-  // This includes make the HTTP call to remote JNs and fetch the edit input
-  // stream.
-  private void initEditLogStream(EditLogInputStream in) throws IOException {
-    long start = Time.monotonicNow();
-    try {
-      int retry = 0;
-      while (retry < INIT_EDIT_STREAM_RETRY_MAX) {
-        try {
-          in.getVersion(false);
-          return;
-        } catch (Throwable e) {
-          LOG.warn("Caught exception initializing " + in +
-              " on try #" + retry, e);
-          retry++;
-          Thread.sleep(INIT_EDIT_STREAM_RETRY_SLEEP_MS);
-        }
-      }
-      LOG.warn("Failed to initialize " + in.getName() + " after " +
-          INIT_EDIT_STREAM_RETRY_MAX + " retries");
-    } catch (InterruptedException e) {
-      throw new IOException("Interrupted while initializing " + in, e);
-    } finally {
-      NameNode.getNameNodeMetrics().addEditLogOpenConnTime(
-          Time.monotonicNow() - start);
     }
   }
 

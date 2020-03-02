@@ -138,9 +138,6 @@ public class NameNodeMetrics {
   @Metric("Time between edit log tailing in msec")
   MutableRate editLogTailInterval;
   private final MutableQuantiles[] editLogTailIntervalQuantiles;
-  @Metric("Time to open a HTTP connection to JournalNodes")
-  MutableRate editLogOpenConnTime;
-  private final MutableQuantiles[] editLogOpenConnTimeQuantiles;
 
   @Metric("GetImageServlet getEdit")
   MutableRate getEdit;
@@ -167,7 +164,6 @@ public class NameNodeMetrics {
     editLogFetchTimeQuantiles = new MutableQuantiles[len];
     numEditLogLoadedQuantiles = new MutableQuantiles[len];
     editLogTailIntervalQuantiles = new MutableQuantiles[len];
-    editLogOpenConnTimeQuantiles = new MutableQuantiles[len];
 
     for (int i = 0; i < len; i++) {
       int interval = intervals[i];
@@ -198,10 +194,6 @@ public class NameNodeMetrics {
       editLogTailIntervalQuantiles[i] = registry.newQuantiles(
           "editLogTailInterval" + interval + "s",
           "Edit log tailing interval", "ops", "latency", interval);
-      editLogOpenConnTimeQuantiles[i] = registry.newQuantiles(
-          "editLogOpenConnTime" + interval + "s",
-          "Time to open HTTP connection", "ops", "latency", interval);
-
     }
   }
 
@@ -419,13 +411,5 @@ public class NameNodeMetrics {
     for (MutableQuantiles q : editLogTailIntervalQuantiles) {
       q.add(elapsed);
     }
-  }
-
-  public void addEditLogOpenConnTime(long elapsed) {
-    editLogOpenConnTime.add(elapsed);
-    for (MutableQuantiles q : editLogOpenConnTimeQuantiles) {
-      q.add(elapsed);
-    }
-
   }
 }
