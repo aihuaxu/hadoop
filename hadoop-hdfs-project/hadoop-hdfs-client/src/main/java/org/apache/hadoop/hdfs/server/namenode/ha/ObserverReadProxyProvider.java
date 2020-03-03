@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdfs.server.namenode.ha;
 
 import java.io.EOFException;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
@@ -66,8 +65,6 @@ import org.slf4j.LoggerFactory;
  */
 public class ObserverReadProxyProvider<T> extends ConfiguredFailoverProxyProvider<T> {
   private static final Logger LOG = LoggerFactory.getLogger(ObserverReadProxyProvider.class);
-  private static final String GET_LISTING = "getListing";
-  private static final String GET_FILE_INFO = "getFileInfo";
 
   /** Proxies for the observer namenodes */
   private final List<AddressRpcProxyPair<T>> observerProxies;
@@ -237,26 +234,6 @@ public class ObserverReadProxyProvider<T> extends ConfiguredFailoverProxyProvide
         unwrapStandbyException(ex) != null);
   }
 
-  // Check if the exception 'ex' wraps a FileNotFoundException.
-  private boolean isFNFException(Exception ex) {
-    Throwable e = ex.getCause();
-    if (e instanceof RemoteException) {
-      RemoteException re = (RemoteException) e;
-      return re.unwrapRemoteException() instanceof FileNotFoundException;
-    }
-    return false;
-  }
-
-  // Check if the method is either 'getListing' or 'getFileInfo'.
-  private boolean isGetListingOrFileInfo(Method m) {
-    if (m != null) {
-      String methodName = m.getName();
-      return methodName != null && (methodName.equals(GET_LISTING) ||
-          methodName.equals(GET_FILE_INFO));
-    }
-    return false;
-  }
-
   /**
    * Check if a method is read-only.
    * @return whether the 'method' is a read-only operation.
@@ -302,7 +279,6 @@ public class ObserverReadProxyProvider<T> extends ConfiguredFailoverProxyProvide
         throws Throwable {
       Map<String, Exception> badResults = new HashMap<>();
       lastProxy = null;
-      boolean isFNFError = false;
       Object retVal;
 
       if (observerReadEnabled && isRead(method)) {
@@ -318,21 +294,8 @@ public class ObserverReadProxyProvider<T> extends ConfiguredFailoverProxyProvide
             if (i != 0) {
               usableProxyIndex.set(start % observerProxies.size());
             }
-
-            // Check if return value is null (meaning FNF for getListing &
-            // getFileInfo). If so, we break from the loop and try active.
-            if (retVal == null && isGetListingOrFileInfo(method)) {
-              isFNFError = true;
-              break;
-            }
             return retVal;
           } catch (Exception e) {
-            // If received remote FNF exception from server side (e.g., open),
-            // also break from the loop and try active.
-            if (isFNFException(e)) {
-              isFNFError = true;
-              break;
-            }
             if (!shouldRetry(e)) {
               throw e;
             }
@@ -344,7 +307,7 @@ public class ObserverReadProxyProvider<T> extends ConfiguredFailoverProxyProvide
       // If we get here, it means all observer NNs have failed, or that it is a
       // write request. At this point we'll try to fail over to the active NN.
       try {
-        if (!isFNFError && observerReadEnabled && isRead(method)) {
+        if (observerReadEnabled && isRead(method)) {
           LOG.warn("All ONNs have failed for read request " + method.getName() + ". "
               + "Fall back on active NN: " + activeProxy);
         }

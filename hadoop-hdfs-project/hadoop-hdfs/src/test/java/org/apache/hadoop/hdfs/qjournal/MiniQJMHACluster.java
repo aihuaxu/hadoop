@@ -48,7 +48,6 @@ public class MiniQJMHACluster {
     private StartupOption startOpt = null;
     private int numNNs = 2;
     private int numObs = 0;
-    private int numDNs = 0;
     private final MiniDFSCluster.Builder dfsBuilder;
 
     public Builder(Configuration conf) {
@@ -77,11 +76,6 @@ public class MiniQJMHACluster {
 
     public Builder setNumObservers(int obs) {
       this.numObs = obs;
-      return this;
-    }
-
-    public Builder setNumDataNodes(int dns) {
-      this.numDNs = dns;
       return this;
     }
   }
@@ -137,9 +131,7 @@ public class MiniQJMHACluster {
         // First start up the NNs just to format the namespace. The MinIDFSCluster
         // has no way to just format the NameNodes without also starting them.
         cluster = builder.dfsBuilder.nnTopology(topology)
-            .manageNameDfsSharedDirs(false)
-            .numDataNodes(builder.numDNs)
-            .build();
+            .manageNameDfsSharedDirs(false).build();
         cluster.waitActive();
         cluster.shutdownNameNodes();
 

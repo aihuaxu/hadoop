@@ -91,9 +91,9 @@ public class TestObserverNameNode {
 
     try {
       dfs.getFileStatus(testPath);
-      assertSentTo(0);
+      fail("Should throw FileNotFoundException");
     } catch (FileNotFoundException e) {
-      fail("Should not throw FileNotFoundException");
+      // Continue
     }
 
     rollEditLogAndTail(0);
@@ -101,43 +101,6 @@ public class TestObserverNameNode {
     assertSentTo(2);
 
     dfs.mkdir(testPath2, FsPermission.getDefault());
-    assertSentTo(0);
-  }
-
-  @Test
-  public void testFNF() throws Exception {
-    setObserverRead(true);
-
-    dfs.createNewFile(testPath);
-    try {
-      dfs.open(testPath);
-      assertSentTo(0);
-    } catch (FileNotFoundException e) {
-      fail("Should not throw FileNotFoundException");
-    }
-
-    try {
-      dfs.getFileStatus(testPath2);
-      fail("Should throw FileNotFoundException");
-    } catch (FileNotFoundException e) {
-      // Continue
-    }
-    assertSentTo(0);
-
-    try {
-      dfs.listStatus(testPath2);
-      fail("Should throw FileNotFoundException");
-    } catch (FileNotFoundException e) {
-      // Continue
-    }
-    assertSentTo(0);
-
-    try {
-      dfs.listLocatedStatus(testPath2);
-      fail("Should throw FileNotFoundException");
-    } catch (FileNotFoundException e) {
-      // Continue
-    }
     assertSentTo(0);
   }
 
@@ -331,7 +294,6 @@ public class TestObserverNameNode {
     qjmhaCluster = new MiniQJMHACluster.Builder(conf)
         .setNumNameNodes(2)
         .setNumObservers(numObservers)
-        .setNumDataNodes(3)
         .build();
     dfsCluster = qjmhaCluster.getDfsCluster();
 
