@@ -176,7 +176,7 @@ public class TestGenericJournalConf {
 
     @Override
     public void selectInputStreams(Collection<EditLogInputStream> streams,
-        long fromTxnId, boolean inProgressOk, boolean onlyDurableTxns) {
+        long fromTxnId, boolean inProgressOk) {
     }
 
     @Override

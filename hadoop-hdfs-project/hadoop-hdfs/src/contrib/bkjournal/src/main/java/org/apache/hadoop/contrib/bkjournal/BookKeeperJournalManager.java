@@ -533,18 +533,12 @@ public class BookKeeperJournalManager implements JournalManager {
     } catch (InterruptedException ie) {
       Thread.currentThread().interrupt();
       throw new IOException("Error finalising ledger", ie);
-    }
-  }
-
-  public void selectInputStreams(
-      Collection<EditLogInputStream> streams,
-      long fromTxnId, boolean inProgressOk) throws IOException {
-    selectInputStreams(streams, fromTxnId, inProgressOk, false);
+    } 
   }
 
   @Override
   public void selectInputStreams(Collection<EditLogInputStream> streams,
-      long fromTxId, boolean inProgressOk, boolean onlyDurableTxns)
+      long fromTxId, boolean inProgressOk)
       throws IOException {
     List<EditLogLedgerMetadata> currentLedgerList = getLedgerList(fromTxId,
         inProgressOk);

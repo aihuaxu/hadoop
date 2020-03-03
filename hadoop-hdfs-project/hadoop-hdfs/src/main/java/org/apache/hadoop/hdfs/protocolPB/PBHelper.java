@@ -268,8 +268,7 @@ public class PBHelper {
   public static RemoteEditLogManifestProto convert(
       RemoteEditLogManifest manifest) {
     RemoteEditLogManifestProto.Builder builder = RemoteEditLogManifestProto
-        .newBuilder()
-        .setCommittedTxnId(manifest.getCommittedTxnId());
+        .newBuilder();
     for (RemoteEditLog log : manifest.getLogs()) {
       builder.addLogs(convert(log));
     }
@@ -283,8 +282,7 @@ public class PBHelper {
     for (RemoteEditLogProto l : manifest.getLogsList()) {
       logs.add(convert(l));
     }
-    return new RemoteEditLogManifest(logs,
-            manifest.getCommittedTxnId());
+    return new RemoteEditLogManifest(logs);
   }
 
   public static CheckpointCommandProto convert(CheckpointCommand cmd) {

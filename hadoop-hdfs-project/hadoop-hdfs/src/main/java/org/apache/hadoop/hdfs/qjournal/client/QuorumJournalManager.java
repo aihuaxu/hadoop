@@ -413,11 +413,8 @@ public class QuorumJournalManager implements JournalManager {
         layoutVersion);
     loggers.waitForWriteQuorum(q, startSegmentTimeoutMs,
         "startLogSegment(" + txId + ")");
-    boolean updateCommittedTxId = conf.getBoolean(
-        DFSConfigKeys.DFS_HA_TAILEDITS_INPROGRESS_KEY,
-        DFSConfigKeys.DFS_HA_TAILEDITS_INPROGRESS_DEFAULT);
-    return new QuorumOutputStream(loggers, txId, outputBufferCapacity,
-        writeTxnsTimeoutMs, updateCommittedTxId);
+    return new QuorumOutputStream(loggers, txId,
+        outputBufferCapacity, writeTxnsTimeoutMs);
   }
 
   @Override
@@ -476,15 +473,9 @@ public class QuorumJournalManager implements JournalManager {
     loggers.close();
   }
 
-  public void selectInputStreams(Collection<EditLogInputStream> streams,
-      long fromTxnId, boolean inProgressOk) throws IOException {
-    selectInputStreams(streams, fromTxnId, inProgressOk, false);
-  }
-
   @Override
   public void selectInputStreams(Collection<EditLogInputStream> streams,
-      long fromTxnId, boolean inProgressOk,
-      boolean onlyDurableTxns) throws IOException {
+      long fromTxnId, boolean inProgressOk) throws IOException {
 
     QuorumCall<AsyncLogger, RemoteEditLogManifest> q =
         loggers.getEditLogManifest(fromTxnId, inProgressOk);
@@ -501,22 +492,13 @@ public class QuorumJournalManager implements JournalManager {
     for (Map.Entry<AsyncLogger, RemoteEditLogManifest> e : resps.entrySet()) {
       AsyncLogger logger = e.getKey();
       RemoteEditLogManifest manifest = e.getValue();
-      long committedTxnId = manifest.getCommittedTxnId();
-
+      
       for (RemoteEditLog remoteLog : manifest.getLogs()) {
         URL url = logger.buildURLToFetchLogs(remoteLog.getStartTxId());
 
-        long endTxId = remoteLog.getEndTxId();
-
-        // If it's bounded by durable Txns, endTxId could not be larger
-        // than committedTxnId. This ensures the consistency.
-        if (onlyDurableTxns && inProgressOk) {
-          endTxId = Math.min(endTxId, committedTxnId);
-        }
-
         EditLogInputStream elis = EditLogFileInputStream.fromUrl(
             connectionFactory, url, remoteLog.getStartTxId(),
-            endTxId, remoteLog.isInProgress());
+            remoteLog.getEndTxId(), remoteLog.isInProgress());
         allStreams.add(elis);
       }
     }

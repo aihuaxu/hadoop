@@ -320,7 +320,7 @@ public class FSEditLog implements LogsPurgeable {
     // Safety check: we should never start a segment if there are
     // newer txids readable.
     List<EditLogInputStream> streams = new ArrayList<EditLogInputStream>();
-    journalSet.selectInputStreams(streams, segmentTxId, true, false);
+    journalSet.selectInputStreams(streams, segmentTxId, true);
     if (!streams.isEmpty()) {
       String error = String.format("Cannot start writing at txid %s " +
         "when there is a stream available for read: %s",
@@ -1586,23 +1586,15 @@ public class FSEditLog implements LogsPurgeable {
 
   @Override
   public void selectInputStreams(Collection<EditLogInputStream> streams,
-      long fromTxId, boolean inProgressOk, boolean onlyDurableTxns)
-      throws IOException {
-    journalSet.selectInputStreams(streams, fromTxId,
-            inProgressOk, onlyDurableTxns);
+      long fromTxId, boolean inProgressOk) throws IOException {
+    journalSet.selectInputStreams(streams, fromTxId, inProgressOk);
   }
 
   public Collection<EditLogInputStream> selectInputStreams(
       long fromTxId, long toAtLeastTxId) throws IOException {
-    return selectInputStreams(fromTxId, toAtLeastTxId, null, true, false);
+    return selectInputStreams(fromTxId, toAtLeastTxId, null, true);
   }
-
-  public Collection<EditLogInputStream> selectInputStreams(
-      long fromTxId, long toAtLeastTxId, MetaRecoveryContext recovery,
-      boolean inProgressOK) throws IOException {
-    return selectInputStreams(fromTxId, toAtLeastTxId,
-        recovery, inProgressOK, false);
-  }
+  
   /**
    * Select a list of input streams.
    * 
@@ -1610,18 +1602,16 @@ public class FSEditLog implements LogsPurgeable {
    * @param toAtLeastTxId the selected streams must contain this transaction
    * @param recovery recovery context
    * @param inProgressOk set to true if in-progress streams are OK
-   * @param onlyDurableTxns set to true if streams are bounded
-   *                        by the durable TxId
    */
-  public Collection<EditLogInputStream> selectInputStreams(long fromTxId,
-      long toAtLeastTxId, MetaRecoveryContext recovery, boolean inProgressOk,
-      boolean onlyDurableTxns) throws IOException {
+  public Collection<EditLogInputStream> selectInputStreams(
+      long fromTxId, long toAtLeastTxId, MetaRecoveryContext recovery,
+      boolean inProgressOk) throws IOException {
 
     List<EditLogInputStream> streams = new ArrayList<EditLogInputStream>();
     synchronized(journalSetLock) {
       Preconditions.checkState(journalSet.isOpen(), "Cannot call " +
           "selectInputStreams() on closed FSEditLog");
-      selectInputStreams(streams, fromTxId, inProgressOk, onlyDurableTxns);
+      selectInputStreams(streams, fromTxId, inProgressOk);
     }
 
     try {

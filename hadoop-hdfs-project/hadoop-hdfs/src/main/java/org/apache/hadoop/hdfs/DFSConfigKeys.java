@@ -740,9 +740,6 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final String DFS_HA_TAILEDITS_BATCH_INTERVAL_MS_KEY
       = "dfs.ha.tail-edits.batch.interval.ms";
   public static final int DFS_HA_TAILEDITS_BATCH_INTERVAL_MS_DEFAULT = 100;
-  public static final String  DFS_HA_TAILEDITS_INPROGRESS_KEY =
-          "dfs.ha.tail-edits.in-progress";
-  public static final boolean DFS_HA_TAILEDITS_INPROGRESS_DEFAULT = false;
   public static final String DFS_HA_LOGROLL_RPC_TIMEOUT_KEY = "dfs.ha.log-roll.rpc.timeout";
   public static final int DFS_HA_LOGROLL_RPC_TIMEOUT_DEFAULT = 20000; // 20s
   public static final String DFS_HA_FENCE_METHODS_KEY = "dfs.ha.fencing.methods";

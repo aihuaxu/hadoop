@@ -29,15 +29,12 @@ import com.google.common.base.Preconditions;
 public class RemoteEditLogManifest {
 
   private List<RemoteEditLog> logs;
-
-  private long committedTxnId = -1;
-
+  
   public RemoteEditLogManifest() {
   }
-
-  public RemoteEditLogManifest(List<RemoteEditLog> logs, long committedTxnId) {
+  
+  public RemoteEditLogManifest(List<RemoteEditLog> logs) {
     this.logs = logs;
-    this.committedTxnId = committedTxnId;
     checkState();
   }
   
@@ -49,7 +46,7 @@ public class RemoteEditLogManifest {
    */
   private void checkState()  {
     Preconditions.checkNotNull(logs);
-
+    
     RemoteEditLog prev = null;
     for (RemoteEditLog log : logs) {
       if (prev != null) {
@@ -59,6 +56,7 @@ public class RemoteEditLogManifest {
               + this);
         }
       }
+      
       prev = log;
     }
   }
@@ -67,13 +65,10 @@ public class RemoteEditLogManifest {
     return Collections.unmodifiableList(logs);
   }
 
-  public long getCommittedTxnId() {
-    return committedTxnId;
-  }
 
+  
   @Override
   public String toString() {
-    return "[" + Joiner.on(", ").join(logs) + "]" + " CommittedTxId: "
-        + committedTxnId;
+    return "[" + Joiner.on(", ").join(logs) + "]";
   }
 }
