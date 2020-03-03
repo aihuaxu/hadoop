@@ -93,7 +93,7 @@ public class MiniQJMHACluster {
           .setHttpPort(startingPort++));
     }
     for (int i = 0; i < obs; i++) {
-      nameservice.addNN(new MiniDFSNNTopology.NNConf("nn" + (i + nns)).setIpcPort(startingPort++)
+      nameservice.addNN(new MiniDFSNNTopology.NNConf("ob" + (i + nns)).setIpcPort(startingPort++)
           .setHttpPort(startingPort++).setIsObserver());
     }
 

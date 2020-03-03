@@ -461,13 +461,10 @@ public class DFSUtilClient {
     return ret;
   }
 
-  /**
-   * Internal function to get ALL namenode addresses for the input 'nsId'.
-   */
   static Map<String, InetSocketAddress> getAddressesForNameserviceId(
       Configuration conf, String nsId, String defaultValue, String... keys) {
     return getAddressesForNameserviceIdInternal(
-        conf, nsId, defaultValue, NameNodeType.ALL, keys);
+        conf, nsId, defaultValue, NameNodeType.ACTIVE_STANDBY, keys);
   }
 
   private static Map<String, InetSocketAddress> getAddressesForNameserviceIdInternal(
