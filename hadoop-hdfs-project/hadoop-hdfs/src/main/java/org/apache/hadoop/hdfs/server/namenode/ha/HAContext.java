@@ -45,12 +45,6 @@ public interface HAContext {
   /** Start the services required in standby state */
   public void startStandbyServices() throws IOException;
 
-  /** Start the services required in observer state */
-  public void startObserverServices() throws IOException;
-
-  /** Stop the services when exiting observer state */
-  public void stopObserverServices() throws IOException;
-
   /** Prepare to exit the standby state */
   public void prepareToStopStandbyServices() throws ServiceFailedException;
 
@@ -89,10 +83,4 @@ public interface HAContext {
    * while the namespace is not up to date)
    */
   boolean allowStaleReads();
-
-  /**
-   * For observer namenode, whether its namespace is too stale, i.e., has been
-   * too long since last time that edits loaded.
-   */
-  boolean observerTooStale();
 }

@@ -67,8 +67,6 @@ public class GetConf extends Configured implements Tool {
     NAMENODE("-namenodes", "gets list of namenodes in the cluster."),
     SECONDARY("-secondaryNameNodes", 
         "gets list of secondary namenodes in the cluster."),
-    OBSERVER("-observers",
-        "get list of observer namenodes in the cluster"),
     BACKUP("-backupNodes", "gets list of backup nodes in the cluster."),
     INCLUDE_FILE("-includeFile",
         "gets the include file path that defines the datanodes " +
@@ -84,8 +82,6 @@ public class GetConf extends Configured implements Tool {
       map = new HashMap<String, CommandHandler>();
       map.put(StringUtils.toLowerCase(NAMENODE.getName()),
           new NameNodesCommandHandler());
-      map.put(StringUtils.toLowerCase(OBSERVER.getName()),
-          new ObserverNameNodesCommandHandler());
       map.put(StringUtils.toLowerCase(SECONDARY.getName()),
           new SecondaryNameNodesCommandHandler());
       map.put(StringUtils.toLowerCase(BACKUP.getName()),
@@ -191,22 +187,11 @@ public class GetConf extends Configured implements Tool {
   static class NameNodesCommandHandler extends CommandHandler {
     @Override
     int doWorkInternal(GetConf tool, String []args) throws IOException {
-      tool.printMap(DFSUtil.getNNServiceRpcAddressesForClusterExcludingObservers(tool.getConf()));
+      tool.printMap(DFSUtil.getNNServiceRpcAddressesForCluster(tool.getConf()));
       return 0;
     }
   }
-
-  /**
-   * Handler for {@link Command#OBSERVER}
-   */
-  static class ObserverNameNodesCommandHandler extends CommandHandler {
-    @Override
-    public int doWorkInternal(GetConf tool, String []args) throws IOException {
-      tool.printMap(DFSUtil.getObserverNNServiceRpcAddressesForCluster(tool.getConf()));
-      return 0;
-    }
-  }
-
+  
   /**
    * Handler for {@link Command#BACKUP}
    */
@@ -228,7 +213,7 @@ public class GetConf extends Configured implements Tool {
       return 0;
     }
   }
-
+  
   /**
    * Handler for {@link Command#NNRPCADDRESSES}
    * If rpc addresses are defined in configuration, we return them. Otherwise, 

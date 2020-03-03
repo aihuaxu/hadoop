@@ -730,16 +730,6 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final int DFS_HA_LOGROLL_PERIOD_DEFAULT = 2 * 60; // 2m
   public static final String DFS_HA_TAILEDITS_PERIOD_KEY = "dfs.ha.tail-edits.period";
   public static final int DFS_HA_TAILEDITS_PERIOD_DEFAULT = 60; // 1m
-  public static final String DFS_HA_OBSERVER_TAIL_EDITS_PERIOD_MS_KEY
-      = "dfs.ha.observer.tail-edits.ms.period";
-  public static final int DFS_HA_OBSERVER_TAIL_EDITS_PERIOD_MS_DEFAULT = 2 * 60 * 1000; // 2m
-  public static final String DFS_HA_OBSERVER_STALE_LIMIT_MS_KEY = "dfs.ha.observer.stale.limit.ms";
-  public static final long DFS_HA_OBSERVER_STALE_LIMIT_MS_DEFAULT = 5 * 60 * 1000; // 5m
-  public static final String DFS_HA_TAILEDITS_BATCH_SIZE_KEY = "dfs.ha.tail-edits.batch.size";
-  public static final int DFS_HA_TAILEDITS_BATCH_SIZE_DEFAULT = 10000;
-  public static final String DFS_HA_TAILEDITS_BATCH_INTERVAL_MS_KEY
-      = "dfs.ha.tail-edits.batch.interval.ms";
-  public static final int DFS_HA_TAILEDITS_BATCH_INTERVAL_MS_DEFAULT = 100;
   public static final String DFS_HA_LOGROLL_RPC_TIMEOUT_KEY = "dfs.ha.log-roll.rpc.timeout";
   public static final int DFS_HA_LOGROLL_RPC_TIMEOUT_DEFAULT = 20000; // 20s
   public static final String DFS_HA_FENCE_METHODS_KEY = "dfs.ha.fencing.methods";

@@ -1343,16 +1343,6 @@
 </property>
 
 <property>
-  <name>dfs.client.observer.reads.enabled</name>
-  <value>false</value>
-  <description>
-    Enable reads from observer namenodes. To use this, the client
-    must also set failover proxy provider to
-    org.apache.hadoop.hdfs.server.namenode.ha.ObserverReadProxyProvider.
-  </description>
-</property>
-
-<property>
   <name>dfs.client.failover.max.attempts</name>
   <value>15</value>
   <description>
@@ -1454,17 +1444,6 @@
   <description>
     The prefix for a given nameservice, contains a comma-separated
     list of namenodes for a given nameservice (eg EXAMPLENAMESERVICE).
-  </description>
-</property>
-
-<property>
-  <name>dfs.ha.observer.namenodes.EXAMPLENAMESERVICE</name>
-  <value></value>
-  <description>
-    The prefix for a given nameservice, contains a comma-separated
-    list of observer namenodes for a given nameservice (eg EXAMPLENAMESERVICE).
-    Note that all the observer namenodes must also appear in
-    dfs.ha.namenodes.EXAMPLENAMESERVICE.
   </description>
 </property>
 

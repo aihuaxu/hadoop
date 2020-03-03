@@ -53,7 +53,6 @@ if [ ! -f "$excludeFilenameLocal" ] ; then
 fi
 
 namenodes=$("$HADOOP_PREFIX/bin/hdfs" getconf -namenodes)
-observers=$("$HADOOP_PREFIX/bin/hdfs" getconf -observers)
 excludeFilenameRemote=$("$HADOOP_PREFIX/bin/hdfs" getconf -excludeFile)
 
 if [ "$excludeFilenameRemote" = '' ] ; then
@@ -69,14 +68,6 @@ echo "Copying exclude file [$excludeFilenameRemote] to namenodes:"
 for namenode in $namenodes ; do
   echo "    [$namenode]"
   scp "$excludeFilenameLocal" "$namenode:$excludeFilenameRemote"
-  if [ "$?" != '0' ] ; then errorFlag='1' ; fi
-done
-
-echo "Copying exclude file [$excludeFilenameRemote] to observers:"
-
-for observer in $observers ; do
-  echo "    [$observer]"
-  scp "$excludeFilenameLocal" "$observer:$excludeFilenameRemote"
   if [ "$?" != '0' ] ; then errorFlag='1' ; fi
 done
 

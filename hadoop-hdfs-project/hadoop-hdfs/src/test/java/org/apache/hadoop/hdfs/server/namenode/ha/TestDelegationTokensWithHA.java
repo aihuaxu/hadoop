@@ -155,7 +155,7 @@ public class TestDelegationTokensWithHA {
   
   private class EditLogTailerForTest extends EditLogTailer {
     public EditLogTailerForTest(FSNamesystem namesystem, Configuration conf) {
-      super(namesystem, conf, false);
+      super(namesystem, conf);
     }
     
     public void catchupDuringFailover() throws IOException {

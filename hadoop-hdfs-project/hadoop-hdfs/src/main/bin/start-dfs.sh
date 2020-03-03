@@ -54,7 +54,6 @@ nameStartOpt="$nameStartOpt $@"
 # namenodes
 
 NAMENODES=$($HADOOP_PREFIX/bin/hdfs getconf -namenodes)
-OBSERVERS=$($HADOOP_PREFIX/bin/hdfs getconf -observers)
 
 echo "Starting namenodes on [$NAMENODES]"
 
@@ -62,16 +61,6 @@ echo "Starting namenodes on [$NAMENODES]"
   --config "$HADOOP_CONF_DIR" \
   --hostnames "$NAMENODES" \
   --script "$bin/hdfs" start namenode $nameStartOpt
-
-#---------------------------------------------------------
-# observer namenodes (if any)
-
-# TODO: should we pass other startup options to observers?
-echo "Starting observer namenodes on [$OBSERVERS]"
-"$HADOOP_PREFIX/sbin/hadoop-daemons.sh" \
-  --config "$HADOOP_CONF_DIR" \
-  --hostnames "$OBSERVERS" \
-  --script "$bin/hdfs" start namenode -observer $nameStartOpt
 
 #---------------------------------------------------------
 # datanodes (using default slaves file)

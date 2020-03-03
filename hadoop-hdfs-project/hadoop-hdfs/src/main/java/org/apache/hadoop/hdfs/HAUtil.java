@@ -146,38 +146,18 @@ public class HAUtil {
   }
 
   /**
-   * Get the NN IDs of all other nodes in an HA setup, not including observer NNs.
-   *
-   * @param conf the configuration of this node
-   * @param nsId the nameservice id
-   * @return the NN IDs of all other nodes in this nameservice
-   */
-  public static List<String> getNameNodeIdOfOtherNodes(Configuration conf, String nsId) {
-    return getNameNodeIdOfOtherNodes(conf, nsId, false);
-  }
-
-  /**
    * Get the NN IDs of all other nodes in an HA setup.
    *
    * @param conf the configuration of this node
-   * @param nsId the nameservice id
-   * @param includeObservers whether to include observer NNs in the result
    * @return the NN IDs of all other nodes in this nameservice
    */
-  public static List<String> getNameNodeIdOfOtherNodes(
-      Configuration conf, String nsId, boolean includeObservers) {
+  public static List<String> getNameNodeIdOfOtherNodes(Configuration conf, String nsId) {
     Preconditions.checkArgument(nsId != null,
         "Could not determine namespace id. Please ensure that this " +
         "machine is one of the machines listed as a NN RPC address, " +
         "or configure " + DFSConfigKeys.DFS_NAMESERVICE_ID);
-
-    Collection<String> nnIds;
-    if (includeObservers) {
-      nnIds = DFSUtilClient.getNameNodeIds(conf, nsId);
-    } else {
-      nnIds = DFSUtilClient.getNameNodeIdsExcludingObservers(conf, nsId);
-    }
-
+    
+    Collection<String> nnIds = DFSUtilClient.getNameNodeIds(conf, nsId);
     String myNNId = conf.get(DFSConfigKeys.DFS_HA_NAMENODE_ID_KEY);
     Preconditions.checkArgument(nnIds != null,
         "Could not determine namenode ids in namespace '%s'. " +
@@ -216,31 +196,19 @@ public class HAUtil {
     return otherConfs.get(0);
   }
 
-  /**
-   * Given the configuration for this node, return a list of configurations for
-   * all the other nodes (not including observers) in an HA setup.
-   *
-   * @param myConf the configuration of this node
-   * @return the configuration of all other nodes in an HA setup
-   */
-  public static List<Configuration> getConfForOtherNodes(
-      Configuration myConf) {
-    return getConfForOtherNodes(myConf, false);
-  }
 
   /**
    * Given the configuration for this node, return a Configuration object for
    * all the other nodes in an HA setup.
    *
    * @param myConf the configuration of this node
-   * @param includeObservers whether to include observer NNs in the result
    * @return the configuration of all other nodes in an HA setup
    */
   public static List<Configuration> getConfForOtherNodes(
-      Configuration myConf, boolean includeObservers) {
+      Configuration myConf) {
 
     String nsId = DFSUtil.getNamenodeNameServiceId(myConf);
-    List<String> otherNn = getNameNodeIdOfOtherNodes(myConf, nsId, includeObservers);
+    List<String> otherNn = getNameNodeIdOfOtherNodes(myConf, nsId);
 
     // Look up the address of the other NNs
     List<Configuration> confs = new ArrayList<Configuration>(otherNn.size());
@@ -262,11 +230,6 @@ public class HAUtil {
   
   public static void setAllowStandbyReads(Configuration conf, boolean val) {
     conf.setBoolean("dfs.ha.allow.stale.reads", val);
-  }
-
-  public static long getObserverStaleThreshold(Configuration conf) {
-    return conf.getLong(DFSConfigKeys.DFS_HA_OBSERVER_STALE_LIMIT_MS_KEY,
-        DFSConfigKeys.DFS_HA_OBSERVER_STALE_LIMIT_MS_DEFAULT);
   }
 
   /**

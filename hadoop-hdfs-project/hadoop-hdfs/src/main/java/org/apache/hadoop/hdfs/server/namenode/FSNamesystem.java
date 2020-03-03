@@ -30,10 +30,6 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IO_FILE_BUFFER_
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IO_FILE_BUFFER_SIZE_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BLOCK_SIZE_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BLOCK_SIZE_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_HA_TAILEDITS_BATCH_INTERVAL_MS_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_HA_TAILEDITS_BATCH_INTERVAL_MS_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_HA_TAILEDITS_BATCH_SIZE_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_HA_TAILEDITS_BATCH_SIZE_KEY;
 import static org.apache.hadoop.hdfs.client.HdfsClientConfigKeys.DFS_BYTES_PER_CHECKSUM_DEFAULT;
 import static org.apache.hadoop.hdfs.client.HdfsClientConfigKeys.DFS_BYTES_PER_CHECKSUM_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CHECKSUM_TYPE_DEFAULT;
@@ -518,19 +514,9 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   private final ReentrantLock cpLock;
 
   /**
-   * Used when this NN is in standby or observer state to read from the shared edit log.
+   * Used when this NN is in standby state to read from the shared edit log.
    */
   private EditLogTailer editLogTailer = null;
-
-  /**
-   * Batch size for each iteration of edit log loading for standby/observer NN,
-   */
-  private int editLoadBatchSize;
-
-  /**
-   * Interval (in ms) between each batch of edit log loading for standby/observer NN.
-   */
-  private int editLoadBatchIntervalMs;
 
   /**
    * Used when this NN is in standby state to perform checkpoints.
@@ -835,12 +821,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       LOG.info("Append Enabled: " + supportAppends);
 
       this.dtpReplaceDatanodeOnFailure = ReplaceDatanodeOnFailure.get(conf);
-
-      this.editLoadBatchSize = conf.getInt(DFS_HA_TAILEDITS_BATCH_SIZE_KEY,
-          DFS_HA_TAILEDITS_BATCH_SIZE_DEFAULT);
-      this.editLoadBatchIntervalMs = conf.getInt(DFS_HA_TAILEDITS_BATCH_INTERVAL_MS_KEY,
-          DFS_HA_TAILEDITS_BATCH_INTERVAL_MS_DEFAULT);
-
+      
       this.standbyShouldCheckpoint = conf.getBoolean(
           DFS_HA_STANDBY_CHECKPOINTS_KEY, DFS_HA_STANDBY_CHECKPOINTS_DEFAULT);
       // # edit autoroll threshold is a multiple of the checkpoint threshold 
@@ -943,14 +924,6 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
 
   public int getMaxListOpenFilesResponses() {
     return maxListOpenFilesResponses;
-  }
-
-  public int getEditLoadBatchSize() {
-    return editLoadBatchSize;
-  }
-
-  public int getEditLoadBatchIntervalMs() {
-    return editLoadBatchIntervalMs;
   }
 
   void lockRetryCache() {
@@ -1350,34 +1323,17 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       // During startup, we're already open for read.
       getFSImage().editLog.initSharedJournalsForRead();
     }
+    
     blockManager.setPostponeBlocksFromFuture(true);
 
     // Disable quota checks while in standby.
     dir.disableQuotaChecks();
-    editLogTailer = new EditLogTailer(this, conf, false);
+    editLogTailer = new EditLogTailer(this, conf);
     editLogTailer.start();
     if (standbyShouldCheckpoint) {
       standbyCheckpointer = new StandbyCheckpointer(conf, this);
       standbyCheckpointer.start();
     }
-  }
-
-  /**
-   * Start services required in observer state
-   *
-   * @throws IOException
-   */
-  void startObserverState(final Configuration conf) throws IOException {
-    LOG.info("Starting services required for observer state");
-    if (!getFSImage().editLog.isOpenForRead()) {
-      // During startup, we're already open for read.
-      getFSImage().editLog.initSharedJournalsForRead();
-    }
-
-    blockManager.setPostponeBlocksFromFuture(true);
-    dir.disableQuotaChecks();
-    editLogTailer = new EditLogTailer(this, conf, true);
-    editLogTailer.start();
   }
 
   /**
@@ -1416,18 +1372,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
       getFSImage().editLog.close();
     }
   }
-
-  /** Stop services required in observer state */
-  void stopObserverServices() throws IOException {
-    LOG.info("Stopping services started for observer state");
-    if (editLogTailer != null) {
-      editLogTailer.stop();
-    }
-    if (dir != null && getFSImage() != null && getFSImage().editLog != null) {
-      getFSImage().editLog.close();
-    }
-  }
-
+  
   @Override
   public void checkOperation(OperationCategory op) throws StandbyException {
     if (haContext != null) {
@@ -1715,7 +1660,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   public boolean isRunning() {
     return fsRunning;
   }
-
+  
   @Override
   public boolean isInStandbyState() {
     if (haContext == null || haContext.getState() == null) {

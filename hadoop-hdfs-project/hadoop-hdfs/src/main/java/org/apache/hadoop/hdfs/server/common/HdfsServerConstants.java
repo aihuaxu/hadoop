@@ -158,9 +158,7 @@ public interface HdfsServerConstants {
     // only used for StorageDirectory.analyzeStorage() in hot swap drive scenario.
     // TODO refactor StorageDirectory.analyzeStorage() so that we can do away with
     // this in StartupOption.
-    HOTSWAP("-hotswap"),
-    // Startup the namenode in observer mode.
-    OBSERVER("-observer");
+    HOTSWAP("-hotswap");
 
     private static final Pattern ENUM_WITH_ROLLING_UPGRADE_OPTION = Pattern.compile(
         "(\\w+)\\((\\w+)\\)");

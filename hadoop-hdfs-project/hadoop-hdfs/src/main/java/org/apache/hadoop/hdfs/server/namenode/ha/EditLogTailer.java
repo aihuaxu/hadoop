@@ -100,30 +100,17 @@ public class EditLogTailer {
    * available to be read from.
    */
   private final long sleepTimeMs;
-
-  /**
-   * Whether this is for an observer namenode
-   */
-  private final boolean isObserver;
-
-  public EditLogTailer(FSNamesystem namesystem, Configuration conf,
-      boolean isObserver) {
+  
+  public EditLogTailer(FSNamesystem namesystem, Configuration conf) {
     this.tailerThread = new EditLogTailerThread();
     this.conf = conf;
     this.namesystem = namesystem;
     this.editLog = namesystem.getEditLog();
-    this.isObserver = isObserver;
-
+    
     lastLoadTimeMs = monotonicNow();
 
-
-    if (isObserver) {
-      // Observer NN doesn't roll edit log
-      logRollPeriodMs = -1;
-    } else {
-      logRollPeriodMs = conf.getInt(DFSConfigKeys.DFS_HA_LOGROLL_PERIOD_KEY,
-          DFSConfigKeys.DFS_HA_LOGROLL_PERIOD_DEFAULT) * 1000;
-    }
+    logRollPeriodMs = conf.getInt(DFSConfigKeys.DFS_HA_LOGROLL_PERIOD_KEY,
+        DFSConfigKeys.DFS_HA_LOGROLL_PERIOD_DEFAULT) * 1000;
     if (logRollPeriodMs >= 0) {
       this.activeAddr = getActiveNodeAddress();
       Preconditions.checkArgument(activeAddr.getPort() > 0,
@@ -135,17 +122,11 @@ public class EditLogTailer {
       LOG.info("Not going to trigger log rolls on active node because " +
           DFSConfigKeys.DFS_HA_LOGROLL_PERIOD_KEY + " is negative.");
     }
-
-    if (isObserver) {
-      sleepTimeMs = conf.getInt(
-          DFSConfigKeys.DFS_HA_OBSERVER_TAIL_EDITS_PERIOD_MS_KEY,
-          DFSConfigKeys.DFS_HA_OBSERVER_TAIL_EDITS_PERIOD_MS_DEFAULT);
-    } else {
-      sleepTimeMs = conf.getInt(DFSConfigKeys.DFS_HA_TAILEDITS_PERIOD_KEY,
-          DFSConfigKeys.DFS_HA_TAILEDITS_PERIOD_DEFAULT) * 1000;
-    }
-
-    LOG.info("logRollPeriodMs=" + logRollPeriodMs +
+    
+    sleepTimeMs = conf.getInt(DFSConfigKeys.DFS_HA_TAILEDITS_PERIOD_KEY,
+        DFSConfigKeys.DFS_HA_TAILEDITS_PERIOD_DEFAULT) * 1000;
+    
+    LOG.debug("logRollPeriodMs=" + logRollPeriodMs +
         " sleepTime=" + sleepTimeMs);
   }
   
@@ -221,12 +202,7 @@ public class EditLogTailer {
     // transitionToActive RPC takes the write lock before calling
     // tailer.stop() -- so if we're not interruptible, it will
     // deadlock.
-    // TODO: consider enhancing selectInputStreams to accept a upper bound
-    // on TxnId. This will allow us to reuse the code in FSEditLogLoader.
-    if (!isObserver) {
-      // Observer doesn't need lock since it never transition to active/standby
-      namesystem.writeLockInterruptibly();
-    }
+    namesystem.writeLockInterruptibly();
     try {
       FSImage image = namesystem.getFSImage();
 
@@ -255,7 +231,7 @@ public class EditLogTailer {
       // disk are ignored.
       long editsLoaded = 0;
       try {
-        editsLoaded = image.loadEdits(streams, namesystem, isObserver);
+        editsLoaded = image.loadEdits(streams, namesystem);
       } catch (EditLogInputException elie) {
         editsLoaded = elie.getNumEditsLoaded();
         throw elie;
@@ -271,9 +247,7 @@ public class EditLogTailer {
       }
       lastLoadedTxnId = image.getLastAppliedTxId();
     } finally {
-      if (!isObserver) {
-        namesystem.writeUnlock();
-      }
+      namesystem.writeUnlock();
     }
   }
 
@@ -296,8 +270,6 @@ public class EditLogTailer {
    * Trigger the active node to roll its logs.
    */
   private void triggerActiveLogRoll() {
-    Preconditions.checkArgument(!isObserver,
-        "Should not trigger roll from observer NN");
     LOG.info("Triggering log roll on remote NameNode " + activeAddr);
     try {
       getActiveNodeProxy().rollEditLog();
