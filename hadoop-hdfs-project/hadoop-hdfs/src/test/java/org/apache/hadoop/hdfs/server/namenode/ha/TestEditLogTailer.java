@@ -27,7 +27,6 @@ import java.net.BindException;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.permission.FsPermission;
@@ -78,7 +77,7 @@ public class TestEditLogTailer {
   private static final int DIRS_TO_MAKE = 20;
   static final long SLEEP_TIME = 1000;
   static final long NN_LAG_TIMEOUT = 10 * 1000;
-
+  
   static {
     GenericTestUtils.setLogLevel(FSImage.LOG, Level.ALL);
     GenericTestUtils.setLogLevel(FSEditLog.LOG, Level.ALL);
@@ -90,34 +89,6 @@ public class TestEditLogTailer {
     conf.setBoolean(DFSConfigKeys.DFS_NAMENODE_EDITS_ASYNC_LOGGING,
         useAsyncEditLog);
     return conf;
-  }
-
-  private static MiniDFSCluster getMiniDFSClusterWithHA(Configuration conf)
-      throws Exception {
-    MiniDFSCluster cluster = null;
-    for (int i = 0; i < 5; i++) {
-      try {
-        // Have to specify IPC ports so the NNs can talk to each other.
-        int[] ports = ServerSocketUtil.getPorts(2);
-        MiniDFSNNTopology topology = new MiniDFSNNTopology()
-                .addNameservice(new MiniDFSNNTopology.NSConf("ns1")
-                        .addNN(new MiniDFSNNTopology.NNConf("nn1")
-                                .setIpcPort(ports[0]))
-                        .addNN(new MiniDFSNNTopology.NNConf("nn2")
-                                .setIpcPort(ports[1])));
-
-        cluster = new MiniDFSCluster.Builder(conf)
-                .nnTopology(topology)
-                .numDataNodes(0)
-                .build();
-        break;
-      } catch (BindException e) {
-        // retry if race on ports given by ServerSocketUtil#getPorts
-        continue;
-      }
-    }
-
-    return cluster;
   }
 
   @Test
@@ -186,7 +157,28 @@ public class TestEditLogTailer {
     conf.setInt(DFSConfigKeys.DFS_HA_LOGROLL_PERIOD_KEY, 1);
     conf.setInt(DFSConfigKeys.DFS_HA_TAILEDITS_PERIOD_KEY, 1);
 
-    MiniDFSCluster cluster = getMiniDFSClusterWithHA(conf);
+    MiniDFSCluster cluster = null;
+    for (int i = 0; i < 5; i++) {
+      try {
+        // Have to specify IPC ports so the NNs can talk to each other.
+        int[] ports = ServerSocketUtil.getPorts(2);
+        MiniDFSNNTopology topology = new MiniDFSNNTopology()
+            .addNameservice(new MiniDFSNNTopology.NSConf("ns1")
+                .addNN(new MiniDFSNNTopology.NNConf("nn1")
+                    .setIpcPort(ports[0]))
+                .addNN(new MiniDFSNNTopology.NNConf("nn2")
+                    .setIpcPort(ports[1])));
+
+        cluster = new MiniDFSCluster.Builder(conf)
+          .nnTopology(topology)
+          .numDataNodes(0)
+          .build();
+        break;
+      } catch (BindException e) {
+        // retry if race on ports given by ServerSocketUtil#getPorts
+        continue;
+      }
+    }
     if (cluster == null) {
       fail("failed to start mini cluster.");
     }
@@ -219,96 +211,5 @@ public class TestEditLogTailer {
         return expectedInProgressLog.exists() || expectedFinalizedLog.exists();
       }
     }, 100, 10000);
-  }
-
-  @Test
-  public void testNN0TriggersLogRollsWhenTailInProgressEdits() throws Exception {
-    testStandbyTriggersLogRollsWhenTailInProgressEdits(0);
-  }
-
-  @Test
-  public void testNN1TriggersLogRollsWhenTailInProgressEdits() throws Exception {
-    testStandbyTriggersLogRollsWhenTailInProgressEdits(1);
-  }
-
-  private static void testStandbyTriggersLogRollsWhenTailInProgressEdits(
-      int activeIndex) throws Exception {
-    final int STANDBY_CATCHUP_WAIT_TIME = 2;
-    final int NO_LOGROLL_WAIT_TIME = 2;
-    final int LOGROLL_WAIT_TIME = 3;
-
-    Configuration conf = getConf();
-    conf.setInt(DFSConfigKeys.DFS_HA_LOGROLL_PERIOD_KEY,
-            STANDBY_CATCHUP_WAIT_TIME + NO_LOGROLL_WAIT_TIME + 1);
-    conf.setInt(DFSConfigKeys.DFS_HA_TAILEDITS_PERIOD_KEY, 1);
-    conf.setBoolean(DFSConfigKeys.DFS_HA_TAILEDITS_INPROGRESS_KEY, true);
-
-    MiniDFSCluster cluster = getMiniDFSClusterWithHA(conf);
-    if (cluster == null) {
-      fail("failed to start mini cluster.");
-    }
-
-    try {
-      cluster.transitionToActive(activeIndex);
-      int standbyIndex = (activeIndex == 0) ? 1 : 0;
-      NameNode active = cluster.getNameNode(activeIndex);
-      NameNode standby = cluster.getNameNode(standbyIndex);
-
-      long origTxId = active.getNamesystem().getFSImage().getEditLog()
-        .getCurSegmentTxId();
-      for (int i = 0; i < DIRS_TO_MAKE / 2; i++) {
-        NameNodeAdapter.mkdirs(active, getDirPath(i),
-            new PermissionStatus("test","test",
-                new FsPermission((short)00755)), true);
-      }
-
-      long activeTxId = active.getNamesystem().getFSImage().getEditLog()
-        .getLastWrittenTxId();
-      waitForStandbyToCatchUpWithInProgressEdits(active, standby, activeTxId,
-          STANDBY_CATCHUP_WAIT_TIME);
-
-      for (int i = DIRS_TO_MAKE / 2; i < DIRS_TO_MAKE; i++) {
-        NameNodeAdapter.mkdirs(active, getDirPath(i),
-            new PermissionStatus("test","test",
-                new FsPermission((short)00755)), true);
-      }
-
-      boolean exceptionThrown = false;
-      try {
-        checkForLogRoll(active, origTxId, NO_LOGROLL_WAIT_TIME);
-      } catch (TimeoutException e) {
-        exceptionThrown = true;
-      }
-      assertTrue(exceptionThrown);
-
-      checkForLogRoll(active, origTxId, LOGROLL_WAIT_TIME);
-    } finally {
-      cluster.shutdown();
-    }
-  }
-
-  private static void waitForStandbyToCatchUpWithInProgressEdits(
-      final NameNode active, final NameNode standby, final long activeTxId,
-      int until) throws Exception {
-    GenericTestUtils.waitFor(new Supplier<Boolean>() {
-      @Override
-      public Boolean get() {
-        long standbyTxId = standby.getNamesystem().getFSImage()
-          .getLastAppliedTxId();
-        return (standbyTxId >= activeTxId);
-      }
-    }, 100, until * 1000);
-  }
-
-  private static void checkForLogRoll(final NameNode active,
-      final long origTxId, int until) throws Exception {
-    GenericTestUtils.waitFor(new Supplier<Boolean>() {
-      @Override
-      public Boolean get() {
-        long curSegmentTxId = active.getNamesystem().getFSImage().getEditLog()
-          .getCurSegmentTxId();
-        return (origTxId != curSegmentTxId);
-      }
-    }, 100, until * 1000);
   }
 }

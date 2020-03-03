@@ -89,11 +89,6 @@ public class EditLogTailer {
   private long lastLoadTimeMs;
 
   /**
-   * The last time we triggered a edit log roll on active namenode
-   */
-  private long lastRollTimeMs;
-
-  /**
    * How often the Standby should roll edit logs. Since the Standby only reads
    * from finalized log segments, the Standby will only be as up-to-date as how
    * often the logs are rolled.
@@ -125,7 +120,6 @@ public class EditLogTailer {
     this.isObserver = isObserver;
 
     lastLoadTimeMs = monotonicNow();
-    lastRollTimeMs = monotonicNow();
 
 
     if (isObserver) {
@@ -303,9 +297,9 @@ public class EditLogTailer {
   /**
    * @return true if the configured log roll period has elapsed.
    */
-  private boolean tooLongSinceLastRoll() {
-    return logRollPeriodMs >= 0 &&
-            (monotonicNow() - lastRollTimeMs) > logRollPeriodMs ;
+  private boolean tooLongSinceLastLoad() {
+    return logRollPeriodMs >= 0 && 
+      (monotonicNow() - lastLoadTimeMs) > logRollPeriodMs ;
   }
 
   /**
@@ -317,7 +311,6 @@ public class EditLogTailer {
     LOG.info("Triggering log roll on remote NameNode " + activeAddr);
     try {
       getActiveNodeProxy().rollEditLog();
-      lastRollTimeMs = monotonicNow();
       lastRollTriggerTxId = lastLoadedTxnId;
     } catch (IOException ioe) {
       if (ioe instanceof RemoteException) {
@@ -366,7 +359,7 @@ public class EditLogTailer {
           // There's no point in triggering a log roll if the Standby hasn't
           // read any more transactions since the last time a roll was
           // triggered. 
-          if (tooLongSinceLastRoll() &&
+          if (tooLongSinceLastLoad() &&
               lastRollTriggerTxId < lastLoadedTxnId) {
             triggerActiveLogRoll();
           }
