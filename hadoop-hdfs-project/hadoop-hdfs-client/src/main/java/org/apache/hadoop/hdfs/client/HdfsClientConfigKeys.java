@@ -121,9 +121,6 @@ public interface HdfsClientConfigKeys {
   String DFS_CLIENT_OBSERVER_READS_ENABLED =
       "dfs.client.observer.reads.enabled";
   boolean DFS_CLIENT_OBSERVER_READS_ENABLED_DEFAULT = false;
-  String DFS_CLIENT_OBSERVER_READS_RANDOM_ORDER =
-      "dfs.client.observer.reads.random.order";
-  boolean DFS_CLIENT_OBSERVER_READS_RANDOM_ORDER_DEFAULT = false;
   // Much code in hdfs is not yet updated to use these keys.
   // the initial delay (unit is ms) for locateFollowingBlock, the delay time
   // will increase exponentially(double) for each retry.
