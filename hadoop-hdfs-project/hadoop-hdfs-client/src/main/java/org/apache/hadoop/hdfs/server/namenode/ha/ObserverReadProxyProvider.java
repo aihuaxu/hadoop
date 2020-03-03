@@ -305,7 +305,7 @@ public class ObserverReadProxyProvider<T> extends ConfiguredFailoverProxyProvide
       // write request. At this point we'll try to fail over to the active NN.
       Object retVal;
       try {
-        if (observerReadEnabled && isRead(method)) {
+        if (isRead(method)) {
           LOG.warn("All ONNs have failed for read request " + method.getName() + ". "
               + "Fall back on active NN: " + activeProxy);
         }
