@@ -116,7 +116,7 @@ import com.google.common.annotations.VisibleForTesting;
 @SuppressWarnings({"unchecked", "rawtypes"})
 public class RMAppAttemptImpl implements RMAppAttempt, Recoverable {
   private static final String STATE_CHANGE_MESSAGE =
-      "%s State change from %s to %s on event = %s";
+      "%s State change from %s to %s on event = %s in queue = %s";
   private static final String RECOVERY_MESSAGE =
       "Recovering attempt: %s with final state = %s";
   private static final String DIAGNOSTIC_LIMIT_CONFIG_ERROR_MESSAGE =
@@ -921,10 +921,10 @@ public class RMAppAttemptImpl implements RMAppAttempt, Recoverable {
           ((recoveredFinalState == null) ||
             (event.getType() != RMAppAttemptEventType.RECOVER))) {
         LOG.info(String.format(STATE_CHANGE_MESSAGE, appAttemptID, oldState,
-            getAppAttemptState(), event.getType()));
+            getAppAttemptState(), event.getType(), submissionContext.getQueue()));
       } else if ((oldState != getAppAttemptState()) && LOG.isDebugEnabled()) {
         LOG.debug(String.format(STATE_CHANGE_MESSAGE, appAttemptID, oldState,
-            getAppAttemptState(), event.getType()));
+            getAppAttemptState(), event.getType(), submissionContext.getQueue()));
       }
     } finally {
       this.writeLock.unlock();
