@@ -1,9 +1,10 @@
 schema_version: 2.0.0
 service_name: hdfs
-service_type: custom
+service_type: java_8_standard
 
-custom:
-  base_image: 'uber-uai/java8'
+java_8_standard:
+  build_cmds:
+    - RUN echo 'This is hdfs build'
   post_build_cmds:
     - RUN echo hdfs hadoop supergroup | xargs -n 1 groupadd -r && useradd -r -m -s /bin/bash -g hadoop -g hdfs hdfs && usermod -a -G sudo,supergroup udocker && sed -i -e 's/%sudo\s\+ALL=(ALL:ALL)\s\+ALL/%sudo ALL=(ALL) NOPASSWD:ALL/g' /etc/sudoers
     - RUN mkdir -p /opt/hdfs/binary /opt/hdfs/conf /var/log/hadoop /opt/hadoop/keytabs /var/log/hadoop
