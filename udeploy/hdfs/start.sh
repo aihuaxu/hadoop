@@ -87,7 +87,7 @@ function start_zkfc() {
 function start_balancer() {
   # Run balancer with default threshold of 7.
   source "${HADOOP_ENV}"; exec "${HDFS_CMD}" balancer -threshold 7 \
-                                                      -asService
+                                                      -asService 2>&1
 }
 
 # setup system files/dirs.
