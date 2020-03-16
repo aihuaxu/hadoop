@@ -15,6 +15,10 @@ SCRIPTS_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
 # start datanode process.
 function start_datanode() {
+  if [ "${PRIVILEGED_PORT}" == "true" ]; then
+    echo 'INFO: Privileged port flag is set. Launching datanode as root with jsvc.'
+    exec sudo /bin/bash -c "source ${HADOOP_ENV}; ${HDFS_START_SCRIPT} datanode"
+  fi
   source "${HADOOP_ENV}"; exec "${HDFS_START_SCRIPT}" datanode
 }
 
@@ -25,11 +29,11 @@ function start_namenode() {
 
     # Setup required directories through idempotent operations.
     if [ -z "${DYNAMIC_NAMENODE_NAME_DIR}" ]; then
-      echo "ERROR: env DYNAMIC_NAMENODE_NAME_DIR is empty."
+      echo 'ERROR: env DYNAMIC_NAMENODE_NAME_DIR is empty.'
       exit 1
     fi
     if [ -z "${DYNAMIC_NAMENODE_LEGACY_OIV_DIR}" ]; then
-      echo "ERROR: env DYNAMIC_NAMENODE_LEGACY_OIV_DIR is empty."
+      echo 'ERROR: env DYNAMIC_NAMENODE_LEGACY_OIV_DIR is empty.'
       exit 1
     fi
     namenode_name_dir_parent=$(dirname "${DYNAMIC_NAMENODE_NAME_DIR}")
@@ -40,20 +44,20 @@ function start_namenode() {
 
     source "${HADOOP_ENV}"; "${HDFS_START_SCRIPT}" namenode -format ${init_option}
     if [ $? -ne 0 ]; then
-      echo "ERROR: Failed to format namenode."
+      echo 'ERROR: Failed to format namenode.'
       # Not exit on error as it is expected if NN is already formatted.
     else
-      echo "INFO: Successfully formatted namenode."
+      echo 'INFO: Successfully formatted namenode.'
     fi
   # INIT not set -> standby NN in initialization,
   # INIT == false -> maybe a replacement standby NN in running cluster.
   else
     source "${HADOOP_ENV}"; "${HDFS_START_SCRIPT}" namenode -bootstrapStandby ${init_option}
     if [ $? -ne 0 ]; then
-      echo "ERROR: Failed to bootstrap standby namenode."
+      echo 'ERROR: Failed to bootstrap standby namenode.'
       # Not exit on error as it is expected for NN restart.
     else
-      echo "INFO: Successfully bootstrap standby namenode."
+      echo 'INFO: Successfully bootstrap standby namenode.'
     fi
   fi
 
@@ -73,10 +77,10 @@ function start_zkfc() {
   if [ "${INIT}" == "true" ]; then
     source "${HADOOP_ENV}"; "${HDFS_START_SCRIPT}" zkfc -formatZK ${init_option}
     if [ $? -ne 0 ]; then
-      echo "ERROR: Failed to format ZKFC."
+      echo 'ERROR: Failed to format ZKFC.'
       # Not exit on error as it is expected if znode already exist.
     else
-      echo "INFO: Successfully initialized ZK entry."
+      echo 'INFO: Successfully initialized ZK entry.'
     fi
   fi
 

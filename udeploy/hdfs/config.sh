@@ -9,6 +9,7 @@ mkdir -p ${HDFS_CONF_PATH}
 bash ${DSC_SETUP_SCRIPT} ${DSC_TARGET_DIR}
 rsync --exclude *.sha -av ${DSC_TARGET_DIR}/${DSC_SUB_PATH}/* ${HDFS_CONF_PATH}/
 cp ./udeploy/hdfs/topology.py ${HDFS_CONF_PATH}/
+cp -r ./udeploy/hdfs/jsvc ${HDFS_CONF_PATH}/jsvc
 
 # Update ssl-server.xml and ssl-client.xml with passwords
 if [ -f ${TRUSTSTORE_PSD} ] ; then
