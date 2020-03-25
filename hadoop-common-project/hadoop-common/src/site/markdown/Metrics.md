@@ -104,6 +104,17 @@ RetryCache metrics is useful to monitor NameNode fail-over. Each metrics record 
 | `CacheCleared` | Total number of RetryCache cleared |
 | `CacheUpdated` | Total number of RetryCache updated |
 
+DecayRpcSchedulerDetailed
+-------------------------
+
+DecayRpcSchedulerDetailed metrics only exist when DecayRpcScheduler is used (FairCallQueue enabled). It is an addition
+to FairCallQueue metrics. For each level of priority, rpcqueue and rpcprocessing detailed metrics are exposed.
+
+| Name | Description |
+|:---- | :---- |
+|  `DecayRPCSchedulerPriority.`*Priority*`.RpcQueueTime` | RpcQueueTime metrics for each priority |
+|  `DecayRPCSchedulerPriority.`*Priority*`.RpcProcessingTime` | RpcProcessingTime metrics for each priority |
+
 rpcdetailed context
 ===================
 

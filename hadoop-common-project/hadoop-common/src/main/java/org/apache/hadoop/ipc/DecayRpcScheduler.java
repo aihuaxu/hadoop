@@ -42,6 +42,7 @@ import com.google.common.util.concurrent.AtomicDoubleArray;
 import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
+import org.apache.hadoop.ipc.metrics.DecayRpcSchedulerDetailedMetrics;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.MetricsSource;
@@ -160,6 +161,10 @@ public class DecayRpcScheduler implements RpcScheduler,
   private final AtomicDoubleArray responseTimeAvgInLastWindow;
   private final AtomicLongArray responseTimeCountInLastWindow;
 
+  // RPC queue time rates per queue
+  private final DecayRpcSchedulerDetailedMetrics
+      decayRpcSchedulerDetailedMetrics;
+
   // Pre-computed scheduling decisions during the decay sweep are
   // atomically swapped in as a read-only map
   private final AtomicReference<Map<Object, Integer>> scheduleCacheRef =
@@ -245,6 +250,10 @@ public class DecayRpcScheduler implements RpcScheduler,
             DECAYSCHEDULER_METRICS_TOP_USER_COUNT_DEFAULT);
     Preconditions.checkArgument(topUsersCount > 0,
         "the number of top users for scheduler metrics must be at least 1");
+
+    decayRpcSchedulerDetailedMetrics =
+        DecayRpcSchedulerDetailedMetrics.create(ns);
+    decayRpcSchedulerDetailedMetrics.init(numLevels);
 
     // Setup delay timer
     Timer timer = new Timer();
@@ -657,6 +666,11 @@ public class DecayRpcScheduler implements RpcScheduler,
   @Override
   public void addResponseTime(String name, int priorityLevel, int queueTime,
       int processingTime) {
+    this.decayRpcSchedulerDetailedMetrics.addQueueTime(
+        priorityLevel, queueTime);
+    this.decayRpcSchedulerDetailedMetrics.addProcessingTime(
+        priorityLevel, processingTime);
+
     responseTimeCountInCurrWindow.getAndIncrement(priorityLevel);
     responseTimeTotalInCurrWindow.getAndAdd(priorityLevel,
         queueTime+processingTime);
@@ -1007,10 +1021,17 @@ public class DecayRpcScheduler implements RpcScheduler,
     return decayedCallCounts;
   }
 
+  @VisibleForTesting
+  public DecayRpcSchedulerDetailedMetrics
+      getDecayRpcSchedulerDetailedMetrics() {
+    return decayRpcSchedulerDetailedMetrics;
+  }
+
   @Override
   public void stop() {
     metricsProxy.unregisterSource(namespace);
     MetricsProxy.removeInstance(namespace);
+    decayRpcSchedulerDetailedMetrics.shutdown();
   }
 
   protected IdentityProvider getIdentityProvider() {
