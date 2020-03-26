@@ -309,7 +309,7 @@ public class DelegationTokenRenewer extends AbstractService {
 
     @Override
     public String toString() {
-      return token + ";exp=" + expirationDate + "; apps=" + referringAppIds;
+      return token + "; exp=" + expirationDate + "; maxDate=" + maxDate + "; apps=" + referringAppIds;
     }
     
     @Override
@@ -519,7 +519,7 @@ public class DelegationTokenRenewer extends AbstractService {
                   evt.shouldCancelAtEnd());
               continue;
             }
-            throw new IOException("Failed to renew token: " + dttr.token, ioe);
+            throw new IOException("Failed to renew token: " + dttr, ioe);
           }
         }
         tokenList.add(dttr);
@@ -565,7 +565,9 @@ public class DelegationTokenRenewer extends AbstractService {
     
     @Override
     public void run() {
+      LOG.info("RenewalTimerTask.run: token [" +dttr +"]");
       if (cancelled.get()) {
+        LOG.info("Token cancelled already, token [" +dttr +"]");
         return;
       }
 
@@ -578,10 +580,10 @@ public class DelegationTokenRenewer extends AbstractService {
           renewToken(dttr);
           setTimerForTokenRenewal(dttr);// set the next one
         } else {
-          LOG.info("The token was removed already. Token = [" +dttr +"]");
+          LOG.info("Token removed already, token [" +dttr +"]");
         }
       } catch (Exception e) {
-        LOG.error("Exception renewing token" + token + ". Not rescheduled", e);
+        LOG.error("Exception renewing token [" + token + "]. Not rescheduled", e);
         removeFailedDelegationToken(dttr);
       }
     }
@@ -620,7 +622,7 @@ public class DelegationTokenRenewer extends AbstractService {
     // calculate timer time
     long expiresIn = token.expirationDate - System.currentTimeMillis();
     if (expiresIn <= 0) {
-      LOG.info("Will not renew token " + token);
+      LOG.info("Expired, will not set a timer task to renew token [" + token + "]");
       return;
     }
     long renewIn = token.expirationDate - expiresIn/10; // little bit before the expiration
@@ -629,8 +631,7 @@ public class DelegationTokenRenewer extends AbstractService {
     token.setTimerTask(tTask); // keep reference to the timer
 
     renewalTimer.schedule(token.timerTask, new Date(renewIn));
-    LOG.info("Renew " + token + " in " + expiresIn + " ms, appId = "
-        + token.referringAppIds);
+    LOG.info("Will renew token [" + token + "] at " + renewIn + ", currently it will expire in " + expiresIn + " ms");
   }
 
   // renew a token
@@ -649,9 +650,10 @@ public class DelegationTokenRenewer extends AbstractService {
               }
             });
     } catch (InterruptedException e) {
+      LOG.info("Failed to renew token [" + dttr + "], exception: " + e.getMessage());
       throw new IOException(e);
     }
-    LOG.info("Renewed delegation-token= [" + dttr + "]");
+    LOG.info("Renewed token= [" + dttr + "]");
   }
 
   // Request new hdfs token if the token is about to expire, and remove the old
