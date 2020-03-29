@@ -610,7 +610,15 @@ public class DockerLinuxContainerRuntime implements LinuxContainerRuntime {
         .detachOnRun()
         .setContainerWorkDir(containerWorkDir.toString())
         .setNetworkType(network);
-    setHostname(runCommand, containerIdStr, hostname);
+    // adding the --hostname argument to the docker run command to set the hostname in the container to something like:
+    // ctr-e84-1520889172376-0001-01-000001.
+    // This does not work when combined with the --net=host command line option in Docker 1.13.1.
+    // It causes multiple failures when the client tries to resolve the hostname and it fails.
+    // Refer: https://jira.apache.org/jira/browse/YARN-8027.  This backport builds upon 3.x.x which
+    // includes YARN RegistryDNS support.
+    if (!network.equalsIgnoreCase("host")) {
+      setHostname(runCommand, containerIdStr, hostname);
+    }
     runCommand.setCapabilities(capabilities);
 
     if(cgroupsRootDirectory != null) {

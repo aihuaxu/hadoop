@@ -387,7 +387,7 @@ public class TestDockerContainerRuntime {
     List<String> dockerCommands = Files.readAllLines(
         Paths.get(dockerCommandFile), Charset.forName("UTF-8"));
 
-    Assert.assertEquals(14, dockerCommands.size());
+    Assert.assertEquals(13, dockerCommands.size());
     int counter = 0;
     Assert.assertEquals("[docker-command-execution]",
         dockerCommands.get(counter++));
@@ -397,8 +397,6 @@ public class TestDockerContainerRuntime {
     Assert.assertEquals("  detach=true", dockerCommands.get(counter++));
     Assert.assertEquals("  docker-command=run", dockerCommands.get(counter++));
     Assert.assertEquals("  group-add=" + StringUtils.join(",", groups),
-        dockerCommands.get(counter++));
-    Assert.assertEquals("  hostname=ctr-id",
         dockerCommands.get(counter++));
     Assert
         .assertEquals("  image=busybox:latest", dockerCommands.get(counter++));
@@ -581,7 +579,6 @@ public class TestDockerContainerRuntime {
     Assert.assertEquals("  cap-drop=ALL", dockerCommands.get(counter++));
     Assert.assertEquals("  detach=true", dockerCommands.get(counter++));
     Assert.assertEquals("  docker-command=run", dockerCommands.get(counter++));
-    Assert.assertEquals("  hostname=ctr-id", dockerCommands.get(counter++));
     Assert
         .assertEquals("  image=busybox:latest", dockerCommands.get(counter++));
     Assert.assertEquals(
@@ -1024,32 +1021,31 @@ public class TestDockerContainerRuntime {
     List<String> dockerCommands = Files.readAllLines(
             Paths.get(dockerCommandFile), Charset.forName("UTF-8"));
 
-    Assert.assertEquals(14, dockerCommands.size());
+    Assert.assertEquals(13, dockerCommands.size());
     Assert.assertEquals("[docker-command-execution]", dockerCommands.get(0));
     Assert.assertEquals("  cap-add=SYS_CHROOT,NET_BIND_SERVICE",
             dockerCommands.get(1));
     Assert.assertEquals("  cap-drop=ALL", dockerCommands.get(2));
     Assert.assertEquals("  detach=true", dockerCommands.get(3));
     Assert.assertEquals("  docker-command=run", dockerCommands.get(4));
-    Assert.assertEquals("  hostname=ctr-id", dockerCommands.get(5));
-    Assert.assertEquals("  image=busybox:latest", dockerCommands.get(6));
+    Assert.assertEquals("  image=busybox:latest", dockerCommands.get(5));
     Assert.assertEquals(
             "  launch-command=bash,/test_container_work_dir/launch_container.sh",
-            dockerCommands.get(7));
-    Assert.assertEquals("  name=container_id", dockerCommands.get(8));
-    Assert.assertEquals("  net=host", dockerCommands.get(9));
+            dockerCommands.get(6));
+    Assert.assertEquals("  name=container_id", dockerCommands.get(7));
+    Assert.assertEquals("  net=host", dockerCommands.get(8));
     Assert.assertEquals("  ro-mounts=/etc/passwd:/etc/passwd,/etc/krb5.conf:/etc/krb5.conf",
-            dockerCommands.get(10));
+            dockerCommands.get(9));
     Assert.assertEquals(
             "  rw-mounts=/test_container_local_dir:/test_container_local_dir,"
                     + "/test_filecache_dir:/test_filecache_dir,"
                     + "/test_container_work_dir:/test_container_work_dir,"
                     + "/test_container_log_dir:/test_container_log_dir,"
                     + "/test_user_local_dir:/test_user_local_dir",
-            dockerCommands.get(11));
-    Assert.assertEquals("  user=run_as_user", dockerCommands.get(12));
+            dockerCommands.get(10));
+    Assert.assertEquals("  user=run_as_user", dockerCommands.get(11));
     Assert.assertEquals("  workdir=/test_container_work_dir",
-            dockerCommands.get(13));
+            dockerCommands.get(12));
   }
 
   @Test
@@ -1073,30 +1069,29 @@ public class TestDockerContainerRuntime {
     List<String> dockerCommands = Files.readAllLines(
             Paths.get(dockerCommandFile), Charset.forName("UTF-8"));
 
-    Assert.assertEquals(13, dockerCommands.size());
+    Assert.assertEquals(12, dockerCommands.size());
     Assert.assertEquals("[docker-command-execution]", dockerCommands.get(0));
     Assert.assertEquals("  cap-add=SYS_CHROOT,NET_BIND_SERVICE",
             dockerCommands.get(1));
     Assert.assertEquals("  cap-drop=ALL", dockerCommands.get(2));
     Assert.assertEquals("  detach=true", dockerCommands.get(3));
     Assert.assertEquals("  docker-command=run", dockerCommands.get(4));
-    Assert.assertEquals("  hostname=ctr-id", dockerCommands.get(5));
-    Assert.assertEquals("  image=test-image-name:test-image-tag", dockerCommands.get(6));
+    Assert.assertEquals("  image=test-image-name:test-image-tag", dockerCommands.get(5));
     Assert.assertEquals(
             "  launch-command=bash,/test_container_work_dir/launch_container.sh",
-            dockerCommands.get(7));
-    Assert.assertEquals("  name=container_id", dockerCommands.get(8));
-    Assert.assertEquals("  net=host", dockerCommands.get(9));
+            dockerCommands.get(6));
+    Assert.assertEquals("  name=container_id", dockerCommands.get(7));
+    Assert.assertEquals("  net=host", dockerCommands.get(8));
     Assert.assertEquals(
             "  rw-mounts=/test_container_local_dir:/test_container_local_dir,"
                     + "/test_filecache_dir:/test_filecache_dir,"
                     + "/test_container_work_dir:/test_container_work_dir,"
                     + "/test_container_log_dir:/test_container_log_dir,"
                     + "/test_user_local_dir:/test_user_local_dir",
-            dockerCommands.get(10));
-    Assert.assertEquals("  user=run_as_user", dockerCommands.get(11));
+            dockerCommands.get(9));
+    Assert.assertEquals("  user=run_as_user", dockerCommands.get(10));
     Assert.assertEquals("  workdir=/test_container_work_dir",
-            dockerCommands.get(12));
+            dockerCommands.get(11));
   }
 
 //  @Test
