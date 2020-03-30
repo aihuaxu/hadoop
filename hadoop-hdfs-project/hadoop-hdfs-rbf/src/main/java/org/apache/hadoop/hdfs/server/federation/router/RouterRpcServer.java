@@ -33,6 +33,7 @@ import java.io.IOException;
 import java.lang.reflect.Array;
 import java.net.InetSocketAddress;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -1078,13 +1079,14 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol {
         rpcClient.invokeConcurrent(
             locations, method, false, false, DirectoryListing.class);
 
-    Map<String, HdfsFileStatus> nnListing = new TreeMap<>();
+    TreeMap<String, HdfsFileStatus> nnListing = new TreeMap<>();
     int totalRemainingEntries = 0;
     int remainingEntries = 0;
     boolean namenodeListingExists = false;
+    // Check the subcluster listing with the smallest name to make sure
+    // no file is skipped across subclusters
+    String lastName = null;
     if (listings != null) {
-      // Check the subcluster listing with the smallest name
-      String lastName = null;
       for (Entry<RemoteLocation, DirectoryListing> entry :
           listings.entrySet()) {
         RemoteLocation location = entry.getKey();
@@ -1126,6 +1128,10 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol {
 
     // Add mount points at this level in the tree
     final List<String> children = subclusterResolver.getMountPoints(src);
+    // Sort the list as the entries from subcluster are also sorted
+    if (children != null) {
+      Collections.sort(children);
+    }
     if (children != null) {
       // Get the dates for each mount point
       Map<String, Long> dates = getMountPointDates(src);
@@ -1139,9 +1145,27 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol {
         // TODO add number of children
         HdfsFileStatus dirStatus = getMountPointStatus(child, 0, date);
 
-        // This may overwrite existing listing entries with the mount point
-        // TODO don't add if already there?
-        nnListing.put(child, dirStatus);
+        // if there is no subcluster path, always add mount point
+        if (lastName == null) {
+          nnListing.put(child, dirStatus);
+        } else {
+          if (shouldAddMountPoint(child,
+              lastName, startAfter, remainingEntries)) {
+            // This may overwrite existing listing entries with the mount point
+            // TODO don't add if already there?
+            nnListing.put(child, dirStatus);
+          }
+        }
+      }
+      // Update the remaining count to include left mount points
+      if (nnListing.size() > 0) {
+        String lastListing = nnListing.lastKey();
+        for (int i = 0; i < children.size(); i++) {
+          if (children.get(i).compareTo(lastListing) > 0) {
+            remainingEntries += (children.size() - i);
+            break;
+          }
+        }
       }
     }
 
@@ -2343,6 +2367,36 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol {
       .fileId(inodeId)
       .children(childrenNum)
       .build();
+  }
+
+  /**
+   * Check if we should add the mount point into the total listing.
+   * This should be done under either of the two cases:
+   * 1) current mount point is between startAfter and cutoff lastEntry.
+   * 2) there are no remaining entries from subclusters and this mount
+   *    point is bigger than all files from subclusters
+   * This is to make sure that the following batch of
+   * getListing call will use the correct startAfter, which is lastEntry from
+   * subcluster.
+   *
+   * @param mountPoint to be added mount point inside router
+   * @param lastEntry biggest listing from subcluster
+   * @param startAfter starting listing from client, used to define listing
+   *                   start boundary
+   * @param remainingEntries how many entries left from subcluster
+   * @return
+   */
+  private static boolean shouldAddMountPoint(
+      String mountPoint, String lastEntry, byte[] startAfter,
+      int remainingEntries) {
+    if (mountPoint.compareTo(DFSUtil.bytes2String(startAfter)) > 0 &&
+        mountPoint.compareTo(lastEntry) <= 0) {
+      return true;
+    }
+    if (remainingEntries == 0 && mountPoint.compareTo(lastEntry) >= 0) {
+      return true;
+    }
+    return false;
   }
 
   /**
