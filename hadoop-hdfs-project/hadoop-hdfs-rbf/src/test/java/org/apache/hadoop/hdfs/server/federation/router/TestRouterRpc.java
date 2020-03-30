@@ -76,6 +76,7 @@ import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.server.federation.MiniRouterDFSCluster;
 import org.apache.hadoop.hdfs.server.federation.MiniRouterDFSCluster.NamenodeContext;
 import org.apache.hadoop.hdfs.server.federation.MiniRouterDFSCluster.RouterContext;
+import org.apache.hadoop.hdfs.server.federation.MockResolver;
 import org.apache.hadoop.hdfs.server.federation.RouterConfigBuilder;
 import org.apache.hadoop.hdfs.server.federation.metrics.NamenodeBeanMetrics;
 import org.apache.hadoop.hdfs.server.federation.resolver.FileSubclusterResolver;
@@ -150,6 +151,9 @@ public class TestRouterRpc {
     // We need 6 DNs to test Erasure Coding with RS-6-3-64k
     cluster.setNumDatanodesPerNameservice(6);
 
+    Configuration conf = new Configuration();
+    conf.setInt(DFSConfigKeys.DFS_LIST_LIMIT, 5);
+    cluster.addNamenodeOverrides(conf);
     // Start NNs and DNs and wait until ready
     cluster.startCluster();
 
@@ -377,6 +381,62 @@ public class TestRouterRpc {
     String badPath = "/unknownlocation/unknowndir";
     compareResponses(routerProtocol, nnProtocol, m,
         new Object[] {badPath, HdfsFileStatus.EMPTY_NAME, false});
+  }
+
+  @Test
+  public void testProxyListFilesLargeDir() throws IOException {
+    // Call listStatus against a dir with many files
+    // Create a parent point as well as a subfolder mount
+    // /parent
+    //    ns0 -> /parent
+    // /parent/file-7
+    //    ns0 -> /parent/file-7
+    // /parent/file-0
+    //    ns0 -> /parent/file-0
+    for (RouterContext rc : cluster.getRouters()) {
+      MockResolver resolver =
+          (MockResolver) rc.getRouter().getSubclusterResolver();
+      resolver.addLocation("/parent", ns, "/parent");
+      // file-0 is only in mount table
+      resolver.addLocation("/parent/file-0", ns, "/parent/file-0");
+      // file-7 is both in mount table and in file system
+      resolver.addLocation("/parent/file-7", ns, "/parent/file-7");
+    }
+
+    // Test the case when there is no subcluster path and only mount point
+    FileStatus[] result = routerFS.listStatus(new Path("/parent"));
+    assertEquals(2, result.length);
+    // this makes sure file[0-8] is added in order
+    assertEquals("file-0", result[0].getPath().getName());
+    assertEquals("file-7", result[1].getPath().getName());
+
+    // Create files and test full listing in order
+    NamenodeContext nn = cluster.getNamenode(ns, null);
+    FileSystem nnFileSystem = nn.getFileSystem();
+    for (int i = 1; i < 9; i++) {
+      createFile(nnFileSystem, "/parent/file-"+i, 32);
+    }
+
+    result = routerFS.listStatus(new Path("/parent"));
+    assertEquals(9, result.length);
+    // this makes sure file[0-8] is added in order
+    for (int i = 0; i < 9; i++) {
+      assertEquals("file-"+i, result[i].getPath().getName());
+    }
+
+    // Add file-9 and now this listing will be added from mount point
+    for (RouterContext rc : cluster.getRouters()) {
+      MockResolver resolver =
+          (MockResolver) rc.getRouter().getSubclusterResolver();
+      resolver.addLocation("/parent/file-9", ns, "/parent/file-9");
+    }
+    assertFalse(verifyFileExists(nnFileSystem, "/parent/file-9"));
+    result = routerFS.listStatus(new Path("/parent"));
+    // file-9 will be added by mount point
+    assertEquals(10, result.length);
+    for (int i = 0; i < 10; i++) {
+      assertEquals("file-"+i, result[i].getPath().getName());
+    }
   }
 
   @Test
