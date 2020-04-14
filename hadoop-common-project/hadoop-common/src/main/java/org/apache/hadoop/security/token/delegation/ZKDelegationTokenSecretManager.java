@@ -148,9 +148,6 @@ public abstract class ZKDelegationTokenSecretManager<TokenIdent extends Abstract
   private int currentSeqNum;
   private int currentMaxSeqNum;
 
-  private ZKDelegationTokenSecretManagerMetrics metric =
-      new ZKDelegationTokenSecretManagerMetrics();;
-
   public ZKDelegationTokenSecretManager(Configuration conf) {
     super(conf.getLong(DelegationTokenManager.UPDATE_INTERVAL,
         DelegationTokenManager.UPDATE_INTERVAL_DEFAULT) * 1000,
@@ -403,27 +400,26 @@ public abstract class ZKDelegationTokenSecretManager<TokenIdent extends Abstract
       tokenCache = new PathChildrenCache(zkClient, ZK_DTSM_TOKENS_ROOT, true);
       if (tokenCache != null) {
         tokenCache.start(StartMode.BUILD_INITIAL_CACHE);
-        // Remove the watches to zk
-//        tokenCache.getListenable().addListener(new PathChildrenCacheListener() {
-//
-//          @Override
-//          public void childEvent(CuratorFramework client,
-//              PathChildrenCacheEvent event) throws Exception {
-//            switch (event.getType()) {
-//            case CHILD_ADDED:
-//              processTokenAddOrUpdate(event.getData());
-//              break;
-//            case CHILD_UPDATED:
-//              processTokenAddOrUpdate(event.getData());
-//              break;
-//            case CHILD_REMOVED:
-//              processTokenRemoved(event.getData());
-//              break;
-//            default:
-//              break;
-//            }
-//          }
-//        }, listenerThreadPool);
+        tokenCache.getListenable().addListener(new PathChildrenCacheListener() {
+
+          @Override
+          public void childEvent(CuratorFramework client,
+              PathChildrenCacheEvent event) throws Exception {
+            switch (event.getType()) {
+            case CHILD_ADDED:
+              processTokenAddOrUpdate(event.getData());
+              break;
+            case CHILD_UPDATED:
+              processTokenAddOrUpdate(event.getData());
+              break;
+            case CHILD_REMOVED:
+              processTokenRemoved(event.getData());
+              break;
+            default:
+              break;
+            }
+          }
+        }, listenerThreadPool);
         loadFromZKCache(true);
       }
     } catch (Exception e) {
@@ -708,15 +704,8 @@ public abstract class ZKDelegationTokenSecretManager<TokenIdent extends Abstract
   protected DelegationTokenInformation getTokenInfo(TokenIdent ident) {
     // First check if I have this..
     DelegationTokenInformation tokenInfo = currentTokens.get(ident);
-
-    // Decide which op is calling this first
-    TokenOp op = OP_NAME.get();
-    if (op == null) {
-      op = TokenOp.READ;
-    }
     // Then query ZK
     if (tokenInfo == null) {
-      metric.addMiss(op);
       try {
         tokenInfo = getTokenInfoFromZK(ident);
         if (tokenInfo != null) {
@@ -726,8 +715,6 @@ public abstract class ZKDelegationTokenSecretManager<TokenIdent extends Abstract
         LOG.error("Error retrieving tokenInfo [" + ident.getSequenceNumber()
             + "] from ZK", e);
       }
-    } else {
-      metric.addHit(op);
     }
     return tokenInfo;
   }

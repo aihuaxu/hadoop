@@ -104,17 +104,6 @@ extends AbstractDelegationTokenIdentifier>
    */
   protected Object noInterruptsLock = new Object();
 
-  public enum TokenOp {
-    READ, RENEW, CANCEL
-  }
-
-  protected ThreadLocal<TokenOp> OP_NAME =
-      new ThreadLocal<>();
-
-  protected void setOpName(TokenOp op) {
-    OP_NAME.set(op);
-  }
-
   /**
    * Create a secret manager
    * @param delegationKeyUpdateInterval the number of milliseconds for rolling
@@ -537,7 +526,7 @@ extends AbstractDelegationTokenIdentifier>
     String trackingId = getTrackingIdIfEnabled(id);
     DelegationTokenInformation info = new DelegationTokenInformation(renewTime,
         password, trackingId);
-    setOpName(TokenOp.RENEW);
+
     if (getTokenInfo(id) == null) {
       throw new InvalidToken("Renewal request for unknown token "
           + formatTokenId(id));
@@ -573,11 +562,6 @@ extends AbstractDelegationTokenIdentifier>
             .equals(renewer.toString()))) {
       throw new AccessControlException(canceller
           + " is not authorized to cancel the token " + formatTokenId(id));
-    }
-    setOpName(TokenOp.CANCEL);
-    if (getTokenInfo(id) == null) {
-      throw new InvalidToken("Cancel request for unknown token "
-          + formatTokenId(id));
     }
     DelegationTokenInformation info = currentTokens.remove(id);
     if (info == null) {
