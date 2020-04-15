@@ -34,6 +34,9 @@ export DSC_SETUP_SCRIPT="/shared/dsc/configs/${ODIN_TECHNOLOGY}/setup-config.sh"
 export SSL_CLIENT="${HDFS_CONF_PATH}/ssl-client.xml"
 export SSL_SERVER="${HDFS_CONF_PATH}/ssl-server.xml"
 
+export CORE_SITE="${HDFS_CONF_PATH}/core-site.xml"
+export HDFS_SITE="${HDFS_CONF_PATH}/hdfs-site.xml"
+
 export LANGLEY_PATH='/langley/current/hdfs'
 export TRUSTSTORE_FILE="${LANGLEY_PATH}/hadoop_secure_webhdfs_truststore/truststore"
 export TRUSTSTORE_PSD="${LANGLEY_PATH}/hadoop_secure_webhdfs_truststore/password"
@@ -45,3 +48,9 @@ export SECURE_STORE_PATH='/opt/hadoop/keytabs'
 export HDFS_START_SCRIPT="${HDFS_PATH}/binary/sbin/hadoop-start.sh"
 export HDFS_CMD="${HDFS_PATH}/binary/bin/hdfs"
 export HADOOP_ENV="${HDFS_CONF_PATH}/hadoop-env.sh"
+
+export ODIN_SECRETS_WEBHDFS_PATH='/secrets/webhdfs'
+export ODIN_TRUSTSTORE_FILE="${ODIN_SECRETS_PATH}/truststore/truststore"
+export ODIN_TRUSTSTORE_PSD="${ODIN_SECRETS_PATH}/truststore/password"
+export ODIN_KEYSTORE_FILE="${ODIN_SECRETS_PATH}/keystore/keystore"
+export ODIN_KEYSTORE_PSD="${ODIN_SECRETS_PATH}/keystore/password"
