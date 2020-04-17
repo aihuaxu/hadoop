@@ -648,7 +648,11 @@ public class ResourceManager extends CompositeService implements Recoverable {
       }
       rmContext.setStateStore(rmStore);
 
-      if (UserGroupInformation.isSecurityEnabled()) {
+      boolean alwaysUseDelegationTokensForTests =
+              conf.getBoolean(YarnConfiguration.DELEGATION_TOKEN_ALWAYS_USE,
+                      YarnConfiguration.DEFAULT_DELEGATION_TOKEN_ALWAYS_USE);
+
+      if (alwaysUseDelegationTokensForTests || UserGroupInformation.isSecurityEnabled()) {
         delegationTokenRenewer = createDelegationTokenRenewer();
         rmContext.setDelegationTokenRenewer(delegationTokenRenewer);
       }

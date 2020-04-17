@@ -215,6 +215,7 @@ public class ClientRMService extends AbstractService implements
 
   private static final EnumSet<RMAppState> ACTIVE_APP_STATES = EnumSet.of(
       RMAppState.ACCEPTED, RMAppState.RUNNING);
+  private boolean alwaysUseDelegationTokensForTests = false; // HACK: for top-bottom security test only
 
   public ClientRMService(RMContext rmContext, YarnScheduler scheduler,
                          RMAppManager rmAppManager, ApplicationACLsManager applicationACLsManager,
@@ -256,6 +257,10 @@ public class ClientRMService extends AbstractService implements
                     conf, this.rmDTSecretManager,
                     conf.getInt(YarnConfiguration.RM_CLIENT_THREAD_COUNT,
                             YarnConfiguration.DEFAULT_RM_CLIENT_THREAD_COUNT));
+
+    alwaysUseDelegationTokensForTests =
+            conf.getBoolean(YarnConfiguration.DELEGATION_TOKEN_ALWAYS_USE,
+                    YarnConfiguration.DEFAULT_DELEGATION_TOKEN_ALWAYS_USE);
 
     // Enable service authorization?
     if (conf.getBoolean(
@@ -1247,6 +1252,10 @@ public class ClientRMService extends AbstractService implements
   }
 
   private boolean isAllowedDelegationTokenOp() throws IOException {
+    if (alwaysUseDelegationTokensForTests) {
+      return true;
+    }
+
     if (UserGroupInformation.isSecurityEnabled()) {
       return EnumSet.of(AuthenticationMethod.KERBEROS,
               AuthenticationMethod.KERBEROS_SSL,

@@ -115,6 +115,11 @@ public class YarnConfiguration extends Configuration {
       YarnConfiguration.NM_PREFIX + "log-container-debug-info.enabled";
 
   public static final boolean DEFAULT_NM_LOG_CONTAINER_DEBUG_INFO = false;
+  /** For security test only. Provide dummy delegation token for unsecured
+   * cluster */
+  public static final String DELEGATION_TOKEN_ALWAYS_USE =
+          YARN_PREFIX + "delegation.token.always-use";
+  public static final boolean DEFAULT_DELEGATION_TOKEN_ALWAYS_USE = false;
 
   ////////////////////////////////
   // IPC Configs

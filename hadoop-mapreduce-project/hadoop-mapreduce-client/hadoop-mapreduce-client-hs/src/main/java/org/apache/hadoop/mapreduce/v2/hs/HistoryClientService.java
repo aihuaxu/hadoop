@@ -81,6 +81,7 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.service.AbstractService;
+import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.factories.RecordFactory;
 import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
 import org.apache.hadoop.yarn.ipc.RPCUtil;
@@ -106,7 +107,9 @@ public class HistoryClientService extends AbstractService {
   private InetSocketAddress bindAddress;
   private HistoryContext history;
   private JHSDelegationTokenSecretManager jhsDTSecretManager;
-  
+
+  private boolean alwaysUseDelegationTokensForTests =false;
+
   public HistoryClientService(HistoryContext history,
       JHSDelegationTokenSecretManager jhsDTSecretManager) {
     super("HistoryClientService");
@@ -130,6 +133,10 @@ public class HistoryClientService extends AbstractService {
             conf, jhsDTSecretManager,
             conf.getInt(JHAdminConfig.MR_HISTORY_CLIENT_THREAD_COUNT,
                 JHAdminConfig.DEFAULT_MR_HISTORY_CLIENT_THREAD_COUNT));
+
+    alwaysUseDelegationTokensForTests =
+            conf.getBoolean(YarnConfiguration.DELEGATION_TOKEN_ALWAYS_USE,
+                    YarnConfiguration.DEFAULT_DELEGATION_TOKEN_ALWAYS_USE);
 
     // Enable service authorization?
     if (conf.getBoolean(
@@ -428,6 +435,8 @@ public class HistoryClientService extends AbstractService {
     }
 
     private boolean isAllowedDelegationTokenOp() throws IOException {
+      if (alwaysUseDelegationTokensForTests) return true;
+
       if (UserGroupInformation.isSecurityEnabled()) {
         return EnumSet.of(AuthenticationMethod.KERBEROS,
                           AuthenticationMethod.KERBEROS_SSL,

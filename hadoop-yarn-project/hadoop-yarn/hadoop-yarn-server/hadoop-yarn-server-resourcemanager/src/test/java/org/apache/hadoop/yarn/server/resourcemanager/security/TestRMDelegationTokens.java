@@ -164,6 +164,38 @@ public class TestRMDelegationTokens {
     rm1.stop();
   }
 
+  // Test fake delegation token is generated when DELEGATION_TOKEN_ALWAYS_USE is
+  // true on non secured cluster
+  @Test(timeout = 15000)
+  public void testFakeDelegationOnNonSecuredCluster() throws Exception {
+    YarnConfiguration conf = new YarnConfiguration();
+    conf.setBoolean(YarnConfiguration.DELEGATION_TOKEN_ALWAYS_USE, true);
+    UserGroupInformation.setConfiguration(conf);
+    conf.set(YarnConfiguration.RM_STORE, MemoryRMStateStore.class.getName());
+
+    MemoryRMStateStore memStore = new MemoryRMStateStore();
+    memStore.init(conf);
+
+    MockRM rm1 = new MyMockRM(conf, memStore);
+    rm1.start();
+
+    // request to generate a RMDelegationToken
+    GetDelegationTokenRequest request = mock(GetDelegationTokenRequest.class);
+    when(request.getRenewer()).thenReturn("renewer1");
+    GetDelegationTokenResponse response =
+            rm1.getClientRMService().getDelegationToken(request);
+    org.apache.hadoop.yarn.api.records.Token delegationToken =
+            response.getRMDelegationToken();
+    Token<RMDelegationTokenIdentifier> token1 =
+            ConverterUtils.convertFromYarn(delegationToken, (Text) null);
+    RMDelegationTokenIdentifier dtId1 = token1.decodeIdentifier();
+
+    Assert.assertNotNull(dtId1);
+    Assert.assertEquals("renewer1", dtId1.getRenewer().toString());
+
+    rm1.stop();
+  }
+
   class MyMockRM extends TestSecurityMockRM {
 
     public MyMockRM(Configuration conf, RMStateStore store) {
