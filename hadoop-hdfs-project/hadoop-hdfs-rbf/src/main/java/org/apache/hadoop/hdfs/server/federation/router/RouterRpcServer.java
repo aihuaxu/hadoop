@@ -2352,7 +2352,7 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol {
       owner = ugi.getUserName();
       group = ugi.getPrimaryGroupName();
     } catch (IOException e) {
-      LOG.error("Cannot get the remote user: {}", e.getMessage());
+      LOG.debug("Cannot get the remote user: {}", e.getMessage());
     }
     long inodeId = 0;
     return new HdfsFileStatus.Builder()
