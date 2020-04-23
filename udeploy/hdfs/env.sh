@@ -54,3 +54,6 @@ export ODIN_TRUSTSTORE_FILE="${ODIN_SECRETS_PATH}/truststore/truststore"
 export ODIN_TRUSTSTORE_PSD="${ODIN_SECRETS_PATH}/truststore/password"
 export ODIN_KEYSTORE_FILE="${ODIN_SECRETS_PATH}/keystore/keystore"
 export ODIN_KEYSTORE_PSD="${ODIN_SECRETS_PATH}/keystore/password"
+
+export KRB5_CONF_TEMPLATE="krb5.conf.template"
+export KRB5_CONF_PATH="/etc/krb5.conf"
