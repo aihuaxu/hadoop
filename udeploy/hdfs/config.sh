@@ -66,6 +66,17 @@ config_secrets() {
 
   # set permissions for secrets
   sudo chown -R udocker:udocker ${SECURE_STORE_PATH}
+
+  # set permissions for data dirs
+  # secure cluster should have HDFS_KEYTAB_PATH exported by Odin HDFS worker.
+  if [ -f "${HDFS_KEYTAB_PATH}" ]; then
+    for dir in $(ls / | grep data[0-9][0-9]); do
+      target_dir="/${dir}/dfs"
+      if [ -d "${target_dir}" ]; then
+        sudo chmod 700 ${target_dir}
+      fi
+    done
+  fi
 }
 
 setup_production_kdc_env() {
