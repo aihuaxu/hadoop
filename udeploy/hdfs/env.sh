@@ -50,10 +50,10 @@ export HDFS_CMD="${HDFS_PATH}/binary/bin/hdfs"
 export HADOOP_ENV="${HDFS_CONF_PATH}/hadoop-env.sh"
 
 export ODIN_SECRETS_WEBHDFS_PATH='/secrets/webhdfs'
-export ODIN_TRUSTSTORE_FILE="${ODIN_SECRETS_PATH}/truststore/truststore"
-export ODIN_TRUSTSTORE_PSD="${ODIN_SECRETS_PATH}/truststore/password"
-export ODIN_KEYSTORE_FILE="${ODIN_SECRETS_PATH}/keystore/keystore"
-export ODIN_KEYSTORE_PSD="${ODIN_SECRETS_PATH}/keystore/password"
+export ODIN_TRUSTSTORE_FILE="${ODIN_SECRETS_WEBHDFS_PATH}/truststore/truststore"
+export ODIN_TRUSTSTORE_PSD="${ODIN_SECRETS_WEBHDFS_PATH}/truststore/password"
+export ODIN_KEYSTORE_FILE="${ODIN_SECRETS_WEBHDFS_PATH}/keystore/keystore"
+export ODIN_KEYSTORE_PSD="${ODIN_SECRETS_WEBHDFS_PATH}/keystore/password"
 
 export KRB5_CONF_TEMPLATE="krb5.conf.template"
 export KRB5_CONF_PATH="/etc/krb5.conf"
