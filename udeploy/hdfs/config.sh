@@ -61,8 +61,8 @@ config_secrets() {
   fi 
 
   # update hostname placeholder in principal value in core/hdfs-site.xml, use system HOSTNAME env.
-  [ -f ${CORE_SITE} ] && sed -i "s|HOSTNAME|${HOSTNAME}|" ${CORE_SITE}
-  [ -f ${HDFS_SITE} ] && sed -i "s|HOSTNAME|${HOSTNAME}|" ${HDFS_SITE}
+  [ -f ${CORE_SITE} ] && sed -i "s|HOSTNAME|${HOSTNAME}|g" ${CORE_SITE}
+  [ -f ${HDFS_SITE} ] && sed -i "s|HOSTNAME|${HOSTNAME}|g" ${HDFS_SITE}
 
   # set permissions for secrets
   sudo chown -R udocker:udocker ${SECURE_STORE_PATH}
@@ -85,14 +85,18 @@ setup_production_kdc_env() {
     fi
 
     export KRB_KDC_REALM='DATASRE.PROD.UBER.INTERNAL'
-    export KRB_KDC_HOST_ADDR="hadoopkdc-${UBER_REGION}.uber.internal"
+    # Use single host for testing purpose as KDC DNS is not resolvable in Crane Prod.
+    # Will switch to "hadoopkdc-${UBER_REGION}.uber.internal" once resolved.
+    export KRB_KDC_HOST_ADDR="hadoopldap06-dca8.prod.uber.internal"
     export KRB_ADMIN_SERVER_HOST_ADDR='hadoopldap00-phx2.prod.uber.internal'
     export KRB_DOMAIN_REALM='prod.uber.internal'
 }
 
 setup_staging_kdc_env() {
     export KRB_KDC_REALM='DATA.STAGING.UBER.INTERNAL'
-    export KRB_KDC_HOST_ADDR="hadoopkdcstaging-phx.uber.internal"
+    # Use single host for testing purpose as KDC DNS is not resolvable in Crane Prod.
+    # Will switch to "hadoopkdcstaging-phx.uber.internal" once resolved.
+    export KRB_KDC_HOST_ADDR="hadoopkdcstaging01-phx2.prod.uber.internal"
     export KRB_ADMIN_SERVER_HOST_ADDR='hadoopkdcstaging01-phx2.prod.uber.internal'
     export KRB_DOMAIN_REALM='prod.uber.internal'
 }
@@ -106,8 +110,10 @@ config_krb5_conf() {
   fi
   
   sudo rm -f "${KRB5_CONF_PATH}"
-  sudo install -o udocker -g udocker -m 644 /dev/null /etc/krb5.conf
-  envsubst < "${KRB5_CONF_TEMPLATE}" > "${KRB5_CONF_PATH}"
+  dir=$(dirname "$0")
+  sudo install -o udocker -g udocker -m 666 /dev/null "${KRB5_CONF_PATH}"
+  envsubst < "${dir}/${KRB5_CONF_TEMPLATE}" > "${KRB5_CONF_PATH}"
+  sudo chmod 644 "${KRB5_CONF_PATH}"
 }
 
 config_hdfs_conf
