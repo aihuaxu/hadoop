@@ -108,14 +108,7 @@ for i in "$@"; do
     --snappylibbundle=*)
       SNAPPYLIBBUNDLE=${i#*=}
     ;;
-    --zstdbinbundle=*)
-      ZSTDBINBUNDLE=${i#*=}
-    ;;
-    --zstdlib=*)
-      ZSTDLIB=${i#*=}
-    ;;
-    --zstdlibbundle=*)
-      ZSTDLIBBUNDLE=${i#*=}
+
   esac
 done
 
@@ -140,8 +133,6 @@ if [[ -d "${LIB_DIR}" ]]; then
 
   bundle_native_lib "${SNAPPYLIBBUNDLE}" "snappy.lib" "snappy" "${SNAPPYLIB}"
 
-  bundle_native_lib "${ZSTDLIBBUNDLE}" "zstd.lib" "zstd" "${ZSTDLIB}"
-
   bundle_native_lib "${OPENSSLLIBBUNDLE}" "openssl.lib" "crypto" "${OPENSSLLIB}"
 fi
 
@@ -159,8 +150,6 @@ if [[ -d "${BIN_DIR}" ]] ; then
   fi
 
   bundle_native_bin "${SNAPPYBINBUNDLE}" "${SNAPPYLIBBUNDLE}" "snappy.lib" "snappy" "${SNAPPYLIB}"
-
-  bundle_native_bin "${ZSTDBINBUNDLE}" "${ZSTDLIBBUNDLE}" "zstd.lib" "zstd" "${ZSTDLIB}"
 
   bundle_native_bin "${OPENSSLBINBUNDLE}" "${OPENSSLLIBBUNDLE}" "openssl.lib" "crypto" "${OPENSSLLIB}"
 

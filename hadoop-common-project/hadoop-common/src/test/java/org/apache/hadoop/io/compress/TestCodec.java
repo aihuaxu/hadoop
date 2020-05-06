@@ -75,7 +75,6 @@ import org.junit.Assert;
 import org.junit.Assume;
 import org.junit.Test;
 import static org.junit.Assert.*;
-import static org.junit.Assume.assumeTrue;
 
 public class TestCodec {
 
@@ -537,18 +536,6 @@ public class TestCodec {
     }
   }
 
-  @Test(timeout=20000)
-  public void testSequenceFileZStandardCodec() throws Exception {
-    assumeTrue(ZStandardCodec.isNativeCodeLoaded());
-    Configuration conf = new Configuration();
-    sequenceFileCodecTest(conf, 0,
-        "org.apache.hadoop.io.compress.ZStandardCodec", 100);
-    sequenceFileCodecTest(conf, 100,
-        "org.apache.hadoop.io.compress.ZStandardCodec", 100);
-    sequenceFileCodecTest(conf, 200000,
-        "org.apache.hadoop.io.compress.ZStandardCodec", 1000000);
-  }
-
   @Test
   public void testSequenceFileDeflateCodec() throws IOException, ClassNotFoundException,
       InstantiationException, IllegalAccessException {
@@ -611,7 +598,7 @@ public class TestCodec {
    */
   @Test
   public void testSnappyMapFile() throws Exception {
-    assumeTrue(SnappyCodec.isNativeCodeLoaded());
+    Assume.assumeTrue(SnappyCodec.isNativeCodeLoaded());
     codecTestMapFile(SnappyCodec.class, CompressionType.BLOCK, 100);
   }
   

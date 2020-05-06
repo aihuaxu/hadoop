@@ -20,8 +20,6 @@ java_8_standard:
 debian_packages_for_build:
   - name: cron
   - name: curl
-  - name: gettext-base
-  - name: krb5-user
   - name: sudo
   - name: tar
   - name: wget
