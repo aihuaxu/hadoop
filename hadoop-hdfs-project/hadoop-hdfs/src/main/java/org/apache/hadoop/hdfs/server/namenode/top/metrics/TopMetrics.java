@@ -70,6 +70,8 @@ public class TopMetrics implements MetricsSource {
   public static final Logger LOG = LoggerFactory.getLogger(TopMetrics.class);
   public static final String TOPMETRICS_METRICS_SOURCE_NAME =
       "NNTopUserOpCounts";
+  public static final String FILES_IN_LISTINGS_CMD =
+      "filesInListing";
   private final boolean isMetricsSourceEnabled;
 
   private static void logConf(Configuration conf) {
@@ -131,14 +133,29 @@ public class TopMetrics implements MetricsSource {
     report(currTime, userName, cmd);
   }
 
+  /**
+   * Record number of files (represented by 'delta') in listing op
+   * for the given 'userName'.
+   */
+  public void reportFilesInListings(String userName, long delta) {
+    long currTime = Time.monotonicNow();
+    report(currTime, userName, FILES_IN_LISTINGS_CMD, delta, false);
+  }
+
   public void report(long currTime, String userName, String cmd) {
+    report(currTime, userName, cmd, 1, true);
+  }
+  public void report(long currTime, String userName, String cmd,
+      long delta, boolean reportAll) {
     LOG.debug("a metric is reported: cmd: {} user: {}", cmd, userName);
     userName = UserGroupInformation.trimLoginMethod(userName);
     for (RollingWindowManager rollingWindowManager : rollingWindowManagers
         .values()) {
-      rollingWindowManager.recordMetric(currTime, cmd, userName, 1);
-      rollingWindowManager.recordMetric(currTime,
-          TopConf.ALL_CMDS, userName, 1);
+      rollingWindowManager.recordMetric(currTime, cmd, userName, delta);
+      if (reportAll) {
+        rollingWindowManager.recordMetric(currTime,
+            TopConf.ALL_CMDS, userName, delta);
+      }
     }
   }
 

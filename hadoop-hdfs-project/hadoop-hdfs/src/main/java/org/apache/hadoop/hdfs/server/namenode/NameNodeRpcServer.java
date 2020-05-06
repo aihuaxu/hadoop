@@ -137,6 +137,7 @@ import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.NamenodeRole;
 import org.apache.hadoop.hdfs.server.common.IncorrectVersionException;
 import org.apache.hadoop.hdfs.server.namenode.NameNode.OperationCategory;
 import org.apache.hadoop.hdfs.server.namenode.metrics.NameNodeMetrics;
+import org.apache.hadoop.hdfs.server.namenode.top.metrics.TopMetrics;
 import org.apache.hadoop.hdfs.server.protocol.BlockReportContext;
 import org.apache.hadoop.hdfs.server.protocol.BlocksWithLocations;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeCommand;
@@ -1098,6 +1099,12 @@ public class NameNodeRpcServer implements NamenodeProtocols {
     if (files != null) {
       metrics.incrGetListingOps();
       metrics.incrFilesInGetListingOps(files.getPartialListing().length);
+      UserGroupInformation ugi = Server.getRemoteUser();
+      TopMetrics topMetrics = namesystem.getTopMetrics();
+      if (topMetrics != null) {
+        topMetrics.reportFilesInListings(
+            ugi != null ? ugi.toString() : "null", files.getPartialListing().length);
+      }
     }
     return files;
   }
