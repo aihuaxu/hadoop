@@ -640,6 +640,10 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     return haEnabled;
   }
 
+  TopMetrics getTopMetrics() {
+    return this.topMetrics;
+  }
+
   /**
    * Check the supplied configuration for correctness.
    * @param conf Supplies the configuration to validate.

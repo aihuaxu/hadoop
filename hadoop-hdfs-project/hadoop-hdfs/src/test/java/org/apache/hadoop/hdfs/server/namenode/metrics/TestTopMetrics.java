@@ -59,5 +59,36 @@ public class TestTopMetrics {
 
     verify(rb, times(3)).addCounter(Interns.info("op=listStatus." +
         "user=test.count", "Total operations performed by user"), 3L);
+ }
+
+  @Test
+  public void testFilesInListingOps() {
+    Configuration conf = new Configuration();
+    TopConf topConf = new TopConf(conf);
+    TopMetrics topMetrics = new TopMetrics(conf,
+        topConf.nntopReportingPeriodsMs);
+    // Dummy command
+    topMetrics.report("test", "listStatus");
+    topMetrics.reportFilesInListings("test", 100);
+    topMetrics.reportFilesInListings("test", 500);
+    topMetrics.reportFilesInListings("test", 1000);
+
+    MetricsRecordBuilder rb = getMetrics(topMetrics);
+    MetricsCollector mc = rb.parent();
+
+    verify(mc).addRecord(TOPMETRICS_METRICS_SOURCE_NAME + ".windowMs=60000");
+    verify(mc).addRecord(TOPMETRICS_METRICS_SOURCE_NAME + ".windowMs=300000");
+    verify(mc).addRecord(TOPMETRICS_METRICS_SOURCE_NAME + ".windowMs=1500000");
+
+    verify(rb, times(3)).addCounter(Interns.info("op="+
+            TopMetrics.FILES_IN_LISTINGS_CMD+".TotalCount",
+        "Total operation count"), 1600L);
+    // total count should not include files in listing command
+    verify(rb, times(3)).addCounter(Interns.info("op=*.TotalCount",
+        "Total operation count"), 1L);
+
+    verify(rb, times(3)).addCounter(Interns.info("op="+
+        TopMetrics.FILES_IN_LISTINGS_CMD+".user=test.count",
+        "Total operations performed by user"), 1600L);
   }
 }
