@@ -85,18 +85,14 @@ setup_production_kdc_env() {
     fi
 
     export KRB_KDC_REALM='DATASRE.PROD.UBER.INTERNAL'
-    # Use single host for testing purpose as KDC DNS is not resolvable in Crane Prod.
-    # Will switch to "hadoopkdc-${UBER_REGION}.uber.internal" once resolved.
-    export KRB_KDC_HOST_ADDR="hadoopldap06-dca8.prod.uber.internal"
+    export KRB_KDC_HOST_ADDR="hadoopkdc-${UBER_REGION}.uber.internal"
     export KRB_ADMIN_SERVER_HOST_ADDR='hadoopldap00-phx2.prod.uber.internal'
     export KRB_DOMAIN_REALM='prod.uber.internal'
 }
 
 setup_staging_kdc_env() {
     export KRB_KDC_REALM='DATA.STAGING.UBER.INTERNAL'
-    # Use single host for testing purpose as KDC DNS is not resolvable in Crane Prod.
-    # Will switch to "hadoopkdcstaging-phx.uber.internal" once resolved.
-    export KRB_KDC_HOST_ADDR="hadoopkdcstaging01-phx2.prod.uber.internal"
+    export KRB_KDC_HOST_ADDR="hadoopkdcstaging-phx.uber.internal"
     export KRB_ADMIN_SERVER_HOST_ADDR='hadoopkdcstaging01-phx2.prod.uber.internal'
     export KRB_DOMAIN_REALM='prod.uber.internal'
 }
