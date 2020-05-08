@@ -59,6 +59,7 @@ RUN apt-get -q update \
         libprotobuf-dev \
         libprotoc-dev \
         libsasl2-dev \
+        libsnappy-dev \
         libssl-dev \
         libtool \
         libzstd1-dev \
@@ -74,15 +75,11 @@ RUN apt-get -q update \
         python-wheel \
         rsync \
         software-properties-common \
+        snappy \
         sudo \
         zlib1g-dev \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
-
-RUN curl http://launchpadlibrarian.net/160159422/libsnappy-dev_1.1.0-1ubuntu1_amd64.deb -o libsnappy-dev.deb
-RUN curl http://launchpadlibrarian.net/160159423/libsnappy1_1.1.0-1ubuntu1_amd64.deb -o libsnappy1.deb
-RUN dpkg -i libsnappy1.deb
-RUN dpkg -i libsnappy-dev.deb
 
 #######
 # OpenJDK 7
