@@ -166,6 +166,10 @@ public class CapacityScheduler extends
   // timeout to join when we stop this service
   protected final long THREAD_JOIN_TIMEOUT_MS = 1000;
 
+  private final int MAXIMUM_ALLOCATION_QUEUE_SORTING_EXCEPTIONS = 3;
+
+  private int allocationQueueSortingExceptions = 0;
+
   private PreemptionManager preemptionManager = new PreemptionManager();
 
   private volatile boolean isLazyPreemptionEnabled = false;
@@ -1099,9 +1103,23 @@ public class CapacityScheduler extends
         updateSchedulerHealth(lastNodeUpdateTime, rmNode.getNodeID(),
             CSAssignment.NULL_ASSIGNMENT);
 
-        allocateContainersToNode(rmNode.getNodeID(), true);
-        ActivitiesLogger.NODE.finishNodeUpdateRecording(activitiesManager,
+        try {
+          allocateContainersToNode(rmNode.getNodeID(), true);
+          ActivitiesLogger.NODE.finishNodeUpdateRecording(activitiesManager,
             rmNode.getNodeID());
+        } catch (IllegalArgumentException ex) {
+          allocationQueueSortingExceptions++;
+          String sortingError = "Comparison exception happened when sorting children queues.";
+          if (ex.getMessage().toLowerCase().startsWith(sortingError.toLowerCase())
+            && (allocationQueueSortingExceptions <= MAXIMUM_ALLOCATION_QUEUE_SORTING_EXCEPTIONS)) {
+            String error = String.format("Queue sorting comparison exception happened, "
+              + "skipping node update event - #%d time, RM node: %s, node labels: %s",
+              allocationQueueSortingExceptions, rmNode, rmNode.getNodeLabels());
+            LOG.error(error, ex);
+          } else {
+            throw ex;
+          }
+        }
       } finally {
         writeLock.unlock();
       }

@@ -719,7 +719,20 @@ public class ParentQueue extends AbstractCSQueue {
 
   private Iterator<CSQueue> sortAndGetChildrenAllocationIterator(
       String partition) {
-    return queueOrderingPolicy.getAssignmentIterator(partition);
+    Iterator<CSQueue> queueIterator;
+    try {
+      queueIterator = queueOrderingPolicy.getAssignmentIterator(partition);
+    } catch (IllegalArgumentException ex) {
+      if (ex.getMessage().equals("Comparison method violates its general contract!")) {
+        String error = String.format("Comparison exception happened when sorting children queues. "
+            + " Queue ordering policy: %s, parent queue: %s, children: %s",
+          queueOrderingPolicy, getQueuePath(), getChildQueuesToPrint());
+        throw new IllegalArgumentException(error, ex);
+      } else {
+        throw ex;
+      }
+    }
+    return queueIterator;
   }
 
   private CSAssignment assignContainersToChildQueues(Resource cluster,
@@ -788,10 +801,10 @@ public class ParentQueue extends AbstractCSQueue {
     StringBuilder sb = new StringBuilder();
     for (CSQueue q : childQueues) {
       sb.append(q.getQueuePath() + 
-          "usedCapacity=(" + q.getUsedCapacity() + "), " + 
+          ", usedCapacity=(" + q.getUsedCapacity() + ")," +
           " label=("
-          + StringUtils.join(q.getAccessibleNodeLabels().iterator(), ",") 
-          + ")");
+          + StringUtils.join(q.getAccessibleNodeLabels().iterator(), ",")
+          + "); ");
     }
     return sb.toString();
   }
