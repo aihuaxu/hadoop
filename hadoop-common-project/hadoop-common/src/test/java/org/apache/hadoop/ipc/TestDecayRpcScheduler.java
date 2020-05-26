@@ -245,15 +245,15 @@ public class TestDecayRpcScheduler {
         .DECAYSCHEDULER_BLACKLISTED_USERS, "A");
     scheduler = new DecayRpcScheduler(2, namespace, conf);
 
-    assertEquals(0, scheduler.getPriorityLevel(mockCall("A")));
+    assertEquals(1, scheduler.getPriorityLevel(mockCall("A")));
     assertEquals(1, scheduler.getPriorityLevel(mockCall("A")));
     assertEquals(0, scheduler.getPriorityLevel(mockCall("B")));
     assertEquals(0, scheduler.getPriorityLevel(mockCall("B")));
     assertEquals(0, scheduler.getPriorityLevel(mockCall("C")));
     assertEquals(0, scheduler.getPriorityLevel(mockCall("C")));
-    assertEquals(0, scheduler.getPriorityLevel(mockCall("A")));
-    assertEquals(0, scheduler.getPriorityLevel(mockCall("A")));
-    assertEquals(0, scheduler.getPriorityLevel(mockCall("A")));
+    assertEquals(1, scheduler.getPriorityLevel(mockCall("A")));
+    assertEquals(1, scheduler.getPriorityLevel(mockCall("A")));
+    assertEquals(1, scheduler.getPriorityLevel(mockCall("A")));
     assertEquals(1, scheduler.getPriorityLevel(mockCall("A")));
 
     MBeanServer mbs = ManagementFactory.getPlatformMBeanServer();
@@ -286,15 +286,15 @@ public class TestDecayRpcScheduler {
         .DECAYSCHEDULER_BLACKLISTED_USERS, "A");
     scheduler = new DecayRpcScheduler(2, namespace, conf);
 
-    assertEquals(0, scheduler.getPriorityLevel(mockCall("A")));
+    assertEquals(1, scheduler.getPriorityLevel(mockCall("A")));
     assertEquals(1, scheduler.getPriorityLevel(mockCall("A")));
     assertEquals(0, scheduler.getPriorityLevel(mockCall("B")));
     assertEquals(0, scheduler.getPriorityLevel(mockCall("B")));
     assertEquals(0, scheduler.getPriorityLevel(mockCall("C")));
     assertEquals(0, scheduler.getPriorityLevel(mockCall("C")));
-    assertEquals(0, scheduler.getPriorityLevel(mockCall("A")));
-    assertEquals(0, scheduler.getPriorityLevel(mockCall("A")));
-    assertEquals(0, scheduler.getPriorityLevel(mockCall("A")));
+    assertEquals(1, scheduler.getPriorityLevel(mockCall("A")));
+    assertEquals(1, scheduler.getPriorityLevel(mockCall("A")));
+    assertEquals(1, scheduler.getPriorityLevel(mockCall("A")));
     assertEquals(1, scheduler.getPriorityLevel(mockCall("A")));
 
     scheduler.deleteFromBlackList("A");

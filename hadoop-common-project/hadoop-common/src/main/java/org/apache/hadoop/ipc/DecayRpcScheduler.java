@@ -185,6 +185,11 @@ public class DecayRpcScheduler implements RpcScheduler,
   private boolean blacklistEnabled;
   private Set<String> blacklistedUsers;
 
+  // Counter for calculated priority not equal to the blacklisted priority
+  // blacklist priority == lowest priority == numLevels-1
+  private final ConcurrentHashMap<String, AtomicLong>
+      outOfBlacklistPriorityCount = new ConcurrentHashMap<>();
+
   /**
    * This TimerTask will call decayCurrentCounts until
    * the scheduler has been garbage collected.
@@ -605,9 +610,22 @@ public class DecayRpcScheduler implements RpcScheduler,
 
     // (POC feature flag) if this user is not in the blacklist,
     // always put it into the first queue as if there is no fair call queue
-    if (this.blacklistEnabled && !this.blacklistedUsers.contains(identity)) {
-      return 0;
+    if (this.blacklistEnabled) {
+      if (!this.blacklistedUsers.contains(identity)) {
+        return 0;
+      } else {
+        // for simplicity, blacklisted users should be directly put into lowest
+        // queue
+        if (computedPriority != this.numLevels-1) {
+          // this check should not be necessary but just in case
+          if (this.outOfBlacklistPriorityCount.containsKey(identity)) {
+            this.outOfBlacklistPriorityCount.get(identity).getAndIncrement();
+          }
+          return this.numLevels-1;
+        }
+      }
     }
+
     return computedPriority;
   }
 
@@ -615,11 +633,13 @@ public class DecayRpcScheduler implements RpcScheduler,
   public void addToBlackList(String identity) {
     LOG.info("User {} is added to the blacklist", identity);
     this.blacklistedUsers.add(identity);
+    this.outOfBlacklistPriorityCount.putIfAbsent(identity, new AtomicLong());
   }
 
   @Override
   public void deleteFromBlackList(String identity) {
     if (this.blacklistedUsers.remove(identity)) {
+      this.outOfBlacklistPriorityCount.remove(identity);
       LOG.info("User {} is removed from the blacklist", identity);
     } else {
       LOG.info("Noop since user {} is not in the blacklist.", identity);
@@ -906,6 +926,7 @@ public class DecayRpcScheduler implements RpcScheduler,
       addAvgResponseTimePerPriority(rb);
       addCallVolumePerPriority(rb);
       addRawCallVolume(rb);
+      addBlackListedUserPriorityMissCount(rb);
     } catch (Exception e) {
       LOG.warn("Exception thrown while metric collection. Exception : "
           + e.getMessage());
@@ -981,6 +1002,16 @@ public class DecayRpcScheduler implements RpcScheduler,
       }
     }
     return topNCallers;
+  }
+
+  private void addBlackListedUserPriorityMissCount(MetricsRecordBuilder rb) {
+    for (Map.Entry<String, AtomicLong> entry :
+        outOfBlacklistPriorityCount.entrySet()) {
+      String caller = "BlacklistedCaller(" + entry.getKey() + ")";
+      String callerMissedCount = caller + ".MissedPriorityCount";
+      rb.addCounter(Interns.info(callerMissedCount, callerMissedCount),
+          entry.getValue().longValue());
+    }
   }
 
   public String getSchedulingDecisionSummary() {
