@@ -246,14 +246,14 @@ public class TestDecayRpcScheduler {
         .DECAYSCHEDULER_BLACKLISTED_USERS, "A");
     scheduler = new DecayRpcScheduler(2, namespace, conf);
 
-    assertEquals(0, getPriorityIncrementCallCount("A"));
+    assertEquals(1, getPriorityIncrementCallCount("A"));
     assertEquals(1, getPriorityIncrementCallCount("A"));
     assertEquals(0, getPriorityIncrementCallCount("B"));
     assertEquals(0, getPriorityIncrementCallCount("B"));
     assertEquals(0, getPriorityIncrementCallCount("C"));
     assertEquals(0, getPriorityIncrementCallCount("C"));
-    assertEquals(0, getPriorityIncrementCallCount("A"));
-    assertEquals(0, getPriorityIncrementCallCount("A"));
+    assertEquals(1, getPriorityIncrementCallCount("A"));
+    assertEquals(1, getPriorityIncrementCallCount("A"));
     assertEquals(1, getPriorityIncrementCallCount("A"));
     assertEquals(1, getPriorityIncrementCallCount("A"));
 
@@ -287,14 +287,14 @@ public class TestDecayRpcScheduler {
         .DECAYSCHEDULER_BLACKLISTED_USERS, "A");
     scheduler = new DecayRpcScheduler(2, namespace, conf);
 
-    assertEquals(0, getPriorityIncrementCallCount("A"));
+    assertEquals(1, getPriorityIncrementCallCount("A"));
     assertEquals(1, getPriorityIncrementCallCount("A"));
     assertEquals(0, getPriorityIncrementCallCount("B"));
     assertEquals(0, getPriorityIncrementCallCount("B"));
     assertEquals(0, getPriorityIncrementCallCount("C"));
     assertEquals(0, getPriorityIncrementCallCount("C"));
-    assertEquals(0, getPriorityIncrementCallCount("A"));
-    assertEquals(0, getPriorityIncrementCallCount("A"));
+    assertEquals(1, getPriorityIncrementCallCount("A"));
+    assertEquals(1, getPriorityIncrementCallCount("A"));
     assertEquals(1, getPriorityIncrementCallCount("A"));
     assertEquals(1, getPriorityIncrementCallCount("A"));
 
