@@ -686,7 +686,7 @@ public class TestRMNodeTransitions {
     RMNodeImpl node = getRunningNode();
     rmContext.getRMNodes().put(node.getNodeID(), node);
 
-    NodeHealthStatus status = NodeHealthStatus.newInstance(true, "NODE_STRESSED",
+    NodeHealthStatus status = NodeHealthStatus.newInstance(false, "NODE_STRESSED;unhealthy",
             System.currentTimeMillis());
     NodeStatus nodeStatus = NodeStatus.newInstance(node.getNodeID(), 0,
             null, null, status, null, null,
@@ -694,7 +694,7 @@ public class TestRMNodeTransitions {
     node.handle(new RMNodeStatusEvent(node.getNodeID(), nodeStatus, null));
 
     // Change in the node running status
-    Assert.assertEquals(NodeState.RUNNING, node.getState());
+    Assert.assertEquals(NodeState.UNHEALTHY, node.getState());
     Assert.assertEquals(0, rmContext.getStressedRMNodes().size());
     // Node should not have stressed in the health report
     Assert.assertTrue(!node.getHealthReport().contains("NODE_STRESSED"));
@@ -702,7 +702,7 @@ public class TestRMNodeTransitions {
     node = getRunningNode();
     rmContext.getRMNodes().put(node.getNodeID(), node);
 
-    status = NodeHealthStatus.newInstance(false, "NODE_STRESSED",
+    status = NodeHealthStatus.newInstance(false, "NODE_STRESSED;unhealthy",
         System.currentTimeMillis());
     nodeStatus = NodeStatus.newInstance(node.getNodeID(), 0,
         null, null, status, null, null,
@@ -713,6 +713,97 @@ public class TestRMNodeTransitions {
     Assert.assertEquals(NodeState.UNHEALTHY, node.getState());
     // Node should not have stressed in the health report as threshold has been reached
     Assert.assertTrue(!node.getHealthReport().contains("NODE_STRESSED"));
+
+    rmContext.getRMNodes().clear();
+    rmContext.getStressedRMNodes().clear();
+  }
+
+  @Test
+  public void testHealthyToUnHealthyStressedMultipleTransitions() {
+    Configuration conf = new YarnConfiguration();
+    // No threshold for stressed nodes, which means all stressed reports should be ignored
+    conf.set(YarnConfiguration.RM_THRESHOLD_PERCENTAGE_STRESSED_NODES, "100.0");
+    ((RMContextImpl) rmContext).setYarnConfiguration(conf);
+
+    RMNodeImpl node = getRunningNode();
+    rmContext.getRMNodes().put(node.getNodeID(), node);
+
+    NodeHealthStatus status = NodeHealthStatus.newInstance(false,
+            "NODE_STRESSED;1/2 log-dirs usable space is below configured utilization percentage/no more" +
+                    " usable space [ /yarn02/yarn/container : used space above threshold of 90.0%",
+            System.currentTimeMillis());
+    NodeStatus nodeStatus = NodeStatus.newInstance(node.getNodeID(), 0,
+            null, null, status, null, null,
+            null);
+    node.handle(new RMNodeStatusEvent(node.getNodeID(), nodeStatus, null));
+
+    // Change in the node running status
+    Assert.assertEquals(NodeState.RUNNING, node.getState());
+    Assert.assertEquals(1, rmContext.getStressedRMNodes().size());
+    // Node should have utilization info in the health report
+    Assert.assertTrue(node.getHealthReport().contains("below configured utilization percentage"));
+
+    node = getRunningNode();
+    rmContext.getRMNodes().put(node.getNodeID(), node);
+
+    status = NodeHealthStatus.newInstance(false,
+            "permission issue;1/2 log-dirs usable space is below configured utilization percentage",
+            System.currentTimeMillis());
+    nodeStatus = NodeStatus.newInstance(node.getNodeID(), 0,
+            null, null, status, null, null,
+            null);
+    node.handle(new RMNodeStatusEvent(node.getNodeID(), nodeStatus, null));
+
+    // Node should change to unhealthy
+    Assert.assertEquals(NodeState.UNHEALTHY, node.getState());
+    // Node should be removed from stressed map
+    Assert.assertEquals(0, rmContext.getStressedRMNodes().size());
+    // Node should have permission issue
+    Assert.assertTrue(node.getHealthReport().contains("permission issue;"));
+
+    rmContext.getRMNodes().clear();
+    rmContext.getStressedRMNodes().clear();
+  }
+
+  @Test
+  public void testHealthyToUnHealthyStressedMultipleTransitions2() {
+    Configuration conf = new YarnConfiguration();
+    conf.set(YarnConfiguration.RM_THRESHOLD_PERCENTAGE_STRESSED_NODES, "100.0");
+    ((RMContextImpl) rmContext).setYarnConfiguration(conf);
+
+    RMNodeImpl node = getRunningNode();
+    rmContext.getRMNodes().put(node.getNodeID(), node);
+
+    NodeHealthStatus status = NodeHealthStatus.newInstance(true,
+            "NODE_STRESSED;",
+            System.currentTimeMillis());
+    NodeStatus nodeStatus = NodeStatus.newInstance(node.getNodeID(), 0,
+            null, null, status, null, null,
+            null);
+    node.handle(new RMNodeStatusEvent(node.getNodeID(), nodeStatus, null));
+
+    // Change in the node running status
+    Assert.assertEquals(NodeState.RUNNING, node.getState());
+    Assert.assertEquals(1, rmContext.getStressedRMNodes().size());
+
+    node = getRunningNode();
+    rmContext.getRMNodes().put(node.getNodeID(), node);
+
+    status = NodeHealthStatus.newInstance(false,
+            "1/2 log-dirs usable space is below configured utilization percentage/no more" +
+                    "usable space [ /yarn02/yarn/container : used space above threshold of 90.0%",
+            System.currentTimeMillis());
+    nodeStatus = NodeStatus.newInstance(node.getNodeID(), 0,
+            null, null, status, null, null,
+            null);
+    node.handle(new RMNodeStatusEvent(node.getNodeID(), nodeStatus, null));
+
+    // Node should continue to RUNNING
+    Assert.assertEquals(NodeState.RUNNING, node.getState());
+    // Node should continue to be in stressed map
+    Assert.assertEquals(1, rmContext.getStressedRMNodes().size());
+    // Node should have correct error report
+    Assert.assertTrue(node.getHealthReport().contains("1/2 log-dirs usable space is below configured utilization"));
 
     rmContext.getRMNodes().clear();
     rmContext.getStressedRMNodes().clear();
@@ -915,6 +1006,55 @@ public class TestRMNodeTransitions {
 
     Assert.assertEquals("Stressed Nodes", initialStressed + 2,
         cm.getNumStressedNodes());
+
+    rmContext.getStressedRMNodes().clear();
+    rmContext.getRMNodes().clear();
+  }
+
+  @Test
+  public void testTransitionToUnhealthyStressed() {
+    Configuration conf = new YarnConfiguration();
+    conf.set(YarnConfiguration.RM_THRESHOLD_PERCENTAGE_STRESSED_NODES, "100.0");
+    ((RMContextImpl) rmContext).setYarnConfiguration(conf);
+
+
+    RMNodeImpl nodeA = getRunningNode();
+    rmContext.getRMNodes().put(nodeA.getNodeID(), nodeA);
+
+    NodeHealthStatus status = NodeHealthStatus.newInstance(false,
+            "1/2 local-dirs usable space is below configured utilization percentage/no more usable space" +
+                    " [ /yarn02/yarn/nm : used space above threshold of 90.0% ] ;" +
+                    " 1/2 log-dirs usable space is below configured utilization percentage/no more usable space" +
+                    " [ /yarn02/yarn/container : used space above threshold of 90.0% ]",
+            System.currentTimeMillis());
+    NodeStatus nodeStatus = NodeStatus.newInstance(nodeA.getNodeID(), 0,
+            null, null, status, null, null,
+            null);
+    nodeA.handle(new RMNodeStatusEvent(nodeA.getNodeID(), nodeStatus, null));
+    Assert.assertEquals(1, rmContext.getStressedRMNodes().size());
+
+    rmContext.getStressedRMNodes().clear();
+    rmContext.getRMNodes().clear();
+  }
+
+  @Test
+  public void testTransitionToUnhealthyNonStressed() {
+    Configuration conf = new YarnConfiguration();
+    conf.set(YarnConfiguration.RM_THRESHOLD_PERCENTAGE_STRESSED_NODES, "100.0");
+    ((RMContextImpl) rmContext).setYarnConfiguration(conf);
+
+    ClusterMetrics cm = ClusterMetrics.getMetrics();
+    int initialStressed = cm.getNumStressedNodes();
+
+    RMNodeImpl nodeA = getRunningNode();
+    NodeHealthStatus status = NodeHealthStatus.newInstance(false,
+            "permission issue;permission issue",
+            System.currentTimeMillis());
+    NodeStatus nodeStatus = NodeStatus.newInstance(nodeA.getNodeID(), 0,
+            null, null, status, null, null,
+            null);
+    nodeA.handle(new RMNodeStatusEvent(nodeA.getNodeID(), nodeStatus, null));
+    Assert.assertEquals(0, rmContext.getStressedRMNodes().size());
 
     rmContext.getStressedRMNodes().clear();
     rmContext.getRMNodes().clear();

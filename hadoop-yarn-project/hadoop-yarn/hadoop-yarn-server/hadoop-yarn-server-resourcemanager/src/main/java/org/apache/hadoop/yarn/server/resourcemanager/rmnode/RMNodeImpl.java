@@ -108,6 +108,11 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
 
   /** Node stressed message*/
   private static final String NODE_STRESSED_MSG = "NODE_STRESSED";
+  // Disk utilization warning threshold
+  private static final String DISK_UTILIZATION_MSG = "usable space is below configured utilization";
+  // Allowable health reports to let containers drain
+  private static final String[] CONTAINER_ALLOWABLE_HEALTH_REPORT = {DISK_UTILIZATION_MSG,
+          NODE_STRESSED_MSG};
 
   private final ReadLock readLock;
   private final WriteLock writeLock;
@@ -822,8 +827,13 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
     // Process the stressed node signal
     // Remote node is not reporting stress
     if (!remoteNodeHealthStatus.isNodeStressed()) {
-      // Local node is already stressed
-      if (rmNode.context.getStressedRMNodes().containsKey(rmNode.nodeId)) {
+      // Remote node is unhealthy, but per health report, containers could continue drain
+      // It should continue to be in stressed map
+      boolean remoteNodeUnhealthyStressed = !remoteNodeHealthStatus.getIsNodeHealthy() &&
+              isContainerRunningAllowable(rmNode, remoteNodeHealthStatus);
+      // Remove from the stressed map
+      if (!remoteNodeUnhealthyStressed &&
+              rmNode.context.getStressedRMNodes().containsKey(rmNode.nodeId)) {
         // Remove the node from the stressed map
         rmNode.context.getStressedRMNodes().remove(rmNode.nodeId);
         ClusterMetrics.getMetrics().decrStressedNodes();
@@ -844,18 +854,32 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
           // Put the stressed node in the stressed map
           rmNode.context.getStressedRMNodes().put(rmNode.nodeId, rmNode);
           ClusterMetrics.getMetrics().incrStressedNodes();
-          LOG.info("Put the node:"+rmNode.toString() + " in the stressed state");
+          LOG.info("Put the node : " + rmNode.toString() + " in the stressed state");
 
           // Copy the remote health report as it is
           rmNode.setHealthReport(remoteNodeHealthReport);
         } else {
-          LOG.warn("Not adding the node:"+rmNode.toString() +
+          LOG.warn("Not adding the node : " + rmNode.toString() +
               " to the stressed state due to the threshold");
 
           // If not, remove stress from healthReport and copy the remaining healthReport as it is
           String healthReport = removeStressFromHealthReport(remoteNodeHealthReport);
           rmNode.setHealthReport(healthReport);
         }
+      }
+    }
+    // Process the node unhealthy when health report actually allows to let containers drain
+    if (!remoteNodeHealthStatus.getIsNodeHealthy() &&
+            isContainerRunningAllowable(rmNode, remoteNodeHealthStatus)) {
+      // Add this node as healthy if it can be added to stressed map or already in stress
+      if (rmNode.context.canAddStressedNodes() ||
+              rmNode.context.getStressedRMNodes().containsKey(rmNode.getNodeID())) {
+        remoteNodeHealthStatus.setIsNodeHealthy(true);
+        // Append node stress message
+        rmNode.setHealthReport(remoteNodeHealthReport + ";" + NODE_STRESSED_MSG);
+        LOG.info("Put the node : " + rmNode.toString() + " in the stressed state as it is unhealthy but " +
+                "allow draining of containers");
+        rmNode.context.getStressedRMNodes().put(rmNode.nodeId, rmNode);
       }
     }
 
@@ -900,6 +924,39 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
       String removeStressedReport = removeStressFromHealthReport(healthReport);
       rmNode.setHealthReport(removeStressedReport);
     }
+  }
+
+  /**
+   * Consider the node health report before deciding to de-activate the node from Scheduler
+   * Idea is to let current running containers finish if the health report is in allowable list
+   * @param rmNode
+   * @param remoteNodeHealthStatus
+   * @return
+   */
+  private static boolean isContainerRunningAllowable(RMNode rmNode,
+                                                     NodeHealthStatus remoteNodeHealthStatus) {
+    if (remoteNodeHealthStatus != null && rmNode != null) {
+      // Get remote node health report delimited by ";"
+      String[] remoteNodeHealthReports = remoteNodeHealthStatus.getHealthReport().split(";");
+      // Check if all of the health reports are from allowable list
+      for (String remoteNodeHealthReport : remoteNodeHealthReports) {
+        boolean allowable = false;
+        for (String allowableHealthReport : CONTAINER_ALLOWABLE_HEALTH_REPORT) {
+          allowableHealthReport = allowableHealthReport.toLowerCase();
+          if (remoteNodeHealthReport.toLowerCase().contains(allowableHealthReport)) {
+            // Find the report in the list of allowable health reports
+            allowable = true;
+            break;
+          }
+        }
+        if (!allowable) {
+          return false;
+        }
+      }
+      LOG.info("Allowing the unhealthy node : " + rmNode.toString() + " to drain current running containers");
+      return true;
+    }
+    return false;
   }
 
   public static class AddNodeTransition implements
