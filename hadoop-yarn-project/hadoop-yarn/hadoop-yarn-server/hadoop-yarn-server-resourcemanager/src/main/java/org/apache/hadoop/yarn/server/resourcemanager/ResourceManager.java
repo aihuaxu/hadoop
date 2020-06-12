@@ -795,6 +795,11 @@ public class ResourceManager extends CompositeService implements Recoverable {
         }
       }
 
+      String configVersion = conf.get(YarnConfiguration.YARN_PACKAGE_CONFIG_VERSION);
+      if (configVersion != null) {
+        LOG.info("Config version : " + configVersion);
+      }
+
       super.serviceStart();
     }
 

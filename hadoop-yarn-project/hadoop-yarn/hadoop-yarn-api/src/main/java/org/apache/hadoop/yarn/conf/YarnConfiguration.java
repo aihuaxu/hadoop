@@ -3354,6 +3354,8 @@ public class YarnConfiguration extends Configuration {
   public static final String YARN_INTERNAL_LOW_PRIORITY_ORIGINAL_QUEUE_PREFIX =
           "yarn-internal-low-priority-original-queue=";
 
+  public static final String YARN_PACKAGE_CONFIG_VERSION = "yarn.package.config.version";
+
   public YarnConfiguration() {
     super();
   }
