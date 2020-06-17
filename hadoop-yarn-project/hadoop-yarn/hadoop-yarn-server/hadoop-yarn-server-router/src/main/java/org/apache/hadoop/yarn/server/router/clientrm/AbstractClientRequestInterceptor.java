@@ -105,13 +105,16 @@ public abstract class AbstractClientRequestInterceptor
 
     try {
       // Do not create a proxy user if user name matches the user name on
-      // current UGI
-      if (userName.equalsIgnoreCase(
-          UserGroupInformation.getCurrentUser().getUserName())) {
-        user = UserGroupInformation.getCurrentUser();
+      // login UGI
+
+      UserGroupInformation loginUser = UserGroupInformation.getLoginUser();
+      if (userName.equalsIgnoreCase(loginUser.getUserName())) {
+        user = loginUser;
       } else {
-        user = UserGroupInformation.createProxyUser(userName,
-            UserGroupInformation.getCurrentUser());
+        LOG.info("Running as " + loginUser.getShortUserName() + " but will " +
+                "impersonate " + userName);
+        user = UserGroupInformation.createProxyUser(
+                userName, loginUser);
       }
     } catch (IOException e) {
       String message = "Error while creating Router ClientRM Service for user:";

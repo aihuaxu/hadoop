@@ -28,8 +28,11 @@ import java.util.Map;
 
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CommonConfigurationKeys;
+import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.service.AbstractService;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.StringUtils;
@@ -95,8 +98,16 @@ import org.apache.hadoop.yarn.api.protocolrecords.UpdateApplicationTimeoutsRespo
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
+import org.apache.hadoop.yarn.factories.RecordFactory;
+import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
+import org.apache.hadoop.yarn.ipc.RPCUtil;
 import org.apache.hadoop.yarn.ipc.YarnRPC;
+import org.apache.hadoop.yarn.server.resourcemanager.security.authorize.RMPolicyProvider;
+import org.apache.hadoop.yarn.server.router.security.RouterDelegationTokenIdentifier;
+import org.apache.hadoop.yarn.server.router.security.RouterSecurityManager;
+import org.apache.hadoop.yarn.server.utils.BuilderUtils;
 import org.apache.hadoop.yarn.util.LRUCacheHashMap;
+import org.apache.hadoop.yarn.util.Records;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -118,8 +129,12 @@ public class RouterClientRMService extends AbstractService
   private static final Logger LOG =
       LoggerFactory.getLogger(RouterClientRMService.class);
 
+  private final RecordFactory recordFactory = RecordFactoryProvider.getRecordFactory(null);
+
   private Server server;
   private InetSocketAddress listenerEndpoint;
+  /** Router security manager to handle token operations. */
+  private RouterSecurityManager securityManager = null;
 
   // For each user we store an interceptors' pipeline.
   // For performance issue we use LRU cache to keep in memory the newest ones
@@ -142,7 +157,6 @@ public class RouterClientRMService extends AbstractService
             YarnConfiguration.ROUTER_CLIENTRM_ADDRESS,
             YarnConfiguration.DEFAULT_ROUTER_CLIENTRM_ADDRESS,
             YarnConfiguration.DEFAULT_ROUTER_CLIENTRM_PORT);
-
     int maxCacheSize =
         conf.getInt(YarnConfiguration.ROUTER_PIPELINE_CACHE_MAX_SIZE,
             YarnConfiguration.DEFAULT_ROUTER_PIPELINE_CACHE_MAX_SIZE);
@@ -156,8 +170,18 @@ public class RouterClientRMService extends AbstractService
         serverConf.getInt(YarnConfiguration.RM_CLIENT_THREAD_COUNT,
             YarnConfiguration.DEFAULT_RM_CLIENT_THREAD_COUNT);
 
+    // Create security manager monitor
+    this.securityManager = new RouterSecurityManager(conf);
+
     this.server = rpc.getServer(ApplicationClientProtocol.class, this,
-        listenerEndpoint, serverConf, null, numWorkerThreads);
+        listenerEndpoint, serverConf, securityManager.getSecretManager(), numWorkerThreads);
+
+    // Set service-level authorization security policy
+    boolean serviceAuthEnabled = conf.getBoolean(CommonConfigurationKeys.HADOOP_SECURITY_AUTHORIZATION, false);
+    LOG.info("Router ClientRMService Auth is enabled: " + serviceAuthEnabled);
+    if (serviceAuthEnabled) {
+      server.refreshServiceAclWithLoadedConfiguration(conf, RMPolicyProvider.getInstance());
+    }
 
     this.server.start();
     LOG.info("Router ClientRMService listening on address: "
@@ -354,23 +378,56 @@ public class RouterClientRMService extends AbstractService
 
   @Override
   public GetDelegationTokenResponse getDelegationToken(
-      GetDelegationTokenRequest request) throws YarnException, IOException {
-    RequestInterceptorChainWrapper pipeline = getInterceptorChain();
-    return pipeline.getRootInterceptor().getDelegationToken(request);
+      GetDelegationTokenRequest request) throws YarnException {
+
+    try {
+      GetDelegationTokenResponse response =
+              recordFactory.newRecordInstance(GetDelegationTokenResponse.class);
+      Token<RouterDelegationTokenIdentifier> realRouterDToken = securityManager.getDelegationToken(request.getRenewer());
+      response.setRMDelegationToken(
+              BuilderUtils.newDelegationToken(
+              realRouterDToken.getIdentifier(),
+              realRouterDToken.getKind().toString(),
+              realRouterDToken.getPassword(),
+              realRouterDToken.getService().toString()
+      ));
+      return response;
+    } catch(IOException io) {
+      throw RPCUtil.getRemoteException(io);
+    }
   }
 
   @Override
   public RenewDelegationTokenResponse renewDelegationToken(
-      RenewDelegationTokenRequest request) throws YarnException, IOException {
-    RequestInterceptorChainWrapper pipeline = getInterceptorChain();
-    return pipeline.getRootInterceptor().renewDelegationToken(request);
+      RenewDelegationTokenRequest request) throws YarnException {
+    try {
+      org.apache.hadoop.yarn.api.records.Token protoToken = request.getDelegationToken();
+      Token<RouterDelegationTokenIdentifier> token = new Token<RouterDelegationTokenIdentifier>(
+              protoToken.getIdentifier().array(), protoToken.getPassword().array(),
+              new Text(protoToken.getKind()), new Text(protoToken.getService()));
+      long nextExpTime = securityManager.renewDelegationToken(token);
+      RenewDelegationTokenResponse renewResponse = Records
+              .newRecord(RenewDelegationTokenResponse.class);
+      renewResponse.setNextExpirationTime(nextExpTime);
+      return renewResponse;
+    } catch (IOException e) {
+      throw RPCUtil.getRemoteException(e);
+    }
   }
 
   @Override
   public CancelDelegationTokenResponse cancelDelegationToken(
-      CancelDelegationTokenRequest request) throws YarnException, IOException {
-    RequestInterceptorChainWrapper pipeline = getInterceptorChain();
-    return pipeline.getRootInterceptor().cancelDelegationToken(request);
+      CancelDelegationTokenRequest request) throws YarnException {
+    try {
+      org.apache.hadoop.yarn.api.records.Token protoToken = request.getDelegationToken();
+      Token<RouterDelegationTokenIdentifier> token = new Token<RouterDelegationTokenIdentifier>(
+              protoToken.getIdentifier().array(), protoToken.getPassword().array(),
+              new Text(protoToken.getKind()), new Text(protoToken.getService()));
+      securityManager.cancelDelegationToken(token);
+      return Records.newRecord(CancelDelegationTokenResponse.class);
+    } catch (IOException e) {
+      throw RPCUtil.getRemoteException(e);
+    }
   }
 
   @Override

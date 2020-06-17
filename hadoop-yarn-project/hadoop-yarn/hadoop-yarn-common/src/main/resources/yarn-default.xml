@@ -3432,6 +3432,22 @@
   </property>
 
   <property>
+    <description>
+      The Kerberos keytab file to be used for secure login of router.
+    </description>
+    <name>yarn.router.keytab.file</name>
+    <value></value>
+  </property>
+
+  <property>
+    <description>
+      The Kerberos principal for the router.
+    </description>
+    <name>yarn.router.kerberos.principal</name>
+    <value></value>
+  </property>
+ 
+  <property>
     <name>yarn.resourcemanager.display.per-user-apps</name>
     <value>false</value>
       <description>

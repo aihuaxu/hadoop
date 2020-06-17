@@ -24,9 +24,12 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.security.SecurityUtil;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.service.CompositeService;
 import org.apache.hadoop.util.ShutdownHookManager;
 import org.apache.hadoop.util.StringUtils;
+import org.apache.hadoop.util.curator.ZKCuratorManager;
 import org.apache.hadoop.yarn.YarnUncaughtExceptionHandler;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
@@ -40,7 +43,8 @@ import org.apache.hadoop.yarn.webapp.WebApps.Builder;
 import org.apache.hadoop.yarn.webapp.util.WebAppUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
+import static org.apache.hadoop.yarn.conf.YarnConfiguration.ROUTER_KERBEROS_PRINCIPAL_KEY;
+import static org.apache.hadoop.yarn.conf.YarnConfiguration.ROUTER_KEYTAB_FILE_KEY;
 import com.google.common.annotations.VisibleForTesting;
 
 /**
@@ -82,7 +86,12 @@ public class Router extends CompositeService {
   }
 
   protected void doSecureLogin() throws IOException {
-    // TODO YARN-6539 Create SecureLogin inside Router
+    // Enable the security for the Router.
+    // this change is backport from https://issues.apache.org/jira/browse/YARN-6539
+    // since the JIRA is not fully merged into upstream, we copy the patch here
+    UserGroupInformation.setConfiguration(conf);
+    SecurityUtil.login(conf, ROUTER_KEYTAB_FILE_KEY,
+    ROUTER_KERBEROS_PRINCIPAL_KEY);
   }
 
   @Override

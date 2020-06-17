@@ -2957,6 +2957,15 @@ public class YarnConfiguration extends Configuration {
 
   public static final String ROUTER_PREFIX = YARN_PREFIX + "router.";
 
+  public static final String ROUTER_MIGRATION_STORE_ENABLED = ROUTER_PREFIX + "migration.store.enabled";
+
+  public static final String ROUTER_KEYTAB_FILE_KEY = ROUTER_PREFIX + "keytab.file";
+
+  public static final String ROUTER_KERBEROS_PRINCIPAL_KEY = ROUTER_PREFIX + "kerberos.principal";
+
+  public static final String ROUTER_KERBEROS_PRINCIPAL_HOSTNAME_KEY =
+      ROUTER_PREFIX + "kerberos.principal.hostname";
+
   public static final String ROUTER_BIND_HOST = ROUTER_PREFIX + "bind-host";
 
   public static final String ROUTER_CLIENTRM_PREFIX =

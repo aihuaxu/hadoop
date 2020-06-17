@@ -21,9 +21,14 @@ package org.apache.hadoop.yarn.server.router;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.yarn.exceptions.YarnException;
+import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
 
 /**
  * Common utility methods used by the Router server.
@@ -57,6 +62,44 @@ public final class RouterServerUtil {
     } else {
       LOG.error(errMsg);
       throw new YarnException(errMsg);
+    }
+  }
+
+  /**
+   * Log status of delegation token related operation.
+   * Extend in future to use audit logger instead of local logging.
+   */
+  public static void logAuditEvent(boolean succeeded, String cmd, String tokenId)
+          throws IOException {
+    LOG.debug("Operation:" + cmd + " Status:" + succeeded + " TokenId:" + tokenId);
+  }
+
+  /**
+   * Helper method to create instances of Object using the class name specified
+   * in the configuration object.
+   *
+   * @param conf the yarn configuration
+   * @param configuredClassName the configuration provider key
+   * @param defaultValue the default implementation class
+   * @param type the required interface/base class
+   * @param <T> The type of the instance to create
+   * @return the instances created
+   */
+  @SuppressWarnings("unchecked")
+  public static <T> T createInstance(Configuration conf,
+                                     String configuredClassName, String defaultValue, Class<T> type) {
+
+    String className = conf.get(configuredClassName, defaultValue);
+    try {
+      Class<?> clusterResolverClass = conf.getClassByName(className);
+      if (type.isAssignableFrom(clusterResolverClass)) {
+        return (T) ReflectionUtils.newInstance(clusterResolverClass, conf);
+      } else {
+        throw new YarnRuntimeException("Class: " + className
+                + " not instance of " + type.getCanonicalName());
+      }
+    } catch (ClassNotFoundException e) {
+      throw new YarnRuntimeException("Could not instantiate : " + className, e);
     }
   }
 

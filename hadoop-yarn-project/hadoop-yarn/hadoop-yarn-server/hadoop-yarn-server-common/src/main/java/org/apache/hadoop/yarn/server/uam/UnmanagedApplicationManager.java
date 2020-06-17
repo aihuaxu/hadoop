@@ -29,7 +29,9 @@ import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.security.SaslRpcServer;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.yarn.api.ApplicationClientProtocol;
@@ -362,6 +364,11 @@ public class UnmanagedApplicationManager {
     try {
       UserGroupInformation appSubmitter =
           UserGroupInformation.createRemoteUser(this.submitter);
+
+      if(conf.getBoolean(CommonConfigurationKeys.HADOOP_SECURITY_AUTHORIZATION, false)){
+        appSubmitter.setAuthenticationMethod(SaslRpcServer.AuthMethod.KERBEROS);
+      }
+
       this.rmClient = createRMProxy(ApplicationClientProtocol.class, this.conf,
           appSubmitter, null);
 

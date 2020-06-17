@@ -7,7 +7,7 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -39,6 +39,8 @@ import com.google.common.annotations.VisibleForTesting;
  * Delegation Token Manager used by the
  * {@link KerberosDelegationTokenAuthenticationHandler}.
  *
+ *  Copied directly from 3.1.0 branch. TODO: create JIRA to upsteam to add DTSecretManager to 2.9.1
+ *
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
@@ -62,6 +64,12 @@ public class DelegationTokenManager {
   public static final String REMOVAL_SCAN_INTERVAL = PREFIX +
       "removal-scan-interval.sec";
   public static final long REMOVAL_SCAN_INTERVAL_DEFAULT = 60 * 60;
+
+  public static final String BACKOFF_INTERVAL_SEED = PREFIX + "backoff-interval.millis";
+  public static final long BACKOFF_INTERVAL_SEED_DEFAULT = 100;
+
+  public static final String MAX_RETRY = PREFIX + "max-retry";
+  public static final int MAX_RETRY_DEFAULT = 5;
 
   private static class DelegationTokenSecretManager
       extends AbstractDelegationTokenSecretManager<DelegationTokenIdentifier> {
@@ -201,14 +209,14 @@ public class DelegationTokenManager {
       String canceler) throws IOException {
     LOG.debug("Cancelling token:{} with canceler:{}.", token, canceler);
     canceler = (canceler != null) ? canceler :
-               verifyToken(token).getShortUserName();
+        verifyToken(token).getShortUserName();
     secretManager.cancelToken(token, canceler);
   }
 
   @SuppressWarnings("unchecked")
   public UserGroupInformation verifyToken(
       Token<? extends AbstractDelegationTokenIdentifier> token)
-          throws IOException {
+      throws IOException {
     AbstractDelegationTokenIdentifier id = secretManager.decodeTokenIdentifier(token);
     secretManager.verifyToken(id, token.getPassword());
     return id.getUser();
@@ -222,7 +230,7 @@ public class DelegationTokenManager {
 
   private static DelegationTokenIdentifier decodeToken(
       Token<DelegationTokenIdentifier> token, Text tokenKind)
-          throws IOException {
+      throws IOException {
     ByteArrayInputStream buf = new ByteArrayInputStream(token.getIdentifier());
     DataInputStream dis = new DataInputStream(buf);
     DelegationTokenIdentifier id = new DelegationTokenIdentifier(tokenKind);

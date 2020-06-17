@@ -7,7 +7,7 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -23,11 +23,11 @@ import java.io.DataInputStream;
 import java.io.IOException;
 import java.security.MessageDigest;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 import javax.crypto.SecretKey;
 
@@ -45,12 +45,16 @@ import com.google.common.base.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Copied directly from 3.1.0 branch. TODO: create JIRA to upsteam to add DTSecretManager to 2.9.1
+ * @param <TokenIdent>
+ */
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
-public abstract 
-class AbstractDelegationTokenSecretManager<TokenIdent 
-extends AbstractDelegationTokenIdentifier> 
-   extends SecretManager<TokenIdent> {
+public abstract
+class AbstractDelegationTokenSecretManager<TokenIdent
+    extends AbstractDelegationTokenIdentifier>
+    extends SecretManager<TokenIdent> {
   private static final Logger LOG = LoggerFactory
       .getLogger(AbstractDelegationTokenSecretManager.class);
 
@@ -58,25 +62,25 @@ extends AbstractDelegationTokenIdentifier>
     return "(" + id + ")";
   }
 
-  /** 
-   * Cache of currently valid tokens, mapping from DelegationTokenIdentifier 
+  /**
+   * Cache of currently valid tokens, mapping from DelegationTokenIdentifier
    * to DelegationTokenInformation. Protected by this object lock.
    */
-  protected final Map<TokenIdent, DelegationTokenInformation> currentTokens 
-      = new HashMap<TokenIdent, DelegationTokenInformation>();
-  
+  protected final Map<TokenIdent, DelegationTokenInformation> currentTokens
+      = new ConcurrentHashMap<>();
+
   /**
    * Sequence number to create DelegationTokenIdentifier.
    * Protected by this object lock.
    */
   protected int delegationTokenSequenceNumber = 0;
-  
+
   /**
    * Access to allKeys is protected by this object lock
    */
-  protected final Map<Integer, DelegationKey> allKeys 
-      = new HashMap<Integer, DelegationKey>();
-  
+  protected final Map<Integer, DelegationKey> allKeys
+      = new ConcurrentHashMap<>();
+
   /**
    * Access to currentId is protected by this object lock.
    */
@@ -85,7 +89,7 @@ extends AbstractDelegationTokenIdentifier>
    * Access to currentKey is protected by this object lock
    */
   private DelegationKey currentKey;
-  
+
   private long keyUpdateInterval;
   private long tokenMaxLifetime;
   private long tokenRemoverScanInterval;
@@ -135,7 +139,7 @@ extends AbstractDelegationTokenIdentifier>
       tokenRemoverThread.start();
     }
   }
-  
+
   /**
    * Reset all data structures and mutable state.
    */
@@ -145,10 +149,10 @@ extends AbstractDelegationTokenIdentifier>
     setDelegationTokenSeqNum(0);
     currentTokens.clear();
   }
-  
-  /** 
-   * Add a previously used master key to cache (when NN restarts), 
-   * should be called before activate(). 
+
+  /**
+   * Add a previously used master key to cache (when NN restarts),
+   * should be called before activate().
    * */
   public synchronized void addKey(DelegationKey key) throws IOException {
     if (running) // a safety check
@@ -184,7 +188,7 @@ extends AbstractDelegationTokenIdentifier>
   }
 
   // RM
-  protected void storeNewToken(TokenIdent ident, long renewDate) throws IOException{
+  protected void storeNewToken(TokenIdent ident, long renewDate) throws IOException {
     return;
   }
 
@@ -192,6 +196,7 @@ extends AbstractDelegationTokenIdentifier>
   protected void removeStoredToken(TokenIdent ident) throws IOException {
 
   }
+
   // RM
   protected void updateStoredToken(TokenIdent ident, long renewDate) throws IOException {
     return;
@@ -334,9 +339,9 @@ extends AbstractDelegationTokenIdentifier>
     }
   }
 
-  /** 
-   * Update the current master key 
-   * This is called once by startThreads before tokenRemoverThread is created, 
+  /**
+   * Update the current master key
+   * This is called once by startThreads before tokenRemoverThread is created,
    * and only by tokenRemoverThread afterwards.
    */
   private void updateCurrentKey() throws IOException {
@@ -356,9 +361,9 @@ extends AbstractDelegationTokenIdentifier>
       storeDelegationKey(currentKey);
     }
   }
-  
-  /** 
-   * Update the current master key for generating delegation tokens 
+
+  /**
+   * Update the current master key for generating delegation tokens
    * It should be called only by tokenRemoverThread.
    */
   void rollMasterKey() throws IOException {
@@ -390,7 +395,7 @@ extends AbstractDelegationTokenIdentifier>
       }
     }
   }
-  
+
   @Override
   protected synchronized byte[] createPassword(TokenIdent identifier) {
     int sequenceNum;
@@ -413,12 +418,11 @@ extends AbstractDelegationTokenIdentifier>
     }
     return password;
   }
-  
 
 
   /**
    * Find the DelegationTokenInformation for the given token id, and verify that
-   * if the token is expired. Note that this method should be called with 
+   * if the token is expired. Note that this method should be called with
    * acquiring the secret manager's monitor.
    */
   protected DelegationTokenInformation checkToken(TokenIdent identifier)
@@ -437,7 +441,7 @@ extends AbstractDelegationTokenIdentifier>
     }
     return info;
   }
-  
+
   @Override
   public synchronized byte[] retrievePassword(TokenIdent identifier)
       throws InvalidToken {
@@ -473,7 +477,7 @@ extends AbstractDelegationTokenIdentifier>
           + " is invalid, password doesn't match");
     }
   }
-  
+
   /**
    * Renew a delegation token.
    * @param token the token to renew
@@ -483,13 +487,13 @@ extends AbstractDelegationTokenIdentifier>
    * @throws AccessControlException if the user can't renew token
    */
   public synchronized long renewToken(Token<TokenIdent> token,
-                         String renewer) throws InvalidToken, IOException {
+      String renewer) throws InvalidToken, IOException {
     ByteArrayInputStream buf = new ByteArrayInputStream(token.getIdentifier());
     DataInputStream in = new DataInputStream(buf);
     TokenIdent id = createIdentifier();
     id.readFields(in);
     LOG.info("Token renewal for identifier: " + formatTokenId(id)
-        + "; total currentTokens " +  currentTokens.size());
+        + "; total currentTokens " + currentTokens.size());
 
     long now = Time.now();
     if (id.getMaxDate() < now) {
@@ -534,7 +538,7 @@ extends AbstractDelegationTokenIdentifier>
     updateToken(id, info);
     return renewTime;
   }
-  
+
   /**
    * Cancel a token by removing it from cache.
    * @return Identifier of the canceled token
@@ -549,7 +553,7 @@ extends AbstractDelegationTokenIdentifier>
     id.readFields(in);
     LOG.info("Token cancellation requested for identifier: "
         + formatTokenId(id));
-    
+
     if (id.getUser() == null) {
       throw new InvalidToken("Token with no owner " + formatTokenId(id));
     }
@@ -559,7 +563,7 @@ extends AbstractDelegationTokenIdentifier>
     String cancelerShortName = cancelerKrbName.getShortName();
     if (!canceller.equals(owner)
         && (renewer == null || renewer.toString().isEmpty() || !cancelerShortName
-            .equals(renewer.toString()))) {
+        .equals(renewer.toString()))) {
       throw new AccessControlException(canceller
           + " is not authorized to cancel the token " + formatTokenId(id));
     }
@@ -570,7 +574,7 @@ extends AbstractDelegationTokenIdentifier>
     removeStoredToken(id);
     return id;
   }
-  
+
   /**
    * Convert the byte[] to a secret key
    * @param key the byte[] to create the secret key from
@@ -602,7 +606,7 @@ extends AbstractDelegationTokenIdentifier>
       return renewDate;
     }
     /** returns password */
-    byte[] getPassword() {
+    public byte[] getPassword() {
       return password;
     }
     /** returns tracking id */
@@ -610,7 +614,7 @@ extends AbstractDelegationTokenIdentifier>
       return trackingId;
     }
   }
-  
+
   /** Remove expired delegation tokens from cache */
   private void removeExpiredToken() throws IOException {
     long now = Time.now();
@@ -644,7 +648,7 @@ extends AbstractDelegationTokenIdentifier>
     if (LOG.isDebugEnabled())
       LOG.debug("Stopping expired delegation token remover thread");
     running = false;
-    
+
     if (tokenRemoverThread != null) {
       synchronized (noInterruptsLock) {
         tokenRemoverThread.interrupt();
@@ -657,7 +661,7 @@ extends AbstractDelegationTokenIdentifier>
       }
     }
   }
-  
+
   /**
    * is secretMgr running
    * @return true if secret mgr is running
@@ -665,7 +669,7 @@ extends AbstractDelegationTokenIdentifier>
   public synchronized boolean isRunning() {
     return running;
   }
-  
+
   private class ExpiredTokenRemover extends Thread {
     private long lastMasterKeyUpdate;
     private long lastTokenCacheCleanup;
@@ -706,7 +710,7 @@ extends AbstractDelegationTokenIdentifier>
   /**
    * Decode the token identifier. The subclass can customize the way to decode
    * the token identifier.
-   * 
+   *
    * @param token the token where to extract the identifier
    * @return the delegation token identifier
    * @throws IOException
@@ -715,4 +719,12 @@ extends AbstractDelegationTokenIdentifier>
     return token.decodeIdentifier();
   }
 
+  /**
+   * Return the total number of current valid tokens.
+   *
+   * @return the total number of valid tokens
+   */
+  public int getCurrentTokensCount() {
+    return currentTokens.size();
+  }
 }
