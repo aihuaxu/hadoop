@@ -53,12 +53,14 @@ import javax.ws.rs.core.StreamingOutput;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.fs.QuotaUsage;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Options;
+import org.apache.hadoop.fs.TrashPolicyDefault;
 import org.apache.hadoop.fs.XAttr;
 import org.apache.hadoop.fs.permission.AclStatus;
 import org.apache.hadoop.fs.permission.FsAction;
@@ -67,6 +69,7 @@ import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.DFSUtilClient;
 import org.apache.hadoop.hdfs.XAttrHelper;
 import org.apache.hadoop.hdfs.protocol.BlockStoragePolicy;
+import org.apache.hadoop.hdfs.protocol.ClientProtocol;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.DirectoryListing;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
@@ -100,6 +103,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Charsets;
 import com.google.common.collect.Lists;
 import com.sun.jersey.spi.container.ResourceFilters;
+import org.apache.hadoop.util.Time;
 
 /** Web-hdfs NameNode implementation. */
 @Path("")
@@ -108,6 +112,7 @@ public class NamenodeWebHdfsMethods {
   public static final Log LOG = LogFactory.getLog(NamenodeWebHdfsMethods.class);
 
   private static final UriFsPathParam ROOT = new UriFsPathParam("");
+  private static final int MOVE_TO_TRASH_RETRY_NUM = 2;
 
   private volatile Boolean useIpcCallq;
   private String scheme;
@@ -116,6 +121,8 @@ public class NamenodeWebHdfsMethods {
 
   private @Context ServletContext context;
   private @Context HttpServletResponse response;
+
+  private Configuration config;
 
   public NamenodeWebHdfsMethods(@Context HttpServletRequest request) {
     // the request object is a proxy to thread-locals so we have to extract
@@ -134,9 +141,8 @@ public class NamenodeWebHdfsMethods {
       final UriFsPathParam path, final HttpOpParam<?> op,
       final Param<?, ?>... parameters) {
     if (useIpcCallq == null) {
-      Configuration conf =
-          (Configuration)context.getAttribute(JspHelper.CURRENT_CONF);
-      useIpcCallq = conf.getBoolean(
+      config = (Configuration) context.getAttribute(JspHelper.CURRENT_CONF);
+      useIpcCallq = config.getBoolean(
           DFSConfigKeys.DFS_WEBHDFS_USE_IPC_CALLQ,
           DFSConfigKeys.DFS_WEBHDFS_USE_IPC_CALLQ_DEFAULT);
     }
@@ -1108,11 +1114,13 @@ public class NamenodeWebHdfsMethods {
           final DeleteOpParam op,
       @QueryParam(RecursiveParam.NAME) @DefaultValue(RecursiveParam.DEFAULT)
           final RecursiveParam recursive,
+      @QueryParam(SkipTrashParam.NAME) @DefaultValue(SkipTrashParam.DEFAULT)
+          final SkipTrashParam skiptrash,
       @QueryParam(SnapshotNameParam.NAME) @DefaultValue(SnapshotNameParam.DEFAULT)
           final SnapshotNameParam snapshotName
       ) throws IOException, InterruptedException {
     return delete(ugi, delegation, username, doAsUser, ROOT, op, recursive,
-        snapshotName);
+            skiptrash, snapshotName);
   }
 
   /** Handle HTTP DELETE request. */
@@ -1132,17 +1140,20 @@ public class NamenodeWebHdfsMethods {
           final DeleteOpParam op,
       @QueryParam(RecursiveParam.NAME) @DefaultValue(RecursiveParam.DEFAULT)
           final RecursiveParam recursive,
+      @QueryParam(SkipTrashParam.NAME) @DefaultValue(SkipTrashParam.DEFAULT)
+      final SkipTrashParam skiptrash,
       @QueryParam(SnapshotNameParam.NAME) @DefaultValue(SnapshotNameParam.DEFAULT)
           final SnapshotNameParam snapshotName
       ) throws IOException, InterruptedException {
 
-    init(ugi, delegation, username, doAsUser, path, op, recursive, snapshotName);
+    init(ugi, delegation, username, doAsUser, path, op, recursive,
+            skiptrash, snapshotName);
 
     return doAs(ugi, new PrivilegedExceptionAction<Response>() {
       @Override
       public Response run() throws IOException {
           return delete(ugi, delegation, username, doAsUser,
-              path.getAbsolutePath(), op, recursive, snapshotName);
+              path.getAbsolutePath(), op, recursive, skiptrash, snapshotName);
       }
     });
   }
@@ -1155,6 +1166,7 @@ public class NamenodeWebHdfsMethods {
       final String fullpath,
       final DeleteOpParam op,
       final RecursiveParam recursive,
+      final SkipTrashParam skiptrash,
       final SnapshotNameParam snapshotName
       ) throws IOException {
     final NameNode namenode = (NameNode)context.getAttribute("name.node");
@@ -1162,7 +1174,13 @@ public class NamenodeWebHdfsMethods {
 
     switch(op.getValue()) {
     case DELETE: {
-      final boolean b = np.delete(fullpath, recursive.getValue());
+      boolean isSkipTrash = skiptrash.getValue();
+      boolean b;
+      if (isSkipTrash) {
+        b = np.delete(fullpath, recursive.getValue());
+      } else {
+        b = removeToTrash(np, ugi, fullpath, recursive.getValue());
+      }
       final String js = JsonUtil.toJsonString("boolean", b);
       return Response.ok(js).type(MediaType.APPLICATION_JSON).build();
     }
@@ -1173,5 +1191,74 @@ public class NamenodeWebHdfsMethods {
     default:
       throw new UnsupportedOperationException(op + " is not supported");
     }
+  }
+
+  private boolean removeToTrash(NamenodeProtocols np,
+      UserGroupInformation ugi, String src, boolean recursive)
+      throws IOException {
+    org.apache.hadoop.fs.Path srcPath = new org.apache.hadoop.fs.Path(src);
+    if (!srcPath.isAbsolute()) {
+      throw new IOException("Input path " + src + " is not absolute");
+    }
+    HdfsFileStatus fileInfo = np.getFileInfo(src) ;
+    if (fileInfo == null || "/".equals(src)) {
+      return false;
+    }
+
+    if (fileInfo.isDir() && !recursive) {
+      final DirectoryListing dirListing = getDirectoryListing(
+          np, src, HdfsFileStatus.EMPTY_NAME);
+      if (dirListing.getPartialListing().length > 0) {
+        throw new PathIsNotEmptyDirectoryException(src + " is non empty");
+      }
+    }
+
+    // trash dir is located at /home/<user>/.Trash, and the current trash
+    // goes to /home/<user>/.Trash/Current
+    org.apache.hadoop.fs.Path homeDir =
+        DFSUtilClient.getHomeDirectory(config, ugi);
+    org.apache.hadoop.fs.Path trashRoot = new org.apache.hadoop.fs.Path(
+        homeDir.toUri().getPath(), FileSystem.TRASH_PREFIX);
+    org.apache.hadoop.fs.Path trashCurrent =
+        new org.apache.hadoop.fs.Path(trashRoot, "Current");
+
+    if (src.startsWith(trashRoot.toString())) {
+      // already in trash
+      return false;
+    }
+    if (trashRoot.getParent().toString().startsWith(src)) {
+      throw new IOException("Cannot move \"" + src + "\" to the " +
+          "trash, as it contains the trash");
+    }
+
+    IOException cause = null;
+    org.apache.hadoop.fs.Path baseTrashPath =
+        org.apache.hadoop.fs.Path.mergePaths(trashCurrent, srcPath.getParent());
+    org.apache.hadoop.fs.Path trashPath =
+        org.apache.hadoop.fs.Path.mergePaths(trashCurrent, srcPath);
+    for (int i = 0; i < MOVE_TO_TRASH_RETRY_NUM; i++) {
+      if (!np.mkdirs(baseTrashPath.toString(),
+          TrashPolicyDefault.PERMISSION, true)) {
+        throw new IOException("Cannot create trash directory: " +
+            baseTrashPath.toString());
+      }
+      try {
+        // If the target path in trash already exists, append with a current
+        // time in milli-seconds
+        String orig = trashPath.toString();
+        while (np.getFileInfo(trashPath.toString()) != null) {
+          trashPath = new org.apache.hadoop.fs.Path(orig + Time.now());
+        }
+
+        // move to the current trash
+        np.rename2(srcPath.toString(), trashPath.toString(),
+            Options.Rename.TO_TRASH);
+        return true;
+      } catch (IOException e) {
+        cause = e;
+      }
+    }
+    throw new IOException("Failed to move to trash: " + srcPath +
+        ". Error: " + cause.getMessage());
   }
 }

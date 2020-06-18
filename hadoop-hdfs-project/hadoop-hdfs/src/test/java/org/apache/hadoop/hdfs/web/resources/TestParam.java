@@ -215,6 +215,21 @@ public class TestParam {
   }
 
   @Test
+  public void testSkipTrashParam() {
+    final SkipTrashParam p = new SkipTrashParam(SkipTrashParam.DEFAULT);
+    Assert.assertEquals(false, p.getValue());
+
+    new SkipTrashParam("true");
+
+    try {
+      new SkipTrashParam("abc");
+      Assert.fail();
+    } catch (IllegalArgumentException e) {
+      LOG.info("EXPECTED: " + e);
+    }
+  }
+
+  @Test
   public void testRenewerParam() {
     final RenewerParam p = new RenewerParam(RenewerParam.DEFAULT);
     Assert.assertEquals(null, p.getValue());

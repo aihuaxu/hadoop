@@ -482,7 +482,7 @@ See also: [`destination`](#Destination), [FileSystem](../../api/org/apache/hadoo
 * Submit a HTTP DELETE request.
 
         curl -i -X DELETE "http://<host>:<port>/webhdfs/v1/<path>?op=DELETE
-                                      [&recursive=<true |false>]"
+                                      [&recursive=<true|false>][&skiptrash=<true|false>]"
 
     The client receives a response with a [`boolean` JSON object](#Boolean_JSON_Schema):
 
@@ -493,6 +493,7 @@ See also: [`destination`](#Destination), [FileSystem](../../api/org/apache/hadoo
         {"boolean": true}
 
 See also: [`recursive`](#Recursive), [FileSystem](../../api/org/apache/hadoop/fs/FileSystem.html).delete
+See also: [`skiptrash`](#SkipTrash), [FileSystem](../../api/org/apache/hadoop/fs/FileSystem.html).delete
 
 ### Truncate a File
 
@@ -2345,6 +2346,16 @@ See also: [`CREATE`](#Create_and_Write_to_a_File), [`MKDIRS`](#Make_a_Directory)
 | Syntax | true |
 
 See also: [`RENAME`](#Rename_a_FileDirectory)
+
+### SkipTrash
+
+| Name | `skiptrash` |
+|:---- |:---- |
+| Description | Should file/directory delete permanently? or move to trash. |
+| Type | boolean |
+| Default Value | true |
+| Valid Values | false |
+| Syntax | false |
 
 ### Renewer
 

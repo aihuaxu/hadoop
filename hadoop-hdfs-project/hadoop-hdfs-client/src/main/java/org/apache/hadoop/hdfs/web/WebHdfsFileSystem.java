@@ -1401,7 +1401,8 @@ public class WebHdfsFileSystem extends FileSystem
     storageStatistics.incrementOpCounter(OpType.DELETE);
     final HttpOpParam.Op op = DeleteOpParam.Op.DELETE;
     return new FsPathBooleanRunner(op, f,
-        new RecursiveParam(recursive)
+        new RecursiveParam(recursive),
+        new SkipTrashParam(true) // bypass trash for FileSystem impl
     ).run();
   }
 
