@@ -59,7 +59,7 @@ public class TrashPolicyDefault extends TrashPolicy {
 
   private static final Path CURRENT = new Path("Current");
 
-  private static final FsPermission PERMISSION =
+  public static final FsPermission PERMISSION =
     new FsPermission(FsAction.ALL, FsAction.NONE, FsAction.NONE);
 
   private static final DateFormat CHECKPOINT = new SimpleDateFormat("yyMMddHHmmss");
