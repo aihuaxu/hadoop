@@ -438,6 +438,7 @@ public class TestTrashWithSecureEncryptionZones {
     String[] argv = new String[]{"-rm", "-r", "-skipTrash", path.toString()};
     int res = ToolRunner.run(shell, argv);
     assertEquals("rm failed", 0, res);
-    assertFalse("File in trash even with -skipTrash", fs.exists(trashFile));
+    // assertFalse("File in trash even with -skipTrash", fs.exists(trashFile));
+    assertTrue("-skipTrash should be ignored", fs.exists(trashFile));
   }
 }

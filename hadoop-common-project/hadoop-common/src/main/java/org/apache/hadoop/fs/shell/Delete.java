@@ -35,6 +35,7 @@ import org.apache.hadoop.fs.PathNotFoundException;
 import org.apache.hadoop.fs.Trash;
 import org.apache.hadoop.util.ToolRunner;
 
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_CUSTOM_ROOT_KEY;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SHELL_SAFELY_DELETE_LIMIT_NUM_FILES;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SHELL_SAFELY_DELETE_LIMIT_NUM_FILES_DEFAULT;
 
@@ -84,6 +85,12 @@ class Delete {
       ignoreFNF = cf.getOpt("f");
       deleteDirs = cf.getOpt("r") || cf.getOpt("R");
       skipTrash = cf.getOpt("skipTrash");
+      if (skipTrash) {
+        String trashRoot = getConf().get(FS_TRASH_CUSTOM_ROOT_KEY);
+        System.out.println("SkipTrash is now disabled. " +
+            "Please find details in http://t.uber.com/hdfs_trash");
+        skipTrash = false;
+      }
       safeDelete = cf.getOpt("safely");
     }
 
@@ -158,7 +165,7 @@ class Delete {
           if (ioe.getCause() != null) {
             msg += ": " + ioe.getCause().getMessage();
           }
-          throw new IOException(msg + ". Consider using -skipTrash option", ioe);
+          throw new IOException(msg + ".", ioe);
         }
       }
       return success;

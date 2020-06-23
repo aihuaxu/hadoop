@@ -21,10 +21,8 @@ package org.apache.hadoop.fs;
 import static org.apache.hadoop.fs.CommonConfigurationKeys.*;
 import static org.apache.hadoop.fs.FileSystemTestHelper.*;
 
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
-import java.io.PrintStream;
 import java.net.URI;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
@@ -38,6 +36,9 @@ import junit.framework.TestCase;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.TrashPolicyDefault.Emptier;
 import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.fs.viewfs.ConfigUtil;
+import org.apache.hadoop.fs.viewfs.ViewFileSystemTestSetup;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.util.Time;
 import org.junit.Before;
@@ -320,13 +321,13 @@ public class TestTrash extends TestCase {
       assertTrue(trashRootFs.exists(trashRoot));
     }
     
-    // Verify skip trash option really works
+    // Verify skip trash option does not work
     
     // recreate directory and file
     mkdir(fs, myPath);
     writeFile(fs, myFile, 10);
     
-    // Verify that skip trash option really skips the trash for files (rm)
+    // Verify that skip trash option is not effective for -rm
     {
       String[] args = new String[3];
       args[0] = "-rm";
@@ -335,18 +336,18 @@ public class TestTrash extends TestCase {
       int val = -1;
       try {
         // Clear out trash
-        assertEquals("-expunge failed", 
+        assertEquals("-expunge failed",
             0, shell.run(new String [] { "-expunge" } ));
-        
+
         val = shell.run(args);
-        
+
       }catch (Exception e) {
         System.err.println("Exception raised from Trash.run " +
             e.getLocalizedMessage());
       }
-      assertFalse("Expected TrashRoot (" + trashRoot + 
-          ") to exist in file system:"
-          + trashRootFs.getUri(), 
+      assertTrue("Expected TrashRoot (" + trashRoot +
+          ") not to exist in file system:"
+          + trashRootFs.getUri(),
           trashRootFs.exists(trashRoot)); // No new Current should be created
       assertFalse(fs.exists(myFile));
       assertTrue(val == 0);
@@ -356,7 +357,7 @@ public class TestTrash extends TestCase {
     mkdir(fs, myPath);
     writeFile(fs, myFile, 10);
     
-    // Verify that skip trash option really skips the trash for rmr
+    // Verify that skip trash option is not effective for -rmr
     {
       String[] args = new String[3];
       args[0] = "-rmr";
@@ -375,7 +376,7 @@ public class TestTrash extends TestCase {
             e.getLocalizedMessage());
       }
 
-      assertFalse(trashRootFs.exists(trashRoot)); // No new Current should be created
+      assertTrue(trashRootFs.exists(trashRoot)); // No new Current should be created
       assertFalse(fs.exists(myPath));
       assertFalse(fs.exists(myFile));
       assertTrue(val == 0);
@@ -424,31 +425,31 @@ public class TestTrash extends TestCase {
       assertTrue(count==num_runs);
     }
     
-    //Verify skipTrash option is suggested when rm fails due to its absence
-    {
-      String[] args = new String[2];
-      args[0] = "-rmr";
-      args[1] = "/";  //This always contains trash directory
-      PrintStream stdout = System.out;
-      PrintStream stderr = System.err;
-      ByteArrayOutputStream byteStream = new ByteArrayOutputStream();
-      PrintStream newOut = new PrintStream(byteStream);
-      System.setOut(newOut);
-      System.setErr(newOut);
-      try {
-        shell.run(args);
-      } catch (Exception e) {
-        System.err.println("Exception raised from Trash.run " +
-            e.getLocalizedMessage());
-      }
-      String output = byteStream.toString();
-      System.setOut(stdout);
-      System.setErr(stderr);
-      assertTrue("skipTrash wasn't suggested as remedy to failed rm command" +
-          " or we deleted / even though we could not get server defaults",
-          output.indexOf("Consider using -skipTrash option") != -1 ||
-          output.indexOf("Failed to determine server trash configuration") != -1);
-    }
+    // Verify skipTrash option is suggested when rm fails due to its absence
+//    {
+//      String[] args = new String[2];
+//      args[0] = "-rmr";
+//      args[1] = "/";  //This always contains trash directory
+//      PrintStream stdout = System.out;
+//      PrintStream stderr = System.err;
+//      ByteArrayOutputStream byteStream = new ByteArrayOutputStream();
+//      PrintStream newOut = new PrintStream(byteStream);
+//      System.setOut(newOut);
+//      System.setErr(newOut);
+//      try {
+//        shell.run(args);
+//      } catch (Exception e) {
+//        System.err.println("Exception raised from Trash.run " +
+//            e.getLocalizedMessage());
+//      }
+//      String output = byteStream.toString();
+//      System.setOut(stdout);
+//      System.setErr(stderr);
+//      assertTrue("skipTrash wasn't suggested as remedy to failed rm command" +
+//          " or we deleted / even though we could not get server defaults",
+//          output.indexOf("Consider using -skipTrash option") != -1 ||
+//          output.indexOf("Failed to determine server trash configuration") != -1);
+//    }
 
     // Verify old checkpoint format is recognized
     {
@@ -511,6 +512,79 @@ public class TestTrash extends TestCase {
     Configuration conf = new Configuration();
     conf.setClass("fs.file.impl", TestLFS.class, FileSystem.class);
     trashShell(FileSystem.getLocal(conf), TEST_DIR);
+  }
+
+  private void setupCustomizedTrashRootConfig(Configuration config, Path trashRoot) {
+    config.setLong(FS_TRASH_INTERVAL_KEY, FS_TRASH_INTERVAL_DEFAULT + 10);
+    config.setClass("fs.file.impl", TestLFS.class, FileSystem.class);
+    config.setBoolean(CommonConfigurationKeysPublic.FS_TRASH_ENABLE_CUSTOM_ROOT_KEY, true);
+    config.set(CommonConfigurationKeysPublic.FS_TRASH_CUSTOM_ROOT_KEY,
+        trashRoot.toString());
+    config.setClass("fs.trash.classname",
+        TrashPolicyDefault.class,
+        TrashPolicy.class);
+
+  }
+
+  @Test
+  public void testCustomizedTrashRoot() throws Exception {
+    Path trashRoot = new Path(TEST_DIR, "trash");
+    Path userTrash = new Path(trashRoot,
+        UserGroupInformation.getCurrentUser().getShortUserName() + "/Current");
+    Configuration testConf = new Configuration();
+    setupCustomizedTrashRootConfig(testConf, trashRoot);
+
+    FileSystem fs = FileSystem.get(testConf);
+    fs.mkdirs(trashRoot, new FsPermission("777"));
+
+    Path testFile = new Path(TEST_DIR, "testfile");
+    writeFile(fs, testFile, 10);
+
+    String [] args = new String[] {"-rm", testFile.toString()};
+    FsShell shell = new FsShell();
+    shell.setConf(testConf);
+    shell.run(args);
+
+    assertFalse(fs.exists(testFile));
+    assertTrue(fs.exists(new Path(userTrash + "/" + testFile)));
+  }
+
+  @Test
+  public void testCustomizedTrashRootWithViewFS() throws Exception {
+    Path trashRoot = new Path(TEST_DIR, "trash");
+    Path userTrash = new Path(trashRoot,
+        UserGroupInformation.getCurrentUser().getShortUserName() + "/Current");
+    Configuration testConf = new Configuration();
+    setupCustomizedTrashRootConfig(testConf, trashRoot);
+
+    FileSystem fs = FileSystem.get(testConf);
+    fs.mkdirs(trashRoot, new FsPermission("777"));
+
+    Configuration viewFsConf = ViewFileSystemTestSetup.createConfig();
+    final Path viewFsDir = new Path("viewfs:///test/");
+    FileSystemTestHelper fsTestHelper = new FileSystemTestHelper();
+    Path testRoot = fsTestHelper.getAbsoluteTestRootPath(fs);
+    viewFsConf.set(CommonConfigurationKeys.FS_DEFAULT_NAME_KEY, testRoot.toString());
+    ConfigUtil.addLink(viewFsConf, viewFsDir.toUri().getPath(), TEST_DIR.toUri());
+    viewFsConf.setLong(FS_TRASH_INTERVAL_KEY, FS_TRASH_INTERVAL_DEFAULT + 10);
+    viewFsConf.setClass("fs.trash.classname",
+        TrashPolicyDefault.class,
+        TrashPolicy.class);
+    viewFsConf.setBoolean(CommonConfigurationKeysPublic.FS_TRASH_ENABLE_CUSTOM_ROOT_KEY, true);
+    viewFsConf.set(CommonConfigurationKeysPublic.FS_TRASH_CUSTOM_ROOT_KEY,
+        trashRoot.toString());
+
+    Path testFile = new Path(TEST_DIR, "testfile");
+    writeFile(fs, testFile, 10);
+
+    Path viewFsTestPath = new Path(viewFsDir, "testfile");
+    String [] args = new String[] {"-rm", viewFsTestPath.toString()};
+    FsShell shell = new FsShell();
+    shell.setConf(viewFsConf);
+    shell.run(args);
+
+    assertFalse(fs.exists(testFile));
+    assertTrue(fs.exists(new Path(userTrash + "/" + testFile)));
   }
 
   public void testNonDefaultFS() throws IOException {

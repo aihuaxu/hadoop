@@ -17,6 +17,10 @@
  */
 package org.apache.hadoop.fs;
 
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_CUSTOM_ROOT_KEY_DEFAULT;
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_CUSTOM_ROOT_KEY;
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_ENABLE_CUSTOM_ROOT_KEY_DEFAULT;
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_ENABLE_CUSTOM_ROOT_KEY;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_CHECKPOINT_INTERVAL_DEFAULT;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_CHECKPOINT_INTERVAL_KEY;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_DEFAULT;
@@ -24,6 +28,7 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERV
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.net.URI;
 import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -38,6 +43,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Options.Rename;
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -69,6 +75,8 @@ public class TrashPolicyDefault extends TrashPolicy {
   private static final int MSECS_PER_MINUTE = 60*1000;
 
   private long emptierInterval;
+  private boolean useCustomizedTrashRoot;
+  private String customizedTrashRoot;
 
   public TrashPolicyDefault() { }
 
@@ -101,6 +109,10 @@ public class TrashPolicyDefault extends TrashPolicy {
     this.emptierInterval = (long)(conf.getFloat(
         FS_TRASH_CHECKPOINT_INTERVAL_KEY, FS_TRASH_CHECKPOINT_INTERVAL_DEFAULT)
         * MSECS_PER_MINUTE);
+    this.useCustomizedTrashRoot = conf.getBoolean(FS_TRASH_ENABLE_CUSTOM_ROOT_KEY,
+        FS_TRASH_ENABLE_CUSTOM_ROOT_KEY_DEFAULT);
+    this.customizedTrashRoot = conf.get(FS_TRASH_CUSTOM_ROOT_KEY,
+        FS_TRASH_CUSTOM_ROOT_KEY_DEFAULT);
   }
 
   private Path makeTrashRelativePath(Path basePath, Path rmFilePath) {
@@ -126,7 +138,27 @@ public class TrashPolicyDefault extends TrashPolicy {
 
     String qpath = fs.makeQualified(path).toString();
 
-    Path trashRoot = fs.getTrashRoot(path);
+    Path trashRoot;
+    if (useCustomizedTrashRoot) {
+      String userName;
+      UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
+      if (ugi != null) {
+        userName = ugi.getShortUserName();
+      } else {
+        userName = System.getProperty("user.name");
+      }
+      // Get the URI for the default trash path and replace the path with the customized path.
+      // This will handle viewfs cases as well,
+      // as the scheme and authorization will be replaced by the actual destination
+      URI defaultTrash = fs.getTrashRoot(path).toUri();
+      String scheme = defaultTrash.getScheme();
+      String authorization = defaultTrash.getAuthority();
+      trashRoot = new Path(scheme, authorization, customizedTrashRoot);
+      trashRoot = new Path(trashRoot, userName);
+    } else {
+      trashRoot = fs.getTrashRoot(path);
+    }
+
     Path trashCurrent = new Path(trashRoot, CURRENT);
     if (qpath.startsWith(trashRoot.toString())) {
       return false;                               // already in trash
