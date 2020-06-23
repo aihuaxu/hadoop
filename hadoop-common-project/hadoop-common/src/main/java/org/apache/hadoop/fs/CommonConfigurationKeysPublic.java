@@ -138,6 +138,17 @@ public class CommonConfigurationKeysPublic {
   public static final long    FS_TRASH_CHECKPOINT_INTERVAL_DEFAULT = 0;
 
   /**
+   * Use customized trash root instead of /user
+   * Currently this only affects client trash behavior,
+   * namenode will still empty Trash under /user
+   */
+  public static final String FS_TRASH_ENABLE_CUSTOM_ROOT_KEY = "fs.trash.customized.root.enabled";
+  public static final boolean FS_TRASH_ENABLE_CUSTOM_ROOT_KEY_DEFAULT = false;
+
+  public static final String FS_TRASH_CUSTOM_ROOT_KEY = "fs.trash.customized.root";
+  public static final String FS_TRASH_CUSTOM_ROOT_KEY_DEFAULT = "/system/trash";
+
+  /**
    * Directories that cannot be removed unless empty, even by an
    * administrator.
    */
