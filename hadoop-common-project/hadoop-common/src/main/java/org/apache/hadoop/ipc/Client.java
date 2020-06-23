@@ -646,6 +646,7 @@ public class Client implements AutoCloseable {
     }
     
     private synchronized void setupConnection() throws IOException {
+      LOG.debug("Setup connection to " + server.toString());
       short ioFailures = 0;
       short timeoutFailures = 0;
       while (true) {
@@ -704,8 +705,16 @@ public class Client implements AutoCloseable {
         } catch (IOException ie) {
           if (updateAddress()) {
             timeoutFailures = ioFailures = 0;
+            try {
+              // HADOOP-17068: when server changed, ignore the exception.
+              handleConnectionFailure(ioFailures++, ie);
+            } catch (IOException ioe) {
+              LOG.warn("Exception when handle ConnectionFailure: "
+                  + ioe.getMessage());
+            }
+          } else {
+            handleConnectionFailure(ioFailures++, ie);
           }
-          handleConnectionFailure(ioFailures++, ie);
         }
       }
     }
@@ -1246,7 +1255,7 @@ public class Client implements AutoCloseable {
           cleanupCalls();
         }
       } else {
-        // log the info
+        // Log the newest server information if update address.
         if (LOG.isDebugEnabled()) {
           LOG.debug("closing ipc connection to " + server + ": " +
               closeException.getMessage(),closeException);
