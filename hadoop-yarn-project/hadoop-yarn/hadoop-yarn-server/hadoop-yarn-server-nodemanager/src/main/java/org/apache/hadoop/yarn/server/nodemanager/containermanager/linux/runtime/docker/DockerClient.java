@@ -66,9 +66,16 @@ public final class DockerClient {
       throws ContainerExecutionException {
     File dockerCommandFile = null;
     try {
+      File tmpDir = new File(tmpDirPath);
+      // if directory of conf(hadoop.tmp.dir) get deleted during nm process is running, re-created it before
+      // write tmp file under the dir.
+      if (!(tmpDir.exists() || tmpDir.mkdirs())) {
+        LOG.warn("Unable to create directory when write command to temp file: " + tmpDirPath);
+        throw new ContainerExecutionException("Unable to create directory: " +
+            tmpDirPath);
+      }
       dockerCommandFile = File.createTempFile(TMP_FILE_PREFIX + filePrefix,
-          TMP_FILE_SUFFIX, new
-          File(tmpDirPath));
+          TMP_FILE_SUFFIX, tmpDir);
 
       Writer writer = new OutputStreamWriter(
           new FileOutputStream(dockerCommandFile), "UTF-8");
