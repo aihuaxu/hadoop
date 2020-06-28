@@ -77,4 +77,33 @@ public class TestDockerRunCommand {
             .get("launch-command")));
     assertEquals(7, dockerRunCommand.getDockerCommandWithArguments().size());
   }
+
+  @Test
+  public void testCommandWithDockerLabel() {
+    String[] labels = {"key1:value1", "key2:value2"};
+    dockerRunCommand.setLabels(labels);
+    List<String> commands = new ArrayList<>();
+    commands.add("launch_command");
+    dockerRunCommand.setOverrideCommandWithArgs(commands);
+    dockerRunCommand.removeContainerOnExit();
+
+    assertEquals("run", StringUtils.join(",",
+            dockerRunCommand.getDockerCommandWithArguments()
+                    .get("docker-command")));
+    assertEquals("foo", StringUtils.join(",",
+            dockerRunCommand.getDockerCommandWithArguments().get("name")));
+    assertEquals("user_id", StringUtils.join(",",
+            dockerRunCommand.getDockerCommandWithArguments().get("user")));
+    assertEquals("image_name", StringUtils.join(",",
+            dockerRunCommand.getDockerCommandWithArguments().get("image")));
+
+    assertEquals("key1:value1,key2:value2", StringUtils.join(",",
+            dockerRunCommand.getDockerCommandWithArguments().get("label")));
+    assertEquals("true", StringUtils
+            .join(",", dockerRunCommand.getDockerCommandWithArguments().get("rm")));
+    assertEquals("launch_command", StringUtils.join(",",
+            dockerRunCommand.getDockerCommandWithArguments()
+                    .get("launch-command")));
+    assertEquals(7, dockerRunCommand.getDockerCommandWithArguments().size());
+  }
 }

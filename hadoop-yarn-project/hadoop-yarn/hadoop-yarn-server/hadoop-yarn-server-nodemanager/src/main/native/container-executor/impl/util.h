@@ -133,6 +133,15 @@ int execute_regex_match(const char *regex_str, const char *input);
 char* escape_single_quote(const char *str);
 
 /**
+ * Helper function to replace single character in string
+ * @param str Input string
+ * @param orig the char needs to be replaced
+ * @param replace the replace char
+ * @return String with orig char replaced
+ */
+char* replace_char(char* str, char orig, char replace);
+
+/**
  * Helper function to quote the argument to a parameter and then append it to the provided string.
  * @param str Buffer to which the param'arg' string must be appended
  * @param size Size of the buffer

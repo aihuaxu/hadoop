@@ -399,6 +399,16 @@ namespace ContainerExecutor {
     run_docker_run_helper_function(file_cmd_vec, set_group_add);
   }
 
+  TEST_F(TestDockerUtil, test_set_label) {
+      std::vector<std::pair<std::string, std::string> > file_cmd_vec;
+      file_cmd_vec.push_back(std::make_pair<std::string, std::string>(
+          "[docker-command-execution]\n  docker-command=run\n  label=key1:value1,key2:value2", "--label 'key1=value1' --label 'key2=value2' "));
+      file_cmd_vec.push_back(std::make_pair<std::string, std::string>(
+          "[docker-command-execution]\n  docker-command=run", ""));
+
+      run_docker_run_helper_function(file_cmd_vec, set_labels);
+    }
+
   TEST_F(TestDockerUtil, test_set_network) {
     struct configuration container_cfg;
     const int buff_len = 1024;

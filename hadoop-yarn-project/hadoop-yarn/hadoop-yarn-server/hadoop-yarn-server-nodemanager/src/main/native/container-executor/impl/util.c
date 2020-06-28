@@ -175,6 +175,15 @@ char* escape_single_quote(const char *str) {
   return ret;
 }
 
+char* replace_char(char* str, char orig, char replace) {
+    char *current_pos = strchr(str,orig);
+    while (current_pos){
+        *current_pos = replace;
+        current_pos = strchr(current_pos,orig);
+    }
+    return str;
+}
+
 void quote_and_append_arg(char **str, size_t *size, const char* param, const char *arg) {
   char *tmp = escape_single_quote(arg);
   const char *append_format = "%s'%s' ";

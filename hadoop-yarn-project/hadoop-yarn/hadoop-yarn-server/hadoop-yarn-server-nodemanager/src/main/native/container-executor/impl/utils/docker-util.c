@@ -613,6 +613,27 @@ static int set_group_add(const struct configuration *command_config, char *out, 
   return ret;
 }
 
+// read labels from yarn conf with format label=key1:value1,key2:value2 then set label when run docker container
+// as docker run <IMAGE> --label key1=value1 --label key2=value2
+static int set_labels(const struct configuration *command_config, char *out, const size_t outlen) {
+  int i = 0, ret = 0;
+  char **labels = get_configuration_values_delimiter("label", DOCKER_COMMAND_FILE_SECTION, command_config, ",");
+  size_t tmp_buffer_size = 4096;
+  char *tmp_buffer = NULL;
+
+  if (labels != NULL) {
+    for (i = 0; labels[i] != NULL; ++i) {
+      tmp_buffer = (char *) alloc_and_clear_memory(tmp_buffer_size, sizeof(char));
+      quote_and_append_arg(&tmp_buffer, &tmp_buffer_size, "--label ", replace_char(labels[i], ':', '='));
+      ret = add_to_buffer(out, outlen, tmp_buffer);
+      if (ret != 0) {
+        return BUFFER_TOO_SMALL;
+      }
+    }
+  }
+  return ret;
+}
+
 static int set_network(const struct configuration *command_config,
                        const struct configuration *conf, char *out,
                        const size_t outlen) {
@@ -1023,6 +1044,11 @@ int get_docker_run_command(const char *command_file, const struct configuration 
   }
 
   ret = set_group_add(&command_config, out, outlen);
+  if (ret != 0) {
+    return ret;
+  }
+
+  ret = set_labels(&command_config, out, outlen);
   if (ret != 0) {
     return ret;
   }

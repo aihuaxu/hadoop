@@ -1602,6 +1602,8 @@ public class YarnConfiguration extends Configuration {
           "docker.baseimage.tag";
   public static final String NM_DOCKER_CONTAINER_DEFAULT_MOUNT= NM_PREFIX +
           "docker.mount.default";
+  public static final String NM_DOCKER_CONTAINER_LABEL = NM_PREFIX +
+          "docker.label";
 
   /**
    * Comma separated list of runtimes that are allowed when using

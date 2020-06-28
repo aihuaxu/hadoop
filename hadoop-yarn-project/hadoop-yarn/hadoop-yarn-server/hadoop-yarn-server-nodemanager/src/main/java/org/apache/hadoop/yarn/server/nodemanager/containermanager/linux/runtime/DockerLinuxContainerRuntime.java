@@ -21,6 +21,7 @@
 package org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.runtime;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Strings;
 import org.apache.hadoop.yarn.server.nodemanager.Context;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.runtime.docker.DockerCommandExecutor;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.runtime.docker.DockerKillCommand;
@@ -564,9 +565,9 @@ public class DockerLinuxContainerRuntime implements LinuxContainerRuntime {
     String imageName = environment.get(ENV_DOCKER_CONTAINER_IMAGE);
     String network = environment.get(ENV_DOCKER_CONTAINER_NETWORK);
     String hostname = environment.get(ENV_DOCKER_CONTAINER_HOSTNAME);
-    String defaultDockerMount = conf.get(YarnConfiguration.NM_DOCKER_CONTAINER_DEFAULT_MOUNT, null);
-    String baseDockerImageName = conf.get(YarnConfiguration.NM_DOCKER_CONTAINER_BASE_IMAGE_NAME, null);
-    String baseDockerImageTag = conf.get(YarnConfiguration.NM_DOCKER_CONTAINER_BASE_IMAGE_TAG, null);
+    String defaultDockerMount = conf.get(YarnConfiguration.NM_DOCKER_CONTAINER_DEFAULT_MOUNT);
+    String baseDockerImageName = conf.get(YarnConfiguration.NM_DOCKER_CONTAINER_BASE_IMAGE_NAME);
+    String baseDockerImageTag = conf.get(YarnConfiguration.NM_DOCKER_CONTAINER_BASE_IMAGE_TAG);
 
     if(network == null || network.isEmpty()) {
       network = defaultNetwork;
@@ -726,6 +727,11 @@ public class DockerLinuxContainerRuntime implements LinuxContainerRuntime {
       overrideCommands.add("bash");
       overrideCommands.add(launchDst.toUri().getPath());
       runCommand.setOverrideCommandWithArgs(overrideCommands);
+    }
+
+    String containerLabelStr = conf.get(YarnConfiguration.NM_DOCKER_CONTAINER_LABEL);
+    if (!Strings.isNullOrEmpty(containerLabelStr)) {
+      runCommand.setLabels(containerLabelStr.trim().split("\\s*,\\s*"));
     }
 
     if(enableUserReMapping) {

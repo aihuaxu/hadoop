@@ -144,6 +144,11 @@ public class DockerRunCommand extends DockerCommand {
     return this;
   }
 
+  public DockerRunCommand setLabels(String[] labels) {
+    super.addCommandArguments("label", StringUtils.join(",", labels));
+    return this;
+  }
+
   public DockerRunCommand setOverrideCommandWithArgs(
       List<String> overrideCommandWithArgs) {
     for(String override: overrideCommandWithArgs) {
