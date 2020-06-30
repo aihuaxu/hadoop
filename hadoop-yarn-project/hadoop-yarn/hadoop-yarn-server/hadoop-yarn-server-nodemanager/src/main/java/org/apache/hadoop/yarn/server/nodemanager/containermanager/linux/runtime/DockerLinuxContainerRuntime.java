@@ -405,14 +405,21 @@ public class DockerLinuxContainerRuntime implements LinuxContainerRuntime {
   @VisibleForTesting
   protected void addCGroupParentIfRequired(String resourcesOptions,
       String containerIdStr, DockerRunCommand runCommand) {
-    if (cGroupsHandler == null) {
+    String cgroupParentPath = conf.get(YarnConfiguration.NM_DOCKER_CONTAINER_CGROUP_PARENT);
+    boolean cgroupParentNotExist = Strings.isNullOrEmpty(cgroupParentPath);
+    if (cGroupsHandler == null && cgroupParentNotExist) {
       if (LOG.isDebugEnabled()) {
         LOG.debug("cGroupsHandler is null. cgroups are not in use. nothing to"
             + " do.");
       }
       return;
     }
-
+    // set cgroup parent if it's configured in conf
+    if (!cgroupParentNotExist) {
+      LOG.info("set cgroup parent to " + cgroupParentPath);
+      runCommand.setCGroupParent(cgroupParentPath);
+      return;
+    }
     if (resourcesOptions.equals(PrivilegedOperation.CGROUP_ARG_PREFIX
             + PrivilegedOperation.CGROUP_ARG_NO_TASKS)) {
       if (LOG.isDebugEnabled()) {

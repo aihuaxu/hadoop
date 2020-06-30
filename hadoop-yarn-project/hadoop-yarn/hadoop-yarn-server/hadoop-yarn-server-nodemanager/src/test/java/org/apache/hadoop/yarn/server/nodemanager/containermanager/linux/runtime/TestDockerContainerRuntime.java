@@ -1030,6 +1030,34 @@ public class TestDockerContainerRuntime {
   }
 
   @Test
+  public void testMountDockerCGroupParent() throws ContainerExecutionException {
+    String expectedPath = "/test/cgroupparent";
+
+    DockerLinuxContainerRuntime runtime = new DockerLinuxContainerRuntime
+            (mockExecutor, null);
+    runtime.initialize(conf);
+
+    String resourceOptionsNone = "cgroups=none";
+    DockerRunCommand command = Mockito.mock(DockerRunCommand.class);
+
+    runtime.addCGroupParentIfRequired(resourceOptionsNone, containerIdStr,
+            command);
+
+    //no --cgroup-parent should be added
+    Mockito.verifyZeroInteractions(command);
+
+    conf.set(YarnConfiguration.NM_DOCKER_CONTAINER_CGROUP_PARENT,
+            expectedPath);
+    runtime = new DockerLinuxContainerRuntime
+            (mockExecutor, null);
+    runtime.initialize(conf);
+    runtime.addCGroupParentIfRequired(resourceOptionsNone, containerIdStr,
+            command);
+    //--cgroup-parent should be added with value from NM_DOCKER_CONTAINER_CGROUP_PARENT config
+    Mockito.verify(command).setCGroupParent(expectedPath);
+  }
+
+  @Test
   public void testMountMultiple()
       throws ContainerExecutionException, PrivilegedOperationException,
       IOException{
