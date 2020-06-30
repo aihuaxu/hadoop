@@ -1603,7 +1603,7 @@ public class YarnConfiguration extends Configuration {
   public static final String NM_DOCKER_CONTAINER_DEFAULT_MOUNT= NM_PREFIX +
           "docker.mount.default";
   public static final String NM_DOCKER_CONTAINER_LABEL = NM_PREFIX +
-          "docker.label";
+          "docker.labels";
   public static final String NM_DOCKER_CONTAINER_CGROUP_PARENT = NM_PREFIX + "docker.cgroup-parent";
 
   /**
