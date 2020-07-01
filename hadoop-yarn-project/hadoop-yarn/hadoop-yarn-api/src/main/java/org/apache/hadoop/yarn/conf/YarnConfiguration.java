@@ -1605,6 +1605,7 @@ public class YarnConfiguration extends Configuration {
   public static final String NM_DOCKER_CONTAINER_LABEL = NM_PREFIX +
           "docker.labels";
   public static final String NM_DOCKER_CONTAINER_CGROUP_PARENT = NM_PREFIX + "docker.cgroup-parent";
+  public static final String NM_FORCE_RUN_AS_DOCKER_ENABLED = NM_PREFIX + "force-docker-runtime.enabled";
 
   /**
    * Comma separated list of runtimes that are allowed when using

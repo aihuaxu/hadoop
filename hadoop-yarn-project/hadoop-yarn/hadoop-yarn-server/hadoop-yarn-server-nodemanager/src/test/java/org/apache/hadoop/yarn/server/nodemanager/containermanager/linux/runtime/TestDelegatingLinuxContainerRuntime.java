@@ -18,6 +18,7 @@ package org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.runtime
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
+import org.apache.hadoop.yarn.server.nodemanager.containermanager.runtime.ContainerRuntimeConstants;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -76,5 +77,20 @@ public class TestDelegatingLinuxContainerRuntime {
         LinuxContainerRuntimeConstants.RuntimeType.DOCKER));
     assertTrue(delegatingLinuxContainerRuntime.isRuntimeAllowed(
         LinuxContainerRuntimeConstants.RuntimeType.DEFAULT));
+  }
+
+  @Test
+  public void testForcePickDOckerRuntime() throws Exception {
+    conf.set(YarnConfiguration.LINUX_CONTAINER_RUNTIME_ALLOWED_RUNTIMES,
+        "default,docker");
+    conf.setBoolean(YarnConfiguration.NM_FORCE_RUN_AS_DOCKER_ENABLED, true);
+    delegatingLinuxContainerRuntime.initialize(conf);
+    assertTrue(delegatingLinuxContainerRuntime.isRuntimeAllowed(
+        LinuxContainerRuntimeConstants.RuntimeType.DOCKER));
+    assertTrue(delegatingLinuxContainerRuntime.isRuntimeAllowed(
+        LinuxContainerRuntimeConstants.RuntimeType.DEFAULT));
+    Map<String, String> env = new HashMap<>();
+    LinuxContainerRuntime containerRuntime = delegatingLinuxContainerRuntime.pickContainerRuntime(env);
+    assertTrue(containerRuntime instanceof DockerLinuxContainerRuntime);
   }
 }

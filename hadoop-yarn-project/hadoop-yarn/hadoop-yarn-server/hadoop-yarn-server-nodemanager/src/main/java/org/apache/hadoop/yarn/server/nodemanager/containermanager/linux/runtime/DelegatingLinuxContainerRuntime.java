@@ -54,6 +54,7 @@ public class DelegatingLinuxContainerRuntime implements LinuxContainerRuntime {
   private DockerLinuxContainerRuntime dockerLinuxContainerRuntime;
   private EnumSet<LinuxContainerRuntimeConstants.RuntimeType> allowedRuntimes =
       EnumSet.noneOf(LinuxContainerRuntimeConstants.RuntimeType.class);
+  private boolean forceDockerRuntimeEnabled = false;
 
   @Override
   public void initialize(Configuration conf)
@@ -61,6 +62,7 @@ public class DelegatingLinuxContainerRuntime implements LinuxContainerRuntime {
     String[] configuredRuntimes = conf.getTrimmedStrings(
         YarnConfiguration.LINUX_CONTAINER_RUNTIME_ALLOWED_RUNTIMES,
         YarnConfiguration.DEFAULT_LINUX_CONTAINER_RUNTIME_ALLOWED_RUNTIMES);
+    forceDockerRuntimeEnabled = conf.getBoolean(YarnConfiguration.NM_FORCE_RUN_AS_DOCKER_ENABLED, false);
     for (String configuredRuntime : configuredRuntimes) {
       try {
         allowedRuntimes.add(
@@ -99,8 +101,8 @@ public class DelegatingLinuxContainerRuntime implements LinuxContainerRuntime {
   LinuxContainerRuntime pickContainerRuntime(
       Map<String, String> environment) throws ContainerExecutionException {
     LinuxContainerRuntime runtime;
-    if (dockerLinuxContainerRuntime != null &&
-        DockerLinuxContainerRuntime.isDockerContainerRequested(environment)){
+    if (dockerLinuxContainerRuntime != null && (forceDockerRuntimeEnabled ||
+        DockerLinuxContainerRuntime.isDockerContainerRequested(environment))){
       runtime = dockerLinuxContainerRuntime;
     } else if (defaultLinuxContainerRuntime != null &&
         !DockerLinuxContainerRuntime.isDockerContainerRequested(environment)) {
