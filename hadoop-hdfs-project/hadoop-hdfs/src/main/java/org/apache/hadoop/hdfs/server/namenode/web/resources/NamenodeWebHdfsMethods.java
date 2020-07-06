@@ -53,6 +53,7 @@ import javax.ws.rs.core.StreamingOutput;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.fs.QuotaUsage;
 import org.apache.hadoop.conf.Configuration;
@@ -1213,12 +1214,31 @@ public class NamenodeWebHdfsMethods {
       }
     }
 
-    // trash dir is located at /home/<user>/.Trash, and the current trash
-    // goes to /home/<user>/.Trash/Current
-    org.apache.hadoop.fs.Path homeDir =
-        DFSUtilClient.getHomeDirectory(config, ugi);
-    org.apache.hadoop.fs.Path trashRoot = new org.apache.hadoop.fs.Path(
-        homeDir.toUri().getPath(), FileSystem.TRASH_PREFIX);
+    // If custom trash root is enabled, use that and append it with username.
+    // Otherwise use the user home directory (/user/<user>/.Trash) which is
+    // specified from TrashPolicyDefault.
+    org.apache.hadoop.fs.Path trashRoot;
+    boolean useCustomTrashRoot = config.getBoolean(
+        CommonConfigurationKeysPublic.FS_TRASH_ENABLE_CUSTOM_ROOT_KEY,
+        CommonConfigurationKeysPublic.FS_TRASH_ENABLE_CUSTOM_ROOT_KEY_DEFAULT);
+    if (useCustomTrashRoot) {
+      trashRoot = new org.apache.hadoop.fs.Path(config.get(
+          CommonConfigurationKeysPublic.FS_TRASH_CUSTOM_ROOT_KEY,
+          CommonConfigurationKeysPublic.FS_TRASH_CUSTOM_ROOT_KEY_DEFAULT));
+      String username;
+      if (ugi != null) {
+        username = ugi.getShortUserName();
+      } else {
+        username = System.getProperty("user.name");
+      }
+      trashRoot = new org.apache.hadoop.fs.Path(trashRoot, username);
+    } else {
+      org.apache.hadoop.fs.Path homeDir =
+          DFSUtilClient.getHomeDirectory(config, ugi);
+      trashRoot = new org.apache.hadoop.fs.Path(
+          homeDir.toUri().getPath(), FileSystem.TRASH_PREFIX);
+    }
+
     org.apache.hadoop.fs.Path trashCurrent =
         new org.apache.hadoop.fs.Path(trashRoot, "Current");
 
