@@ -1226,6 +1226,9 @@ int run_docker(const char *command_file) {
   fprintf(LOGFILE, "Invoking '%s'\n", docker_command_with_binary);
   char **args = split_delimiter(docker_command_with_binary, " ");
 
+  //clean up command file before we exec
+  unlink(command_file);
+
   int exit_code = -1;
   if (execvp(docker_binary, args) != 0) {
     fprintf(ERRORFILE, "Couldn't execute the container launch with args %s - %s",
@@ -1571,7 +1574,7 @@ int launch_docker_container_as_user(const char * user, const char *app_id,
   }
 
 cleanup:
-
+  unlink(command_file);
   if (exit_code_file != NULL && write_exit_code_file_as_nm(exit_code_file, exit_code) < 0) {
     fprintf (ERRORFILE,
       "Could not write exit code to file %s.\n", exit_code_file);
