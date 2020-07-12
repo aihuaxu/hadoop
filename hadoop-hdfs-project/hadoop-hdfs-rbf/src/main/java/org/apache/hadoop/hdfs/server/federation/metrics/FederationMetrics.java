@@ -55,6 +55,7 @@ import org.apache.hadoop.hdfs.server.federation.resolver.FederationNamenodeConte
 import org.apache.hadoop.hdfs.server.federation.resolver.FederationNamespaceInfo;
 import org.apache.hadoop.hdfs.server.federation.resolver.RemoteLocation;
 import org.apache.hadoop.hdfs.server.federation.router.FederationUtil;
+import org.apache.hadoop.hdfs.server.federation.router.RBFConfigKeys;
 import org.apache.hadoop.hdfs.server.federation.router.Router;
 import org.apache.hadoop.hdfs.server.federation.router.RouterRpcServer;
 import org.apache.hadoop.hdfs.server.federation.router.security.RouterSecurityManager;
@@ -118,7 +119,8 @@ public class FederationMetrics implements FederationMBean {
   private MountTableStore mountTableStore;
   /** Router state store. */
   private RouterStore routerStore;
-
+  /** The number of top token owners reported in metrics. */
+  private int topTokenRealOwners;
 
   public FederationMetrics(Router router) throws IOException {
     this.router = router;
@@ -146,6 +148,13 @@ public class FederationMetrics implements FederationMBean {
       this.routerStore = stateStore.getRegisteredRecordStore(
           RouterStore.class);
     }
+
+    // Initialize the cache for the DN reports
+    Configuration conf = router.getConfig();
+
+    this.topTokenRealOwners = conf.getInt(
+        RBFConfigKeys.DFS_ROUTER_METRICS_TOP_NUM_TOKEN_OWNERS_KEY,
+        RBFConfigKeys.DFS_ROUTER_METRICS_TOP_NUM_TOKEN_OWNERS_KEY_DEFAULT);
   }
 
   /**
@@ -583,6 +592,17 @@ public class FederationMetrics implements FederationMBean {
       return mgr.getSecretManager().getCurrentTokensCount();
     }
     return -1;
+  }
+
+  @Override
+  public String getTopTokenRealOwners() {
+    RouterSecurityManager mgr =
+        this.router.getRpcServer().getRouterSecurityManager();
+    if (mgr != null && mgr.getSecretManager() != null) {
+      return JSON.toString(mgr.getSecretManager()
+          .getTopTokenRealOwners(this.topTokenRealOwners));
+    }
+    return "";
   }
 
   /**
