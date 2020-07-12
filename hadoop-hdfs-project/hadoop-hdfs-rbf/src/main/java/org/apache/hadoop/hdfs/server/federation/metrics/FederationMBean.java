@@ -226,4 +226,11 @@ public interface FederationMBean {
    * @return number of DTs
    */
   int getCurrentTokensCount();
+
+  /**
+   * Get the top delegation token owners(realUser).
+   *
+   * @return Json string of owners to token counts
+   */
+  String getTopTokenRealOwners();
 }
