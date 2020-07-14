@@ -913,21 +913,23 @@ public class DFSAdmin extends FsShell {
         users = proxy.getProxy().blackListUser(action, user);
         System.out.println("Blacklist successful for " +
             proxy.getAddress());
+
+        if (action == HdfsConstants.BlackListAction.BLACKLIST_GET) {
+          if (users.size() == 0) {
+            System.out.println("No blacklisted users right now for " +
+                proxy.getAddress());
+          } else {
+            System.out.println("For " + proxy.getAddress() +
+                " blacklisted users are:");
+            for (String u : users) {
+              System.out.println(u);
+            }
+          }
+        }
       }
     } else {
       users = dfs.blackListUser(action, user);
       System.out.println("Blacklist user successful");
-    }
-
-    if (action == HdfsConstants.BlackListAction.BLACKLIST_GET) {
-      if (users.size() == 0) {
-        System.out.println("No blacklisted users right now!");
-      } else {
-        System.out.println("All blacklisted users are:");
-        for (String u : users) {
-          System.out.println(u);
-        }
-      }
     }
 
     return 0;
