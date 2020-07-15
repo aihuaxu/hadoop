@@ -59,7 +59,7 @@ import org.apache.hadoop.util.Time;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.KeeperException.NoNodeException;
-import org.apache.zookeeper.ZooDefs.Perms;
+import org.apache.zookeeper.ZooDefs;
 import org.apache.zookeeper.client.ZooKeeperSaslClient;
 import org.apache.zookeeper.data.ACL;
 import org.apache.zookeeper.data.Id;
@@ -987,8 +987,17 @@ public abstract class ZKDelegationTokenSecretManager<TokenIdent extends Abstract
     private final List<ACL> saslACL;
 
     private SASLOwnerACLProvider(String principal) {
+      // This is a temporary change for DCA Secure project
+      // By making everything on ZK public we are able to secure and un-secure
+      // DCA routers in a rolling way without downtime
+      // This code change shall be removed once all upstream issues caused by
+      // securing routers are fixed
+      this.saslACL = Collections.singletonList(
+          new ACL(ZooDefs.Perms.ALL, ZooDefs.Ids.ANYONE_ID_UNSAFE));
+      /*
       this.saslACL = Collections.singletonList(
           new ACL(Perms.ALL, new Id("sasl", principal)));
+       */
     }
 
     @Override
