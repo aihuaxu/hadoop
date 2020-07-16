@@ -2,6 +2,7 @@ package org.apache.hadoop.hdfs.server.federation.security;
 
 import static org.apache.hadoop.hdfs.server.federation.metrics.TestFederationMetrics.FEDERATION_BEAN;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.DFSClient;
@@ -14,6 +15,7 @@ import org.apache.hadoop.hdfs.server.federation.router.RBFConfigKeys;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
+import org.eclipse.jetty.util.ajax.JSON;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -59,6 +61,12 @@ public class TestDelegationTokenMetrics {
     FederationMBean bean = FederationTestUtils.getBean(
         FEDERATION_BEAN, FederationMBean.class);
     assertEquals(1, bean.getCurrentTokensCount());
+    Object[] topOwner =
+        (Object[]) JSON.parse(bean.getTopTokenRealOwners());
+    assertEquals(1, topOwner.length);
+    String pair = (String)topOwner[0];
+    assertTrue(pair.contains("router"));
+    assertTrue(pair.contains("1"));
 
     clientProtocol = routerClient.getNamenode();
     clientProtocol.renewDelegationToken(dt);
@@ -66,5 +74,8 @@ public class TestDelegationTokenMetrics {
 
     clientProtocol.cancelDelegationToken(dt);
     assertEquals(0, bean.getCurrentTokensCount());
+    topOwner =
+        (Object[]) JSON.parse(bean.getTopTokenRealOwners());
+    assertEquals(0, topOwner.length);
   }
 }

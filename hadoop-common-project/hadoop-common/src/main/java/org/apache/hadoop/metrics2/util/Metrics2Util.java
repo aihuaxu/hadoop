@@ -48,6 +48,10 @@ public class Metrics2Util {
       return value;
     }
 
+    public String toString() {
+      return getName() + ": " + getValue();
+    }
+
     @Override
     public int compareTo(NameValuePair other) {
       return (int) (value - other.value);
