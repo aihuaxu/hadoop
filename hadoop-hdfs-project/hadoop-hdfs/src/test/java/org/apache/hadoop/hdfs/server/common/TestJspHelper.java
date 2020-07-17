@@ -356,18 +356,17 @@ public class TestJspHelper {
       JspHelper.getUGI(context, request, conf);
       Assert.fail("bad proxy request allowed");
     } catch (AuthorizationException ae) {
-      Assert.assertEquals(
-          "User: " + user + " is not allowed to impersonate " + realUser,
-           ae.getMessage());
+      Assert.assertTrue(
+          ae.getMessage().contains(
+          "User: " + user + " is not allowed to impersonate " + realUser));
     }
     try {
       request = getMockRequest(user, user, realUser);
       JspHelper.getUGI(context, request, conf);
       Assert.fail("bad proxy request allowed");
     } catch (AuthorizationException ae) {
-      Assert.assertEquals(
-          "User: " + user + " is not allowed to impersonate " + realUser,
-           ae.getMessage());
+      assertTrue(ae.getMessage().contains(
+          "User: " + user + " is not allowed to impersonate " + realUser));
     }
   }
 
