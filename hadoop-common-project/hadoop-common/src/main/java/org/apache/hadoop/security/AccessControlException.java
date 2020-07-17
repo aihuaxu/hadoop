@@ -44,7 +44,9 @@ public class AccessControlException
    * with the specified detail message.
    * @param s the detail message.
    */
-  public AccessControlException(String s) {super(s);}
+  public AccessControlException(String s) {
+    super(s + ". Please visit http://t.uber.com/hdfs_security for more info.");
+  }
   
   /**
    * Constructs a new exception with the specified cause and a detail
