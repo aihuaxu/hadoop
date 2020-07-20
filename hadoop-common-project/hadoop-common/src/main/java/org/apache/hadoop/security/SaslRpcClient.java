@@ -90,7 +90,9 @@ public class SaslRpcClient {
   private SaslClient saslClient;
   private SaslPropertiesResolver saslPropsResolver;
   private AuthMethod authMethod;
-  
+
+  private static final String DFS_NAMENODE_KERBEROS_PRINCIPAL_PATTERN_DEFAULT
+      = "*";
   private static final RpcRequestHeaderProto saslHeader = ProtoUtil
       .makeRpcRequestHeader(RpcKind.RPC_PROTOCOL_BUFFER,
           OperationProto.RPC_FINAL_PACKET, AuthProtocol.SASL.callId,
@@ -302,8 +304,9 @@ public class SaslRpcClient {
         authType.getProtocol() + "/" + authType.getServerId(),
         KerberosPrincipal.KRB_NT_SRV_HST).getName();
 
-    // use the pattern if defined
-    String serverKeyPattern = conf.get(serverKey + ".pattern");
+    // use the pattern if defined, accepting everything otherwise
+    String serverKeyPattern = conf.get(serverKey + ".pattern",
+        DFS_NAMENODE_KERBEROS_PRINCIPAL_PATTERN_DEFAULT);
     if (serverKeyPattern != null && !serverKeyPattern.isEmpty()) {
       Pattern pattern = GlobPattern.compile(serverKeyPattern);
       if (!pattern.matcher(serverPrincipal).matches()) {
