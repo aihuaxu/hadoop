@@ -814,6 +814,10 @@ class BlockSender implements java.io.Closeable {
         sentEntireByteRange = true;
       }
     } finally {
+      if (totalRead > 0 && volumeRef != null && volumeRef.getVolume() != null) {
+        volumeRef.getVolume().getMetrics().incrBlocksReadFromDisk();
+        volumeRef.getVolume().getMetrics().incrBytesReadFromDisk((int) totalRead);
+      }
       if ((clientTraceFmt != null) && ClientTraceLog.isDebugEnabled()) {
         final long endTime = System.nanoTime();
         ClientTraceLog.debug(String.format(clientTraceFmt, totalRead,

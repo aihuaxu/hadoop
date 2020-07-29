@@ -53,6 +53,7 @@ import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.server.datanode.BlockMetadataHeader;
 import org.apache.hadoop.hdfs.server.datanode.DataStorage;
 import org.apache.hadoop.hdfs.server.datanode.DatanodeUtil;
+import org.apache.hadoop.hdfs.server.datanode.fsdataset.DataNodeVolumeMetrics;
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.FsDatasetSpi;
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.FsVolumeReference;
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.FsVolumeSpi;
@@ -109,6 +110,7 @@ public class FsVolumeImpl implements FsVolumeSpi {
   // limit the visible capacity for tests. If negative, then we just
   // query from the filesystem.
   protected volatile long configuredCapacity;
+  private final DataNodeVolumeMetrics metrics;
 
   /**
    * Per-volume worker pool that processes new blocks to cache.
@@ -133,6 +135,7 @@ public class FsVolumeImpl implements FsVolumeSpi {
     this.storageType = storageType;
     this.configuredCapacity = -1;
     cacheExecutor = initializeCacheExecutor(parent);
+    this.metrics = DataNodeVolumeMetrics.create(conf, parent.getAbsolutePath());
   }
 
   protected ThreadPoolExecutor initializeCacheExecutor(File parent) {
@@ -925,6 +928,9 @@ public class FsVolumeImpl implements FsVolumeSpi {
     for (Entry<String, BlockPoolSlice> entry : set) {
       entry.getValue().shutdown(null);
     }
+    if (metrics != null) {
+      metrics.unRegister();
+    }
   }
 
   void addBlockPool(String bpid, Configuration conf) throws IOException {
@@ -1055,6 +1061,11 @@ public class FsVolumeImpl implements FsVolumeSpi {
       }
     }
     return lastChecksum;
+  }
+
+  @Override
+  public DataNodeVolumeMetrics getMetrics() {
+    return metrics;
   }
 }
 
