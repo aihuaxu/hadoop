@@ -107,6 +107,12 @@
       <artifactId>protobuf-java</artifactId>
     </dependency>
 
+    <!-- YoP -->
+    <dependency>
+      <groupId>com.uber.peloton</groupId>
+      <artifactId>peloton-client-shade</artifactId>
+      <version>0.8.6.1.1</version>
+    </dependency>
   </dependencies>
 
   <build>

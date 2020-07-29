@@ -29,7 +29,6 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.service.CompositeService;
 import org.apache.hadoop.util.ShutdownHookManager;
 import org.apache.hadoop.util.StringUtils;
-import org.apache.hadoop.util.curator.ZKCuratorManager;
 import org.apache.hadoop.yarn.YarnUncaughtExceptionHandler;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
@@ -37,6 +36,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.webapp.RMWebAppUtil;
 import org.apache.hadoop.yarn.server.router.clientrm.RouterClientRMService;
 import org.apache.hadoop.yarn.server.router.rmadmin.RouterRMAdminService;
 import org.apache.hadoop.yarn.server.router.webapp.RouterWebApp;
+import org.apache.hadoop.yarn.server.router.external.yarnonpeloton.YoPService;
 import org.apache.hadoop.yarn.webapp.WebApp;
 import org.apache.hadoop.yarn.webapp.WebApps;
 import org.apache.hadoop.yarn.webapp.WebApps.Builder;
@@ -71,6 +71,7 @@ public class Router extends CompositeService {
   private RouterClientRMService clientRMProxyService;
   private RouterRMAdminService rmAdminProxyService;
   private WebApp webApp;
+  private YoPService yopService;
   @VisibleForTesting
   protected String webAppAddress;
 
@@ -107,6 +108,9 @@ public class Router extends CompositeService {
     webAppAddress = WebAppUtils.getWebAppBindURL(this.conf,
         YarnConfiguration.ROUTER_BIND_HOST,
         WebAppUtils.getRouterWebAppURLWithoutScheme(this.conf));
+    // YoPService
+    yopService= createYoPService();
+    addService(yopService);
     // Metrics
     DefaultMetricsSystem.initialize(METRICS_NAME);
     super.serviceInit(conf);
@@ -150,6 +154,10 @@ public class Router extends CompositeService {
 
   protected RouterRMAdminService createRMAdminProxyService() {
     return new RouterRMAdminService();
+  }
+
+  protected YoPService createYoPService() {
+    return new YoPService();
   }
 
   @Private
