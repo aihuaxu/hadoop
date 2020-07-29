@@ -197,4 +197,6 @@ public interface FsVolumeSpi {
    */
   byte[] loadLastPartialChunkChecksum(File blockFile, File metaFile)
       throws IOException;
+
+  DataNodeVolumeMetrics getMetrics();
 }

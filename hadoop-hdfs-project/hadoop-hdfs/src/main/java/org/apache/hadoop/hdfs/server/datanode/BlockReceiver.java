@@ -789,7 +789,9 @@ class BlockReceiver implements Closeable {
           flushOrSync(syncBlock);
           
           replicaInfo.setLastChecksumAndDataLen(offsetInBlock, lastCrc);
-
+          if (replicaHandler.getVolumeReference() != null) {
+            replicaHandler.getVolumeReference().getVolume().getMetrics().incrBytesWrittenToDisk(len);
+          }
           datanode.metrics.incrBytesWritten(len);
           datanode.metrics.incrTotalWriteTime(duration);
 
