@@ -25,7 +25,6 @@ import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifie
 import org.apache.hadoop.hdfs.server.federation.router.RouterRpcServer;
 import org.apache.hadoop.hdfs.server.federation.router.Router;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.ipc.StandbyException;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.SecurityUtil;
@@ -144,8 +143,6 @@ public class RouterSecurityManager {
               dtId, dtSecretManager);
       tokenId = dtId.toStringStable();
       success = true;
-    } catch (Exception e) {
-      throw new StandbyException("Zookeeper slowness, failover and retry on a separate router");
     } finally {
       logAuditEvent(success, operationName, tokenId);
     }
