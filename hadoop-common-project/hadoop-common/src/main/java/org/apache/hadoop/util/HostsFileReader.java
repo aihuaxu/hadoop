@@ -25,7 +25,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.Set;
 import java.util.HashSet;
 import java.util.concurrent.atomic.AtomicReference;
@@ -113,7 +115,7 @@ public class HostsFileReader {
 
   public void refresh(String includesFile, String excludesFile)
       throws IOException {
-    LOG.info("Refreshing hosts (include/exclude) list");
+    LOG.info("Refreshing hosts (include/exclude) file input");
     HostDetails oldDetails = current.get();
     Set<String> newIncludes = oldDetails.includes;
     Set<String> newExcludes = oldDetails.excludes;
@@ -129,6 +131,34 @@ public class HostsFileReader {
     }
     HostDetails newDetails = new HostDetails(includesFile, newIncludes,
         excludesFile, newExcludes);
+    current.set(newDetails);
+  }
+
+  /**
+   * Refresh in-memory based on list of hosts
+   * @param includesHost
+   * @param excludesHost
+   */
+  public void refresh(Set<String> includesHost, Set<String> excludesHost) {
+    LOG.info("Refreshing hosts (include/exclude) list of hosts");
+    HostDetails oldDetails = current.get();
+    Set<String> newIncludes = new HashSet<>(oldDetails.includes);
+    Set<String> newExcludes = new HashSet<>(oldDetails.excludes);
+    if (includesHost != null && !includesHost.isEmpty()) {
+      // Add the new hosts to the include list
+      newIncludes.addAll(includesHost);
+      // Remove all newly added hosts from the exclude list if present
+      // This can happen as we have not completely removed excluded file
+      newExcludes.removeAll(includesHost);
+      newIncludes = Collections.unmodifiableSet(newIncludes);
+    }
+    if (excludesHost != null && !excludesHost.isEmpty()) {
+      // Add the excluded hosts to the exclude list
+      newExcludes.addAll(excludesHost);
+      newExcludes = Collections.unmodifiableSet(newExcludes);
+    }
+    HostDetails newDetails = new HostDetails(oldDetails.includesFile, newIncludes,
+            oldDetails.excludesFile, newExcludes);
     current.set(newDetails);
   }
 

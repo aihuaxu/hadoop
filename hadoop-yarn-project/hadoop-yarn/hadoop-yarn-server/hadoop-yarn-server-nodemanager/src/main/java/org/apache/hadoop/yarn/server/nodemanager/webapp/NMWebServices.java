@@ -33,6 +33,7 @@ import org.slf4j.LoggerFactory;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.GET;
+import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
@@ -95,10 +96,10 @@ public class NMWebServices {
   private final String redirectWSUrl;
   private final LogAggregationFileControllerFactory factory;
 
-  private @javax.ws.rs.core.Context 
+  private @javax.ws.rs.core.Context
     HttpServletRequest request;
-  
-  private @javax.ws.rs.core.Context 
+
+  private @javax.ws.rs.core.Context
     HttpServletResponse response;
 
   @javax.ws.rs.core.Context
@@ -336,12 +337,12 @@ public class NMWebServices {
   }
 
   /**
-   * Returns the contents of a container's log file in plain text. 
+   * Returns the contents of a container's log file in plain text.
    *
    * Only works for containers that are still in the NodeManager's memory, so
    * logs are no longer available after the corresponding application is no
    * longer running.
-   * 
+   *
    * @param containerIdStr
    *    The container ID
    * @param filename
@@ -485,6 +486,29 @@ public class NMWebServices {
       return resp.build();
     } catch (IOException ex) {
       return Response.serverError().entity(ex.getMessage()).build();
+    }
+  }
+
+  /**
+   * TBD: Security on UGI
+   * @return
+   */
+  @POST
+  @Path("/unregister")
+  @Produces({ MediaType.TEXT_PLAIN })
+  @Public
+  @Unstable
+  public Response unregister() {
+    boolean unregistered = false;
+    try {
+      unregistered = nmContext.getNodeStatusUpdater().unregister();
+    } catch (IllegalArgumentException ex) {
+      return Response.status(Status.BAD_REQUEST).entity(ex.getMessage()).build();
+    }
+    if (unregistered) {
+      return Response.status(Status.OK).build();
+    } else {
+      return Response.serverError().entity("Failed to unregister the node").build();
     }
   }
 

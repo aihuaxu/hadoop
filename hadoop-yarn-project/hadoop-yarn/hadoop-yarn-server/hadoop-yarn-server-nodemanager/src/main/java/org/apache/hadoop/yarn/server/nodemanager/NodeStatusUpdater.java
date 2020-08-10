@@ -59,4 +59,10 @@ public interface NodeStatusUpdater extends Service {
    * @param ex exception that makes the node unhealthy
    */
   void reportException(Exception ex);
+
+  /**
+   * Expose unregistering the Node Manager
+   * @return
+   */
+  public boolean unregister();
 }

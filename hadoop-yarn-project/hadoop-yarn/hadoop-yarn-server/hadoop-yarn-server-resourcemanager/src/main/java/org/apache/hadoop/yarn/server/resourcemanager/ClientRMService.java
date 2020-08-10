@@ -80,6 +80,8 @@ import org.apache.hadoop.yarn.api.protocolrecords.GetContainersRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.GetContainersResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.GetDelegationTokenRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.GetDelegationTokenResponse;
+import org.apache.hadoop.yarn.api.protocolrecords.GetExternalIncludedHostsRequest;
+import org.apache.hadoop.yarn.api.protocolrecords.GetExternalIncludedHostsResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.GetLabelsToNodesRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.GetLabelsToNodesResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.GetNewApplicationRequest;
@@ -88,10 +90,14 @@ import org.apache.hadoop.yarn.api.protocolrecords.GetNewReservationRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.GetNewReservationResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.GetNodesToLabelsRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.GetNodesToLabelsResponse;
+import org.apache.hadoop.yarn.api.protocolrecords.GetOrderedHostsRequest;
+import org.apache.hadoop.yarn.api.protocolrecords.GetOrderedHostsResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.GetQueueInfoRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.GetQueueInfoResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.GetQueueUserAclsInfoRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.GetQueueUserAclsInfoResponse;
+import org.apache.hadoop.yarn.api.protocolrecords.IncludeExternalHostsRequest;
+import org.apache.hadoop.yarn.api.protocolrecords.IncludeExternalHostsResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.KillApplicationRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.KillApplicationResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.MoveApplicationAcrossQueuesRequest;
@@ -205,6 +211,7 @@ public class ClientRMService extends AbstractService implements
 
   private final ApplicationACLsManager applicationsACLsManager;
   private final QueueACLsManager queueACLsManager;
+  private final NodesListManager nodesListManager;
 
   // For Reservation APIs
   private Clock clock;
@@ -222,13 +229,23 @@ public class ClientRMService extends AbstractService implements
                          QueueACLsManager queueACLsManager,
                          RMDelegationTokenSecretManager rmDTSecretManager) {
     this(rmContext, scheduler, rmAppManager, applicationACLsManager,
-            queueACLsManager, rmDTSecretManager, new UTCClock());
+            queueACLsManager, rmDTSecretManager, null, new UTCClock());
   }
 
   public ClientRMService(RMContext rmContext, YarnScheduler scheduler,
                          RMAppManager rmAppManager, ApplicationACLsManager applicationACLsManager,
                          QueueACLsManager queueACLsManager,
-                         RMDelegationTokenSecretManager rmDTSecretManager, Clock clock) {
+                         RMDelegationTokenSecretManager rmDTSecretManager,
+                         NodesListManager nodesListManager) {
+    this(rmContext, scheduler, rmAppManager, applicationACLsManager,
+            queueACLsManager, rmDTSecretManager, nodesListManager, new UTCClock());
+  }
+
+  public ClientRMService(RMContext rmContext, YarnScheduler scheduler,
+                         RMAppManager rmAppManager, ApplicationACLsManager applicationACLsManager,
+                         QueueACLsManager queueACLsManager,
+                         RMDelegationTokenSecretManager rmDTSecretManager, NodesListManager nodesListManager,
+                         Clock clock) {
     super(ClientRMService.class.getName());
     this.scheduler = scheduler;
     this.rmContext = rmContext;
@@ -239,6 +256,7 @@ public class ClientRMService extends AbstractService implements
     this.reservationSystem = rmContext.getReservationSystem();
     this.clock = clock;
     this.rValidator = new ReservationInputValidator(clock);
+    this.nodesListManager = nodesListManager;
   }
 
   @Override
@@ -1787,6 +1805,51 @@ public class ClientRMService extends AbstractService implements
     RMAuditLogger.logSuccess(callerUGI.getShortUserName(),
         AuditConstants.UPDATE_APP_TIMEOUTS, "ClientRMService", applicationId);
     response.setApplicationTimeouts(applicationTimeouts);
+    return response;
+  }
+
+  /**
+   * TBD - pgolash@uber.com - Add the access check as per UGI
+   * @param request to set included hosts
+   * @return
+   * @throws YarnException
+   * @throws IOException
+   */
+  public IncludeExternalHostsResponse includeExternalHosts(IncludeExternalHostsRequest request) throws YarnException,
+          IOException{
+    if (nodesListManager != null) {
+      Set<String> includedHosts = request.getIncludedHosts();
+      nodesListManager.includeExternalNodes(includedHosts);
+      return recordFactory
+              .newRecordInstance(IncludeExternalHostsResponse.class);
+    }
+    return null;
+  }
+
+  /**
+   * TBD - pgolash@uber.com - Add the access check as per UGI
+   * @param request
+   * @return
+   */
+  public GetExternalIncludedHostsResponse getExternalIncludedHosts(GetExternalIncludedHostsRequest request) {
+    if (nodesListManager != null) {
+      // TBD - tag need to be passed to the the API
+      // For now it is implicitly Peloton hosts
+      String tag = request.getTag();
+      List<String> hosts =  nodesListManager.getExternalIncludedNodes();
+      GetExternalIncludedHostsResponse response = recordFactory
+              .newRecordInstance(GetExternalIncludedHostsResponse.class);
+      response.setIncludedHosts(new HashSet<>(hosts));
+      return response;
+    }
+    return null;
+  }
+
+  @Override
+  public GetOrderedHostsResponse getOrderedHosts(GetOrderedHostsRequest request) {
+    GetOrderedHostsResponse response = recordFactory
+      .newRecordInstance(GetOrderedHostsResponse.class);
+    response.setOrderedHosts(rmContext.getScorerService().getOrderedHostList());
     return response;
   }
 

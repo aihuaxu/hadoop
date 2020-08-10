@@ -282,6 +282,27 @@ message UpdateApplicationTimeoutsResponseProto {
     repeated ApplicationUpdateTimeoutMapProto application_timeouts = 1;
 }
 
+message IncludeExternalHostsRequestProto {
+  repeated string includedHosts = 1;
+}
+
+message IncludeExternalHostsResponseProto {
+}
+
+message GetExternalIncludedHostsRequestProto {
+  optional string tag = 1;
+}
+
+message GetExternalIncludedHostsResponseProto {
+  repeated string includedHosts = 1;
+}
+
+message GetOrderedHostsRequestProto {
+}
+
+message GetOrderedHostsResponseProto {
+  repeated string orderedHosts = 1;
+}
 //////////////////////////////////////////////////////
 /////// client_NM_Protocol ///////////////////////////
 //////////////////////////////////////////////////////

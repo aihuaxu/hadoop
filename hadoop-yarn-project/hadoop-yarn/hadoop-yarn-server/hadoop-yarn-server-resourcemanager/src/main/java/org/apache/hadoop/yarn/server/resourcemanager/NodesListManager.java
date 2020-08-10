@@ -19,6 +19,7 @@
 package org.apache.hadoop.yarn.server.resourcemanager;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -57,6 +58,9 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeDecommissionin
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeEventType;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeImpl;
+import org.apache.hadoop.yarn.server.resourcemanager.scorer.ScorerEvent;
+import org.apache.hadoop.yarn.server.resourcemanager.scorer.ScorerEventType;
+import org.apache.hadoop.yarn.server.resourcemanager.scorer.ScorerHostEvent;
 import org.apache.hadoop.yarn.util.Clock;
 import org.apache.hadoop.yarn.util.SystemClock;
 
@@ -108,6 +112,7 @@ public class NodesListManager extends CompositeService implements
           YarnConfiguration.DEFAULT_RM_NODES_EXCLUDE_FILE_PATH);
       this.hostsReader =
           createHostsFileReader(this.includesFile, this.excludesFile);
+
       setDecomissionedNMs();
       printConfiguredHosts();
     } catch (YarnException ex) {
@@ -211,26 +216,64 @@ public class NodesListManager extends CompositeService implements
     refreshHostsReader(yarnConf, graceful, null);
   }
 
+  /**
+   * Refresh hosts added externally
+   * @param triggerExclusion
+   */
+  public void refreshExternalHosts(boolean triggerExclusion) {
+  /**
+  * Also refresh include and exclude nodes from ZK
+   */
+    List<String> includedHosts = getExternalIncludedNodes();
+    Set<String> includedHostsSet = null;
+    if (includedHosts != null) {
+      includedHostsSet = new HashSet<>(includedHosts);
+    }
+
+    List<String> excludedHosts = getExternalExcludedNodes();
+    Set<String> excludedHostsSet = null;
+    if (includedHosts != null) {
+      excludedHostsSet = new HashSet<>(excludedHosts);
+    }
+
+    // Refresh nodes
+    LOG.info("refreshNodes included and excluded Host set");
+    hostsReader.refresh(includedHostsSet, excludedHostsSet);
+    printConfiguredHosts();
+    LOG.info("hostsReader include:{" +
+            StringUtils.join(",", hostsReader.getHosts()) +
+            "} exclude:{" +
+            StringUtils.join(",", hostsReader.getExcludedHosts()) + "}");
+    if (triggerExclusion) {
+      handleExcludeNodeList(false, null);
+    }
+  }
+
   private void refreshHostsReader(
-      Configuration yarnConf, boolean graceful, Integer timeout)
+          Configuration yarnConf, boolean graceful, Integer timeout)
           throws IOException, YarnException {
     if (null == yarnConf) {
       yarnConf = new YarnConfiguration();
     }
+    /**
+     * Includes and Excludes file will eventually go away once all the system update ZK
+     */
     includesFile =
-        yarnConf.get(YarnConfiguration.RM_NODES_INCLUDE_FILE_PATH,
-            YarnConfiguration.DEFAULT_RM_NODES_INCLUDE_FILE_PATH);
+            yarnConf.get(YarnConfiguration.RM_NODES_INCLUDE_FILE_PATH,
+                    YarnConfiguration.DEFAULT_RM_NODES_INCLUDE_FILE_PATH);
     excludesFile =
-        yarnConf.get(YarnConfiguration.RM_NODES_EXCLUDE_FILE_PATH,
-            YarnConfiguration.DEFAULT_RM_NODES_EXCLUDE_FILE_PATH);
+            yarnConf.get(YarnConfiguration.RM_NODES_EXCLUDE_FILE_PATH,
+                    YarnConfiguration.DEFAULT_RM_NODES_EXCLUDE_FILE_PATH);
     LOG.info("refreshNodes excludesFile " + excludesFile);
     hostsReader.refresh(includesFile, excludesFile);
-    printConfiguredHosts();
+
+    // Refresh include and exclude nodes from ZK
+    refreshExternalHosts(false);
 
     LOG.info("hostsReader include:{" +
-        StringUtils.join(",", hostsReader.getHosts()) +
-        "} exclude:{" +
-        StringUtils.join(",", hostsReader.getExcludedHosts()) + "}");
+            StringUtils.join(",", hostsReader.getHosts()) +
+            "} exclude:{" +
+            StringUtils.join(",", hostsReader.getExcludedHosts()) + "}");
 
     handleExcludeNodeList(graceful, timeout);
   }
@@ -444,7 +487,7 @@ public class NodesListManager extends CompositeService implements
     }
   }
 
-  public boolean isValidNode(String hostName) {
+  public boolean  isValidNode(String hostName) {
     HostDetails hostDetails = hostsReader.getHostDetails();
     return isValidNode(hostName, hostDetails.getIncludedHosts(),
         hostDetails.getExcludedHosts());
@@ -526,6 +569,16 @@ public class NodesListManager extends CompositeService implements
 
   private HostsFileReader createHostsFileReader(String includesFile,
       String excludesFile) throws IOException, YarnException {
+    Set<String> externalIncludedHostsSet = null;
+    Set<String> externalExcludedHostsSet = null;
+    List<String> externalIncludedHosts = getExternalIncludedNodes();
+    if (externalIncludedHosts != null) {
+      externalIncludedHostsSet = new HashSet<>(externalIncludedHosts);
+    }
+    List<String> externalExcludedHosts = getExternalExcludedNodes();
+    if (externalExcludedHosts != null) {
+      externalExcludedHostsSet = new HashSet<>(externalExcludedHosts);
+    }
     HostsFileReader hostsReader =
         new HostsFileReader(includesFile,
             (includesFile == null || includesFile.isEmpty()) ? null
@@ -535,6 +588,8 @@ public class NodesListManager extends CompositeService implements
             (excludesFile == null || excludesFile.isEmpty()) ? null
                 : this.rmContext.getConfigurationProvider()
                     .getConfigurationInputStream(this.conf, excludesFile));
+    // Also add included and excluded hosts
+    hostsReader.refresh(externalIncludedHostsSet, externalExcludedHostsSet);
     return hostsReader;
   }
 
@@ -604,6 +659,124 @@ public class NodesListManager extends CompositeService implements
             new RMNodeEvent(entry.getKey(), nodeEventType));
       }
     }
+  }
+
+  /**
+   * Get list of included hosts
+   */
+  public List<String> getExternalIncludedNodes() {
+    List<String> hostList = null;
+    try {
+      hostList = zkGetExternalIncludeNodes();
+    } catch (Exception e) {
+      LOG.error("Exception getting included hosts, error : " + e);
+    } finally {
+      return hostList;
+    }
+  }
+
+  /**
+   * ZK Read external include nodes
+   * @return
+   * @throws Exception
+   */
+  public List<String> zkGetExternalIncludeNodes() throws Exception {
+    return rmContext.getStateStore().getExternalIncludedNodes();
+  }
+
+  /**
+   * Get list of included hosts
+   */
+  public List<String> getExternalExcludedNodes() {
+    List<String> hostList = null;
+    try {
+      hostList = zkGetExternalExcludeNodes();
+    } catch (Exception e) {
+      LOG.error("Exception getting excluded hosts, error : " + e);
+    } finally {
+      return hostList;
+    }
+  }
+
+  /**
+   * ZK Read exclude nodes
+   * @return
+   * @throws Exception
+   */
+  public List<String> zkGetExternalExcludeNodes() throws Exception {
+    return rmContext.getStateStore().getExternalExcludedNodes();
+  }
+
+  /**
+   *
+   * @param hosts : Hosts to include
+   */
+  public void includeExternalNodes(Set<String> hosts) {
+    try {
+      // Send the latest include host list to ScorerService
+      Set<String> includeHosts = new HashSet<String>();
+      includeHosts.addAll(hosts);
+      rmContext.getDispatcher().getEventHandler().handle(
+        new ScorerHostEvent(includeHosts, ScorerEventType.INCLUDE_HOSTS_UPDATE));
+
+      // Add to set to remove any duplicates
+      Set<String> toBeAddedHosts = hosts;
+      // Get previously added hosts
+      List<String> previousHosts = getExternalIncludedNodes();
+      if (previousHosts != null) {
+        // Remove all the hosts that are already added
+        toBeAddedHosts.removeAll(previousHosts);
+      }
+      zkUpdateExternalIncludeNodes(toBeAddedHosts);
+      // Also refresh the in-memory view of the hosts
+      refreshExternalHosts(true);
+    } catch (Exception e) {
+      LOG.error("Exception including hosts : " + Arrays.toString(hosts.toArray()) + " error: " + e);
+    }
+  }
+
+  /**
+   * Zookeeper update for exclude list
+   * @param toBeAddedHosts
+   * @throws Exception
+   */
+  public void zkUpdateExternalIncludeNodes(Set<String> toBeAddedHosts) throws Exception {
+    rmContext.getStateStore().includeExternalNodes(toBeAddedHosts);
+  }
+
+  /**
+   *
+   * @param hosts: Hosts to be excluded
+   */
+  public void excludeExternalNodes(Set<String> hosts) {
+    try {
+      // Send the latest include host list to ScorerSerice
+      rmContext.getDispatcher().getEventHandler().handle(
+        new ScorerHostEvent(hosts, ScorerEventType.EXCLUDE_HOSTS_UPDATE));
+
+      // Add to set to remove any duplicates
+      Set<String> toBeRemovedHosts = hosts;
+      // Get previously excluded hosts
+      List<String> previousHosts = rmContext.getStateStore().getExternalExcludedNodes();
+      // Remove all the hosts that are already excluded
+      if (previousHosts != null) {
+        toBeRemovedHosts.removeAll(previousHosts);
+      }
+      zkUpdateExternalExcludeNodes(toBeRemovedHosts);
+      // Also refresh the in-memory view of the hosts
+      refreshExternalHosts(true);
+    } catch (Exception e) {
+      LOG.error("Exception excluding hosts : " + Arrays.toString(hosts.toArray()) + " error: " + e);
+    }
+  }
+
+  /**
+   * Zookeeper update for include list
+   * @param toBeRemovedHosts
+   * @throws Exception
+   */
+  public void zkUpdateExternalExcludeNodes(Set<String> toBeRemovedHosts) throws Exception {
+    rmContext.getStateStore().excludeExternalNodes(toBeRemovedHosts);
   }
 
   /**

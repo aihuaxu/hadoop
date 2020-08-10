@@ -21,6 +21,7 @@ package org.apache.hadoop.yarn.server.resourcemanager.recovery;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
@@ -33,6 +34,7 @@ import javax.crypto.SecretKey;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.SettableFuture;
 
+import org.apache.commons.lang.NotImplementedException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
@@ -101,6 +103,9 @@ public abstract class RMStateStore extends AbstractService {
       "ReservationSystemRoot";
   protected static final String VERSION_NODE = "RMVersionNode";
   protected static final String EPOCH_NODE = "EpochNode";
+  protected static final String EXTERNAL_HOSTS_NODE = "ExternalNodes";
+  protected static final String EXTERNAL_HOSTS_INCLUDE = "Include";
+  protected static final String EXTERNAL_HOSTS_EXCLUDE = "Exclude";
   protected long baseEpoch;
   protected ResourceManager resourceManager;
   private final ReadLock readLock;
@@ -1208,6 +1213,48 @@ public abstract class RMStateStore extends AbstractService {
   public abstract void removeApplication(ApplicationId removeAppId)
       throws Exception;
 
+  /**
+   * Derived classes must implement this method to register external nodes in state store
+   *
+   * @throws Exception
+   */
+  public void includeExternalNodes(Set<String> nodes) throws Exception {
+    // Base class has to override this class and implement
+    throw new NotImplementedException();
+  }
+
+  /**
+   * Derived classes must implement this method to remove external nodes from the
+   * state store
+   *
+   * @throws Exception
+   */
+  public void excludeExternalNodes(Set<String> nodes) throws Exception {
+    // Base class has to override this class and implement
+    throw new NotImplementedException();
+  }
+
+  /**
+   * Derived classes must implement this method to get excluded external nodes from the
+   * state store
+   * @return
+   * @throws Exception
+   */
+  public List<String> getExternalExcludedNodes() throws Exception {
+    // Base class has to override this class and implement
+    throw new NotImplementedException();
+  }
+
+  /**
+   *
+   * @return
+   * @throws Exception
+   */
+  public List<String> getExternalIncludedNodes() throws Exception {
+    // Base class has to override this class and implement
+    throw new NotImplementedException();
+  }
+
   public void setResourceManager(ResourceManager rm) {
     this.resourceManager = rm;
   }
@@ -1220,6 +1267,7 @@ public abstract class RMStateStore extends AbstractService {
       this.readLock.unlock();
     }
   }
+
 
   @SuppressWarnings("rawtypes")
   protected EventHandler getRMStateStoreEventHandler() {

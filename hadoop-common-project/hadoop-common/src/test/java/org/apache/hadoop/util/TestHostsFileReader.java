@@ -20,6 +20,8 @@ package org.apache.hadoop.util;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileWriter;
+import java.util.HashSet;
+import java.util.Set;
 
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.util.HostsFileReader.HostDetails;
@@ -287,6 +289,145 @@ public class TestHostsFileReader {
 
     assertTrue(hfp.getExcludedHosts().contains("somehost2"));
     assertFalse(hfp.getExcludedHosts().contains("somehost5"));
+
+  }
+
+  /*
+   * Test host set addition
+   */
+  @Test
+  public void testHostFileReaderWithHostSet() throws Exception {
+    FileWriter efw = new FileWriter(excludesFile);
+    FileWriter ifw = new FileWriter(includesFile);
+
+    efw.write("#DFS-Hosts-excluded");
+    efw.write("     \n");
+    efw.write("somehost");
+    efw.write("     \n");
+    efw.write("somehost3");
+    efw.close();
+
+    ifw.write("#Hosts-in-DFS\n");
+    ifw.write("somehost4");
+    ifw.write("\n");
+    ifw.write("somehost5");
+    ifw.close();
+
+    HostsFileReader hfp = new HostsFileReader(includesFile, excludesFile);
+    Set<String> includedHosts = new HashSet<>();
+    includedHosts.add("somehost6");
+    includedHosts.add("somehost8");
+
+    Set<String> excludedHosts = new HashSet<>();
+    excludedHosts.add("somehost9");
+    excludedHosts.add("somehost10");
+    hfp.refresh(includedHosts, excludedHosts);
+
+    int includesLen = hfp.getHosts().size();
+    int excludesLen = hfp.getExcludedHosts().size();
+
+    assertEquals(4, includesLen);
+    assertEquals(4, excludesLen);
+
+    assertTrue(hfp.getHosts().contains("somehost6"));
+    assertTrue(hfp.getHosts().contains("somehost4"));
+
+    assertTrue(hfp.getExcludedHosts().contains("somehost9"));
+    assertTrue(hfp.getExcludedHosts().contains("somehost10"));
+
+  }
+
+  /*
+   * Test host set addition
+   */
+  @Test
+  public void testHostFileReaderWithHostSetCycle() throws Exception {
+    FileWriter efw = new FileWriter(excludesFile);
+    FileWriter ifw = new FileWriter(includesFile);
+
+    efw.write("#DFS-Hosts-excluded");
+    efw.write("     \n");
+    efw.write("somehost");
+    efw.write("     \n");
+    efw.write("somehost3");
+    efw.close();
+
+    ifw.write("#Hosts-in-DFS\n");
+    ifw.write("somehost4");
+    ifw.write("\n");
+    ifw.write("somehost5");
+    ifw.close();
+
+    HostsFileReader hfp = new HostsFileReader(includesFile, excludesFile);
+    Set<String> includedHosts = new HashSet<>();
+    includedHosts.add("somehost6");
+    includedHosts.add("somehost8");
+
+    Set<String> excludedHosts = new HashSet<>();
+    excludedHosts.add("somehost9");
+    excludedHosts.add("somehost10");
+    hfp.refresh(includedHosts, excludedHosts);
+
+    int includesLen = hfp.getHosts().size();
+    int excludesLen = hfp.getExcludedHosts().size();
+
+    assertEquals(4, includesLen);
+    assertEquals(4, excludesLen);
+    assertTrue(hfp.getExcludedHosts().contains("somehost9"));
+
+    includedHosts.add("somehost9");
+    // No additional excluded hosts
+    excludedHosts = new HashSet<>();
+    hfp.refresh(includedHosts, excludedHosts);
+
+    includesLen = hfp.getHosts().size();
+    excludesLen = hfp.getExcludedHosts().size();
+    assertEquals(5, includesLen);
+    // "somehost9 should go away from the exclude list"
+    assertEquals(3, excludesLen);
+    assertFalse(hfp.getExcludedHosts().contains("somehost9"));
+  }
+
+  /*
+   * Test null host set in include
+   */
+  @Test
+  public void testHostFileReaderWithHostSetNull() throws Exception {
+    FileWriter efw = new FileWriter(excludesFile);
+    FileWriter ifw = new FileWriter(includesFile);
+
+    efw.write("#DFS-Hosts-excluded");
+    efw.write("     \n");
+    efw.write("somehost");
+    efw.write("     \n");
+    efw.write("somehost3");
+    efw.close();
+
+    ifw.write("#Hosts-in-DFS\n");
+    ifw.write("somehost4");
+    ifw.write("\n");
+    ifw.write("somehost5");
+    ifw.close();
+
+    HostsFileReader hfp = new HostsFileReader(includesFile, excludesFile);
+    Set<String> includedHosts = null;
+
+    Set<String> excludedHosts = new HashSet<>();
+    excludedHosts.add("somehost9");
+    excludedHosts.add("somehost10");
+    hfp.refresh(includedHosts, excludedHosts);
+
+    int includesLen = hfp.getHosts().size();
+    int excludesLen = hfp.getExcludedHosts().size();
+
+    assertEquals(2, includesLen);
+    assertEquals(4, excludesLen);
+
+    assertTrue(hfp.getHosts().contains("somehost5"));
+    assertTrue(hfp.getHosts().contains("somehost4"));
+
+    assertTrue(hfp.getExcludedHosts().contains("somehost9"));
+    assertTrue(hfp.getExcludedHosts().contains("somehost10"));
 
   }
 }

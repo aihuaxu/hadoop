@@ -198,6 +198,9 @@ public class ZKRMStateStore extends RMStateStore {
   private String dtSequenceNumberPath;
   private String amrmTokenSecretManagerRoot;
   private String reservationRoot;
+  private String externalNodesRootPath;
+  private String externalNodesIncludePath;
+  private String externalNodesExcludePath;
 
   @VisibleForTesting
   protected String znodeWorkingPath;
@@ -374,6 +377,12 @@ public class ZKRMStateStore extends RMStateStore {
       delegationTokenNodeSplitIndex =
           YarnConfiguration.DEFAULT_ZK_DELEGATION_TOKEN_NODE_SPLIT_INDEX;
     }
+
+    externalNodesRootPath = getNodePath(zkRootNodePath, EXTERNAL_HOSTS_NODE);
+    externalNodesExcludePath =
+            getNodePath(externalNodesRootPath, EXTERNAL_HOSTS_EXCLUDE);
+    externalNodesIncludePath =
+            getNodePath(externalNodesRootPath, EXTERNAL_HOSTS_INCLUDE);
   }
 
   @Override
@@ -402,6 +411,11 @@ public class ZKRMStateStore extends RMStateStore {
     create(dtSequenceNumberPath);
     create(amrmTokenSecretManagerRoot);
     create(reservationRoot);
+
+    // Create Include/Exclude hosts zkNodes
+    create(externalNodesRootPath);
+    create(externalNodesIncludePath);
+    create(externalNodesExcludePath);
   }
 
   private void logRootNodeAcls(String prefix) throws Exception {
@@ -1382,6 +1396,38 @@ public class ZKRMStateStore extends RMStateStore {
       }
     }
     return null;
+  }
+
+  @Override
+  public synchronized void includeExternalNodes(Set<String> nodes) throws Exception {
+    for (String node : nodes) {
+      // Add in the include list
+      zkManager.create(getNodePath(externalNodesIncludePath, node));
+      // Also delete from the exclude list
+      zkManager.delete(getNodePath(externalNodesExcludePath, node));
+    }
+  }
+
+  @Override
+  public synchronized void excludeExternalNodes(Set<String> nodes) throws Exception {
+    for (String node : nodes) {
+      // Add in the exclude list
+      zkManager.create(getNodePath(externalNodesExcludePath, node));
+      // Also delete from the include list
+      zkManager.delete(getNodePath(externalNodesIncludePath, node));
+    }
+  }
+
+  @Override
+  public synchronized List<String> getExternalIncludedNodes() throws Exception {
+    List<String> nodes = zkManager.getChildren(externalNodesIncludePath);
+    return nodes;
+  }
+
+  @Override
+  public synchronized List<String> getExternalExcludedNodes() throws Exception {
+    List<String> nodes = zkManager.getChildren(externalNodesExcludePath);
+    return nodes;
   }
 
   @VisibleForTesting

@@ -41,12 +41,15 @@ import org.apache.hadoop.yarn.api.protocolrecords.GetClusterNodesResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.GetContainerReportResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.GetContainersResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.GetDelegationTokenResponse;
+import org.apache.hadoop.yarn.api.protocolrecords.GetExternalIncludedHostsResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.GetLabelsToNodesResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.GetNewApplicationResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.GetNewReservationResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.GetNodesToLabelsResponse;
+import org.apache.hadoop.yarn.api.protocolrecords.GetOrderedHostsResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.GetQueueInfoResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.GetQueueUserAclsInfoResponse;
+import org.apache.hadoop.yarn.api.protocolrecords.IncludeExternalHostsResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.KillApplicationResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.MoveApplicationAcrossQueuesResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.RenewDelegationTokenResponse;
@@ -82,6 +85,8 @@ import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.GetContainersRequestPB
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.GetContainersResponsePBImpl;
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.GetDelegationTokenRequestPBImpl;
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.GetDelegationTokenResponsePBImpl;
+import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.GetExternalIncludedHostsRequestPBImpl;
+import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.GetExternalIncludedHostsResponsePBImpl;
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.GetLabelsToNodesRequestPBImpl;
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.GetLabelsToNodesResponsePBImpl;
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.GetNewApplicationRequestPBImpl;
@@ -90,10 +95,14 @@ import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.GetNewReservationReque
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.GetNewReservationResponsePBImpl;
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.GetNodesToLabelsRequestPBImpl;
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.GetNodesToLabelsResponsePBImpl;
+import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.GetOrderedHostsRequestPBImpl;
+import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.GetOrderedHostsResponsePBImpl;
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.GetQueueInfoRequestPBImpl;
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.GetQueueInfoResponsePBImpl;
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.GetQueueUserAclsInfoRequestPBImpl;
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.GetQueueUserAclsInfoResponsePBImpl;
+import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.IncludeExternalHostsRequestPBImpl;
+import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.IncludeExternalHostsResponsePBImpl;
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.KillApplicationRequestPBImpl;
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.KillApplicationResponsePBImpl;
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.MoveApplicationAcrossQueuesRequestPBImpl;
@@ -169,6 +178,12 @@ import org.apache.hadoop.yarn.proto.YarnServiceProtos.UpdateApplicationTimeoutsR
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.UpdateApplicationTimeoutsResponseProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.SubmitApplicationRequestProto;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.SubmitApplicationResponseProto;
+import org.apache.hadoop.yarn.proto.YarnServiceProtos.IncludeExternalHostsRequestProto;
+import org.apache.hadoop.yarn.proto.YarnServiceProtos.IncludeExternalHostsResponseProto;
+import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetExternalIncludedHostsRequestProto;
+import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetExternalIncludedHostsResponseProto;
+import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetOrderedHostsRequestProto;
+import org.apache.hadoop.yarn.proto.YarnServiceProtos.GetOrderedHostsResponseProto;
 
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
@@ -631,4 +646,56 @@ public class ApplicationClientProtocolPBServiceImpl implements ApplicationClient
       throw new ServiceException(e);
     }
   }
+
+  @Override
+  public IncludeExternalHostsResponseProto includeExternalHosts(
+          RpcController controller, IncludeExternalHostsRequestProto proto)
+          throws ServiceException {
+    IncludeExternalHostsRequestPBImpl request =
+            new IncludeExternalHostsRequestPBImpl(proto);
+    try {
+      IncludeExternalHostsResponse response =
+              real.includeExternalHosts(request);
+      return ((IncludeExternalHostsResponsePBImpl) response).getProto();
+    } catch (YarnException e) {
+      throw new ServiceException(e);
+    } catch (IOException e) {
+      throw new ServiceException(e);
+    }
+  }
+
+  @Override
+  public GetExternalIncludedHostsResponseProto getExternalIncludedHosts(
+          RpcController controller, GetExternalIncludedHostsRequestProto proto)
+          throws ServiceException {
+    GetExternalIncludedHostsRequestPBImpl request =
+            new GetExternalIncludedHostsRequestPBImpl(proto);
+    try {
+      GetExternalIncludedHostsResponse response =
+              real.getExternalIncludedHosts(request);
+      return ((GetExternalIncludedHostsResponsePBImpl) response).getProto();
+    } catch (YarnException e) {
+      throw new ServiceException(e);
+    } catch (IOException e) {
+      throw new ServiceException(e);
+    }
+  }
+
+  @Override
+  public GetOrderedHostsResponseProto getOrderedHosts(
+    RpcController controller, GetOrderedHostsRequestProto proto)
+    throws ServiceException {
+    GetOrderedHostsRequestPBImpl request =
+      new GetOrderedHostsRequestPBImpl(proto);
+    try {
+      GetOrderedHostsResponse response =
+        real.getOrderedHosts(request);
+      return ((GetOrderedHostsResponsePBImpl) response).getProto();
+    } catch (YarnException e) {
+      throw new ServiceException(e);
+    } catch (IOException e) {
+      throw new ServiceException(e);
+    }
+  }
+
 }

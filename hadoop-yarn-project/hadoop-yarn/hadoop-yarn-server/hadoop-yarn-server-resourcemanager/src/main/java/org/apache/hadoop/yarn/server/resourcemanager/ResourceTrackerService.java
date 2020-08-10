@@ -23,6 +23,7 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -740,6 +741,12 @@ public class ResourceTrackerService extends AbstractService implements
     LOG.info("Node with node id : " + nodeId
         + " has shutdown, hence unregistering the node.");
     this.nmLivelinessMonitor.unregister(nodeId);
+    /**
+     * Exclude the node from the node list manager
+     */
+    Set<String> excludedExternalNodes = new HashSet<>();
+    excludedExternalNodes.add(rmNode.getHostName());
+    this.nodesListManager.excludeExternalNodes(excludedExternalNodes);
     this.rmContext.getDispatcher().getEventHandler()
         .handle(new RMNodeEvent(nodeId, RMNodeEventType.SHUTDOWN));
     return response;

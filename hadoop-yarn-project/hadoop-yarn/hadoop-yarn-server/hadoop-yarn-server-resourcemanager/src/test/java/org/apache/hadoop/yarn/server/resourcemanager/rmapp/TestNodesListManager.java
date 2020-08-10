@@ -20,10 +20,17 @@ package org.apache.hadoop.yarn.server.resourcemanager.rmapp;
 
 import static org.mockito.Matchers.argThat;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.when;
 
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
+import org.apache.hadoop.hdfs.server.balancer.Matcher;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ContainerState;
 import org.apache.hadoop.yarn.api.records.Resource;
@@ -39,6 +46,11 @@ import org.apache.hadoop.yarn.server.resourcemanager.MockRM;
 import org.apache.hadoop.yarn.server.resourcemanager.NodesListManager;
 import org.apache.hadoop.yarn.server.resourcemanager.NodesListManagerEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.NodesListManagerEventType;
+import org.apache.hadoop.yarn.server.resourcemanager.RMActiveServiceContext;
+import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
+import org.apache.hadoop.yarn.server.resourcemanager.RMContextImpl;
+import org.apache.hadoop.yarn.server.resourcemanager.recovery.TestZKRMStateStore;
+import org.apache.hadoop.yarn.server.resourcemanager.recovery.ZKRMStateStore;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttempt;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptState;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
@@ -49,6 +61,7 @@ import org.apache.log4j.Logger;
 import org.junit.Assert;
 import org.junit.Test;
 import org.mockito.ArgumentMatcher;
+import org.mockito.Matchers;
 
 public class TestNodesListManager {
   // To hold list of application for which event was received
@@ -231,6 +244,35 @@ public class TestNodesListManager {
 
   }
 
+  @Test
+  public void testNodesListManagerAPI() {
+    YarnConfiguration conf = new YarnConfiguration();
+    conf.setInt(YarnConfiguration.RM_NODE_IP_CACHE_EXPIRY_INTERVAL_SECS, 30);
+    MockRM rm = new MockRM(conf);
+    rm.init(conf);
+    //rmContext.
+    NodesListManager nodesListManager = mock(NodesListManager.class);
+    List<String> hList = new ArrayList<>();
+    hList.add("hostA");
+    //rmContext.
+    try {
+      when(nodesListManager.getExternalIncludedNodes()).thenReturn(hList);
+    } catch (Exception ex) {
+
+    }
+
+    Set<String> hosts = new HashSet<>();
+    hosts.add("hostA");
+    try {
+      doNothing().when(nodesListManager).zkUpdateExternalIncludeNodes(Matchers.anySetOf(String.class));
+    } catch (Exception ex) {
+
+    }
+    nodesListManager.includeExternalNodes(hosts);
+    List<String> host = nodesListManager.getExternalIncludedNodes();
+    Assert.assertEquals(host.size(), 1);
+  }
+
   /*
    * Create dispatcher object
    */
@@ -259,5 +301,7 @@ public class TestNodesListManager {
     };
     return dispatcher;
   }
+
+
 
 }

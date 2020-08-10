@@ -32,6 +32,25 @@
     <yarn.basedir>${project.parent.parent.basedir}</yarn.basedir>
   </properties>
 
+  <repositories>
+    <repository>
+      <id>Uber-internal-repo</id>
+      <url>https://artifactory.uber.internal/artifactory/repo/</url>
+    </repository>
+    <repository>
+      <id>uber-internal-releases</id>
+      <url>http://artifactory.uber.internal:4587/artifactory/libs-release-local/</url>
+    </repository>
+    <repository>
+      <id>uber-external-releases</id>
+      <url>http://artifactory.uber.internal:4587/artifactory/ext-release-local/</url>
+    </repository>
+    <repository>
+      <id>uber-internal-snapshots</id>
+      <url>http://artifactory.uber.internal:4587/artifactory/libs-snapshot-local/</url>
+    </repository>
+  </repositories>
+
   <dependencies>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
@@ -119,6 +138,12 @@
       <version>20090211</version>
     </dependency>
 
+    <dependency>
+      <groupId>io.perfmark</groupId>
+      <artifactId>perfmark-api</artifactId>
+      <version>0.22.0</version>
+      <scope>runtime</scope>
+    </dependency>
   </dependencies>
 
   <build>

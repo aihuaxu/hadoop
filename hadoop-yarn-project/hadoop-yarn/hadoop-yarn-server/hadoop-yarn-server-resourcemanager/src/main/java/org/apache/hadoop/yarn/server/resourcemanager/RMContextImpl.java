@@ -52,6 +52,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ResourceScheduler
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerNode;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.distributed.QueueLimitCalculator;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.placement.MultiNodeSortingManager;
+import org.apache.hadoop.yarn.server.resourcemanager.scorer.ScorerService;
 import org.apache.hadoop.yarn.server.resourcemanager.security.AMRMTokenSecretManager;
 import org.apache.hadoop.yarn.server.resourcemanager.security.ClientToAMTokenSecretManagerInRM;
 import org.apache.hadoop.yarn.server.resourcemanager.security.DelegationTokenRenewer;
@@ -601,6 +602,16 @@ public class RMContextImpl implements RMContext {
       proxyHostAndPort = WebAppUtils.getProxyHostAndPort(conf);
     }
     return proxyHostAndPort;
+  }
+
+  @Override
+  public ScorerService getScorerService() {
+    return activeServiceContext.getScorerService();
+  }
+
+  @Override
+  public void setScorerService(ScorerService svc) {
+    activeServiceContext.setScorerService(svc);
   }
 
   @Override

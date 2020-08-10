@@ -97,6 +97,10 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerNode;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.SchedulerEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.SchedulerEventType;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.placement.MultiNodeSortingManager;
+import org.apache.hadoop.yarn.server.resourcemanager.scorer.ScorerEvent;
+import org.apache.hadoop.yarn.server.resourcemanager.scorer.ScorerEventDispatcherMetrics;
+import org.apache.hadoop.yarn.server.resourcemanager.scorer.ScorerEventType;
+import org.apache.hadoop.yarn.server.resourcemanager.scorer.ScorerService;
 import org.apache.hadoop.yarn.server.resourcemanager.security.DelegationTokenRenewer;
 import org.apache.hadoop.yarn.server.resourcemanager.security.QueueACLsManager;
 import org.apache.hadoop.yarn.server.resourcemanager.timelineservice.RMTimelineCollectorManager;
@@ -195,6 +199,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
   private final String zkRootNodePassword =
       Long.toString(new SecureRandom().nextLong());
   private boolean recoveryEnabled;
+  private ScorerService scorerService;
 
   @VisibleForTesting
   protected String webAppAddress;
@@ -417,6 +422,13 @@ public class ResourceManager extends CompositeService implements Recoverable {
     return dispatcher;
   }
 
+  protected EventHandler<ScorerEvent> createScorerEventDispatcher() {
+    EventDispatcher dispatcher = new EventDispatcher(this.scorerService, "ScorerEventDispatcher");
+    DispatcherMetrics metrics = ScorerEventDispatcherMetrics.registerMetrics();
+    dispatcher.setMetrics(metrics);
+    return dispatcher;
+  }
+
   protected Dispatcher createDispatcher() {
     AsyncDispatcher dispatcher = new AsyncDispatcher("RM Event dispatcher");
     DispatcherMetrics metrics = RMAsyncDispatcherMetrics.registerMetrics();
@@ -532,6 +544,10 @@ public class ResourceManager extends CompositeService implements Recoverable {
     return publisher;
   }
 
+  protected ScorerService createScorerService() {
+    return new ScorerService();
+  }
+
   // sanity check for configurations
   protected static void validateConfigs(Configuration conf) {
     // validate max-attempts
@@ -567,6 +583,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
 
     private DelegationTokenRenewer delegationTokenRenewer;
     private EventHandler<SchedulerEvent> schedulerDispatcher;
+    private EventHandler<ScorerEvent> scorerDispatcher;
     private ApplicationMasterLauncher applicationMasterLauncher;
     private ContainerAllocationExpirer containerAllocationExpirer;
     private ResourceManager rm;
@@ -684,6 +701,15 @@ public class ResourceManager extends CompositeService implements Recoverable {
       // Register event handler for RmNodes
       rmDispatcher.register(
           RMNodeEventType.class, new NodeEventDispatcher(rmContext));
+
+      //Add Scorer Service to sort Peloton hosts
+      scorerService = createScorerService();
+      scorerService.setRMContext(rmContext);
+      addService(scorerService);
+      rmContext.setScorerService(scorerService);
+      scorerDispatcher = createScorerEventDispatcher();
+      addIfService(scorerDispatcher);
+      rmDispatcher.register(ScorerEventType.class, scorerDispatcher);
 
       nmLivelinessMonitor = createNMLivelinessMonitor();
       addService(nmLivelinessMonitor);
@@ -1300,7 +1326,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
   protected ClientRMService createClientRMService() {
     return new ClientRMService(this.rmContext, scheduler, this.rmAppManager,
         this.applicationACLsManager, this.queueACLsManager,
-        this.rmContext.getRMDelegationTokenSecretManager());
+        this.rmContext.getRMDelegationTokenSecretManager(), this.nodesListManager);
   }
 
   protected ApplicationMasterService createApplicationMasterService() {

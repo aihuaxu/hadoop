@@ -1791,6 +1791,8 @@ public class CapacityScheduler extends
       List<RMContainer> runningContainers =
           node.getCopiedListOfRunningContainers();
       for (RMContainer container : runningContainers) {
+        LOG.info("removeNode is going to complete these containers "
+          + runningContainers + " on node " + nodeId);
         super.completedContainer(container, SchedulerUtils
             .createAbnormalContainerStatus(container.getContainerId(),
                 SchedulerUtils.LOST_CONTAINER), RMContainerEventType.KILL);

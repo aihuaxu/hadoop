@@ -61,4 +61,7 @@ service ApplicationClientProtocolService {
   rpc updateApplicationPriority (UpdateApplicationPriorityRequestProto) returns (UpdateApplicationPriorityResponseProto);
   rpc signalToContainer(SignalContainerRequestProto) returns (SignalContainerResponseProto);
   rpc updateApplicationTimeouts (UpdateApplicationTimeoutsRequestProto) returns (UpdateApplicationTimeoutsResponseProto);
+  rpc includeExternalHosts (IncludeExternalHostsRequestProto) returns (IncludeExternalHostsResponseProto);
+  rpc getExternalIncludedHosts (GetExternalIncludedHostsRequestProto) returns (GetExternalIncludedHostsResponseProto);
+  rpc getOrderedHosts (GetOrderedHostsRequestProto) returns (GetOrderedHostsResponseProto);
 }

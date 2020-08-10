@@ -33,6 +33,8 @@ import org.apache.hadoop.yarn.api.protocolrecords.GetClusterNodeLabelsRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.GetClusterNodeLabelsResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.GetClusterNodesRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.GetClusterNodesResponse;
+import org.apache.hadoop.yarn.api.protocolrecords.GetExternalIncludedHostsRequest;
+import org.apache.hadoop.yarn.api.protocolrecords.GetExternalIncludedHostsResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.GetLabelsToNodesRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.GetLabelsToNodesResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.GetNewApplicationRequest;
@@ -41,10 +43,14 @@ import org.apache.hadoop.yarn.api.protocolrecords.GetNewReservationRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.GetNewReservationResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.GetNodesToLabelsRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.GetNodesToLabelsResponse;
+import org.apache.hadoop.yarn.api.protocolrecords.GetOrderedHostsRequest;
+import org.apache.hadoop.yarn.api.protocolrecords.GetOrderedHostsResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.GetQueueInfoRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.GetQueueInfoResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.GetQueueUserAclsInfoRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.GetQueueUserAclsInfoResponse;
+import org.apache.hadoop.yarn.api.protocolrecords.IncludeExternalHostsRequest;
+import org.apache.hadoop.yarn.api.protocolrecords.IncludeExternalHostsResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.KillApplicationRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.KillApplicationResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.MoveApplicationAcrossQueuesRequest;
@@ -589,4 +595,48 @@ public interface ApplicationClientProtocol extends ApplicationBaseProtocol {
   public UpdateApplicationTimeoutsResponse updateApplicationTimeouts(
       UpdateApplicationTimeoutsRequest request)
       throws YarnException, IOException;
+
+  /**
+   * <p>
+   * The interface used by client to include external hosts
+   * </p>
+   * time then update application throws YarnException.
+   * @param request to set included hosts
+   * @return a response.
+   * @throws YarnException if add request failed.
+   * @throws IOException on IO failures
+   */
+  @Public
+  @Unstable
+  @Idempotent
+  public IncludeExternalHostsResponse includeExternalHosts(
+          IncludeExternalHostsRequest request)
+          throws YarnException, IOException;
+
+  /**
+   * <p>
+   * The interface used by client to get external included hosts
+   * @throws YarnException if failed
+   * @throws IOException on IO failures
+   */
+  @Public
+  @Unstable
+  @Idempotent
+  public GetExternalIncludedHostsResponse getExternalIncludedHosts(
+          GetExternalIncludedHostsRequest request)
+          throws YarnException, IOException;
+
+  /*
+  **
+   * <p>
+   * The interface used by Router to get a list of hosts ordered from Scorer service
+   * @throws YarnException if failed
+   * @throws IOException on IO failures
+   */
+  @Public
+  @Unstable
+  @Idempotent
+  public GetOrderedHostsResponse getOrderedHosts(
+    GetOrderedHostsRequest request)
+    throws YarnException, IOException;
 }
