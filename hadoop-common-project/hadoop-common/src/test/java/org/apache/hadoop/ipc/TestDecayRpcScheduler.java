@@ -20,20 +20,19 @@ package org.apache.hadoop.ipc;
 
 import static java.lang.Thread.sleep;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.conf.Configuration;
 
 import javax.management.MBeanServer;
 import javax.management.ObjectName;
 import java.lang.management.ManagementFactory;
-import java.util.concurrent.TimeUnit;
 
 public class TestDecayRpcScheduler {
   private Schedulable mockCall(String id) {
@@ -130,18 +129,18 @@ public class TestDecayRpcScheduler {
         "99999999"); // Never flush
     scheduler = new DecayRpcScheduler(1, "ipc.10", conf);
 
-    assertEquals(0, scheduler.getCallCostSnapshot().size()); // empty first
+    assertEquals(0, scheduler.getCallCountSnapshot().size()); // empty first
 
-    getPriorityIncrementCallCount("A");
-    assertEquals(1, scheduler.getCallCostSnapshot().get("A").longValue());
-    assertEquals(1, scheduler.getCallCostSnapshot().get("A").longValue());
+    scheduler.getPriorityLevel(mockCall("A"));
+    assertEquals(1, scheduler.getCallCountSnapshot().get("A").longValue());
+    assertEquals(1, scheduler.getCallCountSnapshot().get("A").longValue());
 
-    getPriorityIncrementCallCount("A");
-    getPriorityIncrementCallCount("B");
-    getPriorityIncrementCallCount("A");
+    scheduler.getPriorityLevel(mockCall("A"));
+    scheduler.getPriorityLevel(mockCall("B"));
+    scheduler.getPriorityLevel(mockCall("A"));
 
-    assertEquals(3, scheduler.getCallCostSnapshot().get("A").longValue());
-    assertEquals(1, scheduler.getCallCostSnapshot().get("B").longValue());
+    assertEquals(3, scheduler.getCallCountSnapshot().get("A").longValue());
+    assertEquals(1, scheduler.getCallCountSnapshot().get("B").longValue());
   }
 
   @Test
@@ -155,42 +154,42 @@ public class TestDecayRpcScheduler {
     assertEquals(0, scheduler.getTotalCallSnapshot());
 
     for (int i = 0; i < 4; i++) {
-      getPriorityIncrementCallCount("A");
+      scheduler.getPriorityLevel(mockCall("A"));
     }
 
     sleep(1000);
 
     for (int i = 0; i < 8; i++) {
-      getPriorityIncrementCallCount("B");
+      scheduler.getPriorityLevel(mockCall("B"));
     }
 
     assertEquals(12, scheduler.getTotalCallSnapshot());
-    assertEquals(4, scheduler.getCallCostSnapshot().get("A").longValue());
-    assertEquals(8, scheduler.getCallCostSnapshot().get("B").longValue());
+    assertEquals(4, scheduler.getCallCountSnapshot().get("A").longValue());
+    assertEquals(8, scheduler.getCallCountSnapshot().get("B").longValue());
 
     scheduler.forceDecay();
 
     assertEquals(6, scheduler.getTotalCallSnapshot());
-    assertEquals(2, scheduler.getCallCostSnapshot().get("A").longValue());
-    assertEquals(4, scheduler.getCallCostSnapshot().get("B").longValue());
+    assertEquals(2, scheduler.getCallCountSnapshot().get("A").longValue());
+    assertEquals(4, scheduler.getCallCountSnapshot().get("B").longValue());
 
     scheduler.forceDecay();
 
     assertEquals(3, scheduler.getTotalCallSnapshot());
-    assertEquals(1, scheduler.getCallCostSnapshot().get("A").longValue());
-    assertEquals(2, scheduler.getCallCostSnapshot().get("B").longValue());
+    assertEquals(1, scheduler.getCallCountSnapshot().get("A").longValue());
+    assertEquals(2, scheduler.getCallCountSnapshot().get("B").longValue());
 
     scheduler.forceDecay();
 
     assertEquals(1, scheduler.getTotalCallSnapshot());
-    assertEquals(null, scheduler.getCallCostSnapshot().get("A"));
-    assertEquals(1, scheduler.getCallCostSnapshot().get("B").longValue());
+    assertEquals(null, scheduler.getCallCountSnapshot().get("A"));
+    assertEquals(1, scheduler.getCallCountSnapshot().get("B").longValue());
 
     scheduler.forceDecay();
 
     assertEquals(0, scheduler.getTotalCallSnapshot());
-    assertEquals(null, scheduler.getCallCostSnapshot().get("A"));
-    assertEquals(null, scheduler.getCallCostSnapshot().get("B"));
+    assertEquals(null, scheduler.getCallCountSnapshot().get("A"));
+    assertEquals(null, scheduler.getCallCountSnapshot().get("B"));
   }
 
   @Test
@@ -204,16 +203,16 @@ public class TestDecayRpcScheduler {
         .IPC_FCQ_DECAYSCHEDULER_THRESHOLDS_KEY, "25, 50, 75");
     scheduler = new DecayRpcScheduler(4, namespace, conf);
 
-    assertEquals(0, getPriorityIncrementCallCount("A")); // 0 out of 0 calls
-    assertEquals(3, getPriorityIncrementCallCount("A")); // 1 out of 1 calls
-    assertEquals(0, getPriorityIncrementCallCount("B")); // 0 out of 2 calls
-    assertEquals(1, getPriorityIncrementCallCount("B")); // 1 out of 3 calls
-    assertEquals(0, getPriorityIncrementCallCount("C")); // 0 out of 4 calls
-    assertEquals(0, getPriorityIncrementCallCount("C")); // 1 out of 5 calls
-    assertEquals(1, getPriorityIncrementCallCount("A")); // 2 out of 6 calls
-    assertEquals(1, getPriorityIncrementCallCount("A")); // 3 out of 7 calls
-    assertEquals(2, getPriorityIncrementCallCount("A")); // 4 out of 8 calls
-    assertEquals(2, getPriorityIncrementCallCount("A")); // 5 out of 9 calls
+    assertEquals(0, scheduler.getPriorityLevel(mockCall("A")));
+    assertEquals(2, scheduler.getPriorityLevel(mockCall("A")));
+    assertEquals(0, scheduler.getPriorityLevel(mockCall("B")));
+    assertEquals(1, scheduler.getPriorityLevel(mockCall("B")));
+    assertEquals(0, scheduler.getPriorityLevel(mockCall("C")));
+    assertEquals(0, scheduler.getPriorityLevel(mockCall("C")));
+    assertEquals(1, scheduler.getPriorityLevel(mockCall("A")));
+    assertEquals(1, scheduler.getPriorityLevel(mockCall("A")));
+    assertEquals(1, scheduler.getPriorityLevel(mockCall("A")));
+    assertEquals(2, scheduler.getPriorityLevel(mockCall("A")));
 
     MBeanServer mbs = ManagementFactory.getPlatformMBeanServer();
     ObjectName mxbeanName = new ObjectName(
@@ -246,16 +245,16 @@ public class TestDecayRpcScheduler {
         .DECAYSCHEDULER_BLACKLISTED_USERS, "A");
     scheduler = new DecayRpcScheduler(2, namespace, conf);
 
-    assertEquals(1, getPriorityIncrementCallCount("A"));
-    assertEquals(1, getPriorityIncrementCallCount("A"));
-    assertEquals(0, getPriorityIncrementCallCount("B"));
-    assertEquals(0, getPriorityIncrementCallCount("B"));
-    assertEquals(0, getPriorityIncrementCallCount("C"));
-    assertEquals(0, getPriorityIncrementCallCount("C"));
-    assertEquals(1, getPriorityIncrementCallCount("A"));
-    assertEquals(1, getPriorityIncrementCallCount("A"));
-    assertEquals(1, getPriorityIncrementCallCount("A"));
-    assertEquals(1, getPriorityIncrementCallCount("A"));
+    assertEquals(1, scheduler.getPriorityLevel(mockCall("A")));
+    assertEquals(1, scheduler.getPriorityLevel(mockCall("A")));
+    assertEquals(0, scheduler.getPriorityLevel(mockCall("B")));
+    assertEquals(0, scheduler.getPriorityLevel(mockCall("B")));
+    assertEquals(0, scheduler.getPriorityLevel(mockCall("C")));
+    assertEquals(0, scheduler.getPriorityLevel(mockCall("C")));
+    assertEquals(1, scheduler.getPriorityLevel(mockCall("A")));
+    assertEquals(1, scheduler.getPriorityLevel(mockCall("A")));
+    assertEquals(1, scheduler.getPriorityLevel(mockCall("A")));
+    assertEquals(1, scheduler.getPriorityLevel(mockCall("A")));
 
     MBeanServer mbs = ManagementFactory.getPlatformMBeanServer();
     ObjectName mxbeanName = new ObjectName(
@@ -287,21 +286,21 @@ public class TestDecayRpcScheduler {
         .DECAYSCHEDULER_BLACKLISTED_USERS, "A");
     scheduler = new DecayRpcScheduler(2, namespace, conf);
 
-    assertEquals(1, getPriorityIncrementCallCount("A"));
-    assertEquals(1, getPriorityIncrementCallCount("A"));
-    assertEquals(0, getPriorityIncrementCallCount("B"));
-    assertEquals(0, getPriorityIncrementCallCount("B"));
-    assertEquals(0, getPriorityIncrementCallCount("C"));
-    assertEquals(0, getPriorityIncrementCallCount("C"));
-    assertEquals(1, getPriorityIncrementCallCount("A"));
-    assertEquals(1, getPriorityIncrementCallCount("A"));
-    assertEquals(1, getPriorityIncrementCallCount("A"));
-    assertEquals(1, getPriorityIncrementCallCount("A"));
+    assertEquals(1, scheduler.getPriorityLevel(mockCall("A")));
+    assertEquals(1, scheduler.getPriorityLevel(mockCall("A")));
+    assertEquals(0, scheduler.getPriorityLevel(mockCall("B")));
+    assertEquals(0, scheduler.getPriorityLevel(mockCall("B")));
+    assertEquals(0, scheduler.getPriorityLevel(mockCall("C")));
+    assertEquals(0, scheduler.getPriorityLevel(mockCall("C")));
+    assertEquals(1, scheduler.getPriorityLevel(mockCall("A")));
+    assertEquals(1, scheduler.getPriorityLevel(mockCall("A")));
+    assertEquals(1, scheduler.getPriorityLevel(mockCall("A")));
+    assertEquals(1, scheduler.getPriorityLevel(mockCall("A")));
 
     scheduler.deleteFromBlackList("A");
-    assertEquals(0, getPriorityIncrementCallCount("A"));
-    assertEquals(0, getPriorityIncrementCallCount("A"));
-    assertEquals(0, getPriorityIncrementCallCount("A"));
+    assertEquals(0, scheduler.getPriorityLevel(mockCall("A")));
+    assertEquals(0, scheduler.getPriorityLevel(mockCall("A")));
+    assertEquals(0, scheduler.getPriorityLevel(mockCall("A")));
   }
 
   @Test(timeout=2000)
@@ -316,115 +315,12 @@ public class TestDecayRpcScheduler {
     assertEquals(0, scheduler.getTotalCallSnapshot());
 
     for (int i = 0; i < 64; i++) {
-      getPriorityIncrementCallCount("A");
+      scheduler.getPriorityLevel(mockCall("A"));
     }
 
     // It should eventually decay to zero
     while (scheduler.getTotalCallSnapshot() > 0) {
       sleep(10);
     }
-  }
-
-  @Test
-  public void testUsingWeightedTimeCostProvider() {
-    scheduler = getSchedulerWithWeightedTimeCostProvider(3);
-
-    // 3 details in increasing order of cost. Although medium has a longer
-    // duration, the shared lock is weighted less than the exclusive lock
-    ProcessingDetails callDetailsLow =
-        new ProcessingDetails(TimeUnit.MILLISECONDS);
-    callDetailsLow.set(ProcessingDetails.Timing.LOCKFREE, 1);
-    ProcessingDetails callDetailsMedium =
-        new ProcessingDetails(TimeUnit.MILLISECONDS);
-    callDetailsMedium.set(ProcessingDetails.Timing.LOCKSHARED, 500);
-    ProcessingDetails callDetailsHigh =
-        new ProcessingDetails(TimeUnit.MILLISECONDS);
-    callDetailsHigh.set(ProcessingDetails.Timing.LOCKEXCLUSIVE, 100);
-
-    for (int i = 0; i < 10; i++) {
-      scheduler.addResponseTime("ignored", mockCall("LOW"), callDetailsLow);
-    }
-    scheduler.addResponseTime("ignored", mockCall("MED"), callDetailsMedium);
-    scheduler.addResponseTime("ignored", mockCall("HIGH"), callDetailsHigh);
-
-    assertEquals(0, scheduler.getPriorityLevel(mockCall("LOW")));
-    assertEquals(1, scheduler.getPriorityLevel(mockCall("MED")));
-    assertEquals(2, scheduler.getPriorityLevel(mockCall("HIGH")));
-
-    assertEquals(3, scheduler.getUniqueIdentityCount());
-    long totalCallInitial = scheduler.getTotalRawCallVolume();
-    assertEquals(totalCallInitial, scheduler.getTotalCallVolume());
-
-    scheduler.forceDecay();
-
-    // Relative priorities should stay the same after a single decay
-    assertEquals(0, scheduler.getPriorityLevel(mockCall("LOW")));
-    assertEquals(1, scheduler.getPriorityLevel(mockCall("MED")));
-    assertEquals(2, scheduler.getPriorityLevel(mockCall("HIGH")));
-
-    assertEquals(3, scheduler.getUniqueIdentityCount());
-    assertEquals(totalCallInitial, scheduler.getTotalRawCallVolume());
-    assertTrue(scheduler.getTotalCallVolume() < totalCallInitial);
-
-    for (int i = 0; i < 100; i++) {
-      scheduler.forceDecay();
-    }
-    // After enough decay cycles, all callers should be high priority again
-    assertEquals(0, scheduler.getPriorityLevel(mockCall("LOW")));
-    assertEquals(0, scheduler.getPriorityLevel(mockCall("MED")));
-    assertEquals(0, scheduler.getPriorityLevel(mockCall("HIGH")));
-  }
-
-  @Test
-  public void testUsingWeightedTimeCostProviderWithZeroCostCalls() {
-    scheduler = getSchedulerWithWeightedTimeCostProvider(2);
-
-    ProcessingDetails emptyDetails =
-        new ProcessingDetails(TimeUnit.MILLISECONDS);
-
-    for (int i = 0; i < 1000; i++) {
-      scheduler.addResponseTime("ignored", mockCall("MANY"), emptyDetails);
-    }
-    scheduler.addResponseTime("ignored", mockCall("FEW"), emptyDetails);
-
-    // Since the calls are all "free", they should have the same priority
-    assertEquals(0, scheduler.getPriorityLevel(mockCall("MANY")));
-    assertEquals(0, scheduler.getPriorityLevel(mockCall("FEW")));
-  }
-
-  @Test
-  public void testUsingWeightedTimeCostProviderNoRequests() {
-    scheduler = getSchedulerWithWeightedTimeCostProvider(2);
-
-    assertEquals(0, scheduler.getPriorityLevel(mockCall("A")));
-  }
-
-  /**
-   * Get a scheduler that uses {@link WeightedTimeCostProvider} and has
-   * normal decaying disabled.
-   */
-  private static DecayRpcScheduler getSchedulerWithWeightedTimeCostProvider(
-      int priorityLevels) {
-    Configuration conf = new Configuration();
-    conf.setClass("ns." + CommonConfigurationKeys.IPC_COST_PROVIDER_KEY,
-        WeightedTimeCostProvider.class, CostProvider.class);
-    conf.setLong("ns."
-        + DecayRpcScheduler.IPC_SCHEDULER_DECAYSCHEDULER_PERIOD_KEY, 999999);
-    return new DecayRpcScheduler(priorityLevels, "ns", conf);
-  }
-
-  /**
-   * Get the priority and increment the call count, assuming that
-   * {@link DefaultCostProvider} is in use.
-   */
-  private int getPriorityIncrementCallCount(String callId) {
-    Schedulable mockCall = mockCall(callId);
-    int priority = scheduler.getPriorityLevel(mockCall);
-    // The DefaultCostProvider uses a cost of 1 for all calls, ignoring
-    // the processing details, so an empty one is fine
-    ProcessingDetails emptyProcessingDetails =
-        new ProcessingDetails(TimeUnit.MILLISECONDS);
-    scheduler.addResponseTime("ignored", mockCall, emptyProcessingDetails);
-    return priority;
   }
 }
