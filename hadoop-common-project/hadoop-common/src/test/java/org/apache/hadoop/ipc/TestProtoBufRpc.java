@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.ipc;
 
-import com.google.common.base.Supplier;
 import com.google.protobuf.BlockingService;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
@@ -35,7 +34,6 @@ import org.apache.hadoop.ipc.protobuf.TestRpcServiceProtos.TestProtobufRpc2Proto
 import org.apache.hadoop.ipc.protobuf.TestRpcServiceProtos.TestProtobufRpcProto;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.net.NetUtils;
-import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -217,7 +215,7 @@ public class TestProtoBufRpc extends TestRpcBase {
   }
 
   @Test(timeout = 12000)
-  public void testLogSlowRPC() throws Exception {
+  public void testLogSlowRPC() throws IOException, ServiceException {
     TestRpcService2 client = getClient2();
     // make 10 K fast calls
     for (int x = 0; x < 10000; x++) {
@@ -229,20 +227,16 @@ public class TestProtoBufRpc extends TestRpcBase {
     }
 
     // Ensure RPC metrics are updated
-    final RpcMetrics rpcMetrics = server.getRpcMetrics();
+    RpcMetrics rpcMetrics = server.getRpcMetrics();
     assertTrue(rpcMetrics.getProcessingSampleCount() > 999L);
-    final long before = rpcMetrics.getRpcSlowCalls();
+    long before = rpcMetrics.getRpcSlowCalls();
 
     // make a really slow call. Sleep sleeps for 1000ms
     client.sleep(null, newSleepRequest(SLEEP_DURATION * 3));
 
+    long after = rpcMetrics.getRpcSlowCalls();
     // Ensure slow call is logged.
-    GenericTestUtils.waitFor(new Supplier<Boolean>() {
-      @Override
-      public Boolean get() {
-        return rpcMetrics.getRpcSlowCalls() == before + 1L;
-      }
-    }, 10, 1000);
+    Assert.assertEquals(before + 1L, after);
   }
 
   @Test(timeout = 12000)

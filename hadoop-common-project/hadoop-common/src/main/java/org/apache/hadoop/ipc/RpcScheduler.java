@@ -32,15 +32,8 @@ public interface RpcScheduler {
 
   boolean shouldBackOff(Schedulable obj);
 
-  /**
-   * Store a processing time value for an RPC call into this scheduler.
-   *
-   * @param callName The name of the call.
-   * @param schedulable The schedulable representing the incoming call.
-   * @param details The details of processing time.
-   */
-  void addResponseTime(String callName, Schedulable schedulable,
-      ProcessingDetails details);
+  void addResponseTime(String name, int priorityLevel, int queueTime,
+      int processingTime);
 
   void stop();
 

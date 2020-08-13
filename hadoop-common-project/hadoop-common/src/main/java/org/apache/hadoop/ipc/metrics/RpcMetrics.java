@@ -19,8 +19,6 @@ package org.apache.hadoop.ipc.metrics;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import java.util.concurrent.TimeUnit;
-
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -29,6 +27,7 @@ import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
+import org.apache.hadoop.metrics2.lib.MutableCounterInt;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableQuantiles;
 import org.apache.hadoop.metrics2.lib.MutableRate;
@@ -46,8 +45,6 @@ public class RpcMetrics {
   final MetricsRegistry registry;
   final String name;
   final boolean rpcQuantileEnable;
-  /** The time unit used when storing/accessing time durations. */
-  public final static TimeUnit TIMEUNIT = TimeUnit.MILLISECONDS;
   
   RpcMetrics(Server server, Configuration conf) {
     String port = String.valueOf(server.getListenerAddress().getPort());
@@ -60,25 +57,18 @@ public class RpcMetrics {
         CommonConfigurationKeys.RPC_METRICS_QUANTILE_ENABLE,
         CommonConfigurationKeys.RPC_METRICS_QUANTILE_ENABLE_DEFAULT);
     if (rpcQuantileEnable) {
-      rpcQueueTimeQuantiles =
+      rpcQueueTimeMillisQuantiles =
           new MutableQuantiles[intervals.length];
-      rpcLockWaitTimeQuantiles =
-          new MutableQuantiles[intervals.length];
-      rpcProcessingTimeQuantiles =
+      rpcProcessingTimeMillisQuantiles =
           new MutableQuantiles[intervals.length];
       for (int i = 0; i < intervals.length; i++) {
         int interval = intervals[i];
-        rpcQueueTimeQuantiles[i] = registry.newQuantiles("rpcQueueTime"
-            + interval + "s", "rpc queue time in " + TIMEUNIT, "ops",
+        rpcQueueTimeMillisQuantiles[i] = registry.newQuantiles("rpcQueueTime"
+            + interval + "s", "rpc queue time in milli second", "ops",
             "latency", interval);
-        rpcLockWaitTimeQuantiles[i] = registry.newQuantiles(
-            "rpcLockWaitTime" + interval + "s",
-            "rpc lock wait time in " + TIMEUNIT, "ops",
-            "latency", interval);
-        rpcProcessingTimeQuantiles[i] = registry.newQuantiles(
+        rpcProcessingTimeMillisQuantiles[i] = registry.newQuantiles(
             "rpcProcessingTime" + interval + "s",
-            "rpc processing time in " + TIMEUNIT, "ops",
-            "latency", interval);
+            "rpc processing time in milli second", "ops", "latency", interval);
       }
     }
     LOG.debug("Initialized " + registry);
@@ -94,11 +84,9 @@ public class RpcMetrics {
   @Metric("Number of received bytes") MutableCounterLong receivedBytes;
   @Metric("Number of sent bytes") MutableCounterLong sentBytes;
   @Metric("Queue time") MutableRate rpcQueueTime;
-  MutableQuantiles[] rpcQueueTimeQuantiles;
-  @Metric("Lock wait time") MutableRate rpcLockWaitTime;
-  MutableQuantiles[] rpcLockWaitTimeQuantiles;
+  MutableQuantiles[] rpcQueueTimeMillisQuantiles;
   @Metric("Processing time") MutableRate rpcProcessingTime;
-  MutableQuantiles[] rpcProcessingTimeQuantiles;
+  MutableQuantiles[] rpcProcessingTimeMillisQuantiles;
   @Metric("Number of authentication failures")
   MutableCounterLong rpcAuthenticationFailures;
   @Metric("Number of authentication successes")
@@ -194,20 +182,12 @@ public class RpcMetrics {
    * Add an RPC queue time sample
    * @param qTime the queue time
    */
-  public void addRpcQueueTime(long qTime) {
+  //@Override
+  public void addRpcQueueTime(int qTime) {
     rpcQueueTime.add(qTime);
     if (rpcQuantileEnable) {
-      for (MutableQuantiles q : rpcQueueTimeQuantiles) {
+      for (MutableQuantiles q : rpcQueueTimeMillisQuantiles) {
         q.add(qTime);
-      }
-    }
-  }
-
-  public void addRpcLockWaitTime(long waitTime) {
-    rpcLockWaitTime.add(waitTime);
-    if (rpcQuantileEnable) {
-      for (MutableQuantiles q : rpcLockWaitTimeQuantiles) {
-        q.add(waitTime);
       }
     }
   }
@@ -216,10 +196,11 @@ public class RpcMetrics {
    * Add an RPC processing time sample
    * @param processingTime the processing time
    */
-  public void addRpcProcessingTime(long processingTime) {
+  //@Override
+  public void addRpcProcessingTime(int processingTime) {
     rpcProcessingTime.add(processingTime);
     if (rpcQuantileEnable) {
-      for (MutableQuantiles q : rpcProcessingTimeQuantiles) {
+      for (MutableQuantiles q : rpcProcessingTimeMillisQuantiles) {
         q.add(processingTime);
       }
     }
