@@ -51,6 +51,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.crypto.key.kms.KMSDelegationToken;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
@@ -791,6 +792,44 @@ public class TestDelegationTokenRenewer {
     }
 
   }
+
+  @Test(timeout=20000)
+  public void testBadKMSTokenAppSubmission()
+      throws IOException, InterruptedException, BrokenBarrierException {
+    final Credentials credsx = new Credentials();
+    final Token<DelegationTokenIdentifier> tokenx = mock(Token.class);
+    when(tokenx.getKind()).thenReturn(KMSDelegationToken.TOKEN_KIND);
+    DelegationTokenIdentifier dtId1 =
+        new DelegationTokenIdentifier(new Text("user1"), new Text("renewer"),
+            new Text("user1"));
+    when(tokenx.decodeIdentifier()).thenReturn(dtId1);
+    credsx.addToken(new Text("token"), tokenx);
+    doReturn(true).when(tokenx).isManaged();
+    doThrow(new IOException("boom"))
+        .when(tokenx).renew(any(Configuration.class));
+    // fire up the renewer
+    final DelegationTokenRenewer dtr =
+        createNewDelegationTokenRenewer(conf, counter);
+    RMContext mockContext = mock(RMContext.class);
+    when(mockContext.getSystemCredentialsForApps()).thenReturn(
+        new ConcurrentHashMap<ApplicationId, ByteBuffer>());
+    ClientRMService mockClientRMService = mock(ClientRMService.class);
+    when(mockContext.getClientRMService()).thenReturn(mockClientRMService);
+    InetSocketAddress sockAddr =
+        InetSocketAddress.createUnresolved("localhost", 1234);
+    when(mockClientRMService.getBindAddress()).thenReturn(sockAddr);
+    dtr.setRMContext(mockContext);
+    when(mockContext.getDelegationTokenRenewer()).thenReturn(dtr);
+    dtr.init(conf);
+    dtr.start();
+
+    try {
+      dtr.addApplicationSync(mock(ApplicationId.class), credsx, false, "user");
+    } catch (IOException e){
+      fail("KMS tokens should not cause failed app submissions");
+    }
+  }
+
 
   @Test(timeout=20000)                                                         
   public void testConcurrentAddApplication()                                  

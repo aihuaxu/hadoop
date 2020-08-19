@@ -52,6 +52,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.crypto.key.kms.KMSDelegationToken;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.io.Text;
@@ -517,6 +518,12 @@ public class DelegationTokenRenewer extends AbstractService {
               requestNewHdfsDelegationTokenAsProxyUser(
                   Arrays.asList(applicationId), evt.getUser(),
                   evt.shouldCancelAtEnd());
+              continue;
+            }
+            if (token.getKind().equals(KMSDelegationToken.TOKEN_KIND)) {
+              // Let's log and continue if kms token doesn't renew instead of failing the entire app.
+              // Only a minority of apps need a kms token
+              LOG.warn("Failed to renew kms token " + dttr, ioe);
               continue;
             }
             throw new IOException("Failed to renew token: " + dttr, ioe);
