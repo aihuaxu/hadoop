@@ -23,7 +23,9 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -451,6 +453,19 @@ public class TestConsistentReadsObserver {
 
     @Override
     public void stop() {
+    }
+
+    @Override
+    public void addToBlackList(String identity) {
+    }
+
+    @Override
+    public void deleteFromBlackList(String identity) {
+    }
+
+    @Override
+    public List<String> listBlackList() {
+      return new ArrayList<>();
     }
   }
 }
