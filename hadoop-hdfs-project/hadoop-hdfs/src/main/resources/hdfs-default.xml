@@ -3316,9 +3316,6 @@
   </description>
 </property>
 
-<<<<<<< HEAD
-/configuration>
-=======
 <property>
   <name>dfs.block.replicator.classname</name>
   <value>org.apache.hadoop.hdfs.server.blockmanagement.BlockPlacementPolicyDefault</value>
@@ -4516,4 +4513,3 @@
     </description>
   </property>
 </configuration>
->>>>>>> ca777db3ca0... HDFS-14655. [SBN Read] Namenode crashes if one of The JN is down. Contributed by Ayush Saxena.
