@@ -103,6 +103,7 @@ import org.apache.log4j.Level;
 import org.junit.Assert;
 import org.junit.Test;
 import org.mockito.InOrder;
+import org.mockito.Mockito;
 import org.mockito.internal.util.reflection.Whitebox;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -1689,6 +1690,36 @@ public class TestDistributedFileSystem {
           return null;
         }
       });
+    } finally {
+      if (cluster != null) {
+        cluster.shutdown();
+      }
+    }
+  }
+
+  @Test
+  public void testResolvePath() throws Exception {
+    Configuration conf = getTestConfiguration();
+    MiniDFSCluster cluster = null;
+
+    try {
+      cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
+      DistributedFileSystem fs = cluster.getFileSystem();
+      fs.create(new Path("/testpath"));
+
+      // Mock RouterClient as router server is not available.
+      RouterClient rc = Mockito.mock(RouterClient.class);
+      fs.rc = rc;
+      Path routerPath = new Path("hdfs://ns-router-0/testpath");
+      Mockito.when(rc.getRemoteLocation("/testpath")).thenReturn(new Path("hdfs://ns1/testpath"));
+
+      Path resolvedPath = fs.resolvePath(routerPath);
+      assertEquals(new Path("hdfs://ns1/testpath"), resolvedPath);
+
+      Path regularPath = new Path("/testpath");
+      resolvedPath = fs.resolvePath(regularPath);
+
+      assertEquals(new Path(fs.getUri() + "/testpath"), resolvedPath);
     } finally {
       if (cluster != null) {
         cluster.shutdown();

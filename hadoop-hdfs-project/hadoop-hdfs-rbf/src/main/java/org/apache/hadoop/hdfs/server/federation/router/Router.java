@@ -351,6 +351,15 @@ public class Router extends CompositeService implements TokenVerifier<Delegation
   }
 
   /**
+   * Get the Router Admin server.
+   *
+   * @return Router Admin server.
+   */
+  public RouterAdminServer getAdminServer() {
+    return this.adminServer;
+  }
+
+  /**
    * Set the current RPC socket for the router.
    *
    * @param address RPC address.

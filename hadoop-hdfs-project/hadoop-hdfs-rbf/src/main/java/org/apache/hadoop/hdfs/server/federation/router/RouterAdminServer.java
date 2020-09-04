@@ -23,6 +23,7 @@ import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_PERMISSIONS_ENABLED_KEY;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.List;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
@@ -30,7 +31,10 @@ import org.apache.hadoop.hdfs.HDFSPolicyProvider;
 import org.apache.hadoop.hdfs.protocol.proto.RouterProtocolProtos.RouterAdminProtocolService;
 import org.apache.hadoop.hdfs.protocolPB.RouterAdminProtocolPB;
 import org.apache.hadoop.hdfs.protocolPB.RouterAdminProtocolServerSideTranslatorPB;
+import org.apache.hadoop.hdfs.server.federation.resolver.FileSubclusterResolver;
 import org.apache.hadoop.hdfs.server.federation.resolver.MountTableManager;
+import org.apache.hadoop.hdfs.server.federation.resolver.PathLocation;
+import org.apache.hadoop.hdfs.server.federation.resolver.RemoteLocation;
 import org.apache.hadoop.hdfs.server.federation.store.MountTableStore;
 import org.apache.hadoop.hdfs.server.federation.store.protocol.AddMountTableEntryRequest;
 import org.apache.hadoop.hdfs.server.federation.store.protocol.AddMountTableEntryResponse;
@@ -38,6 +42,8 @@ import org.apache.hadoop.hdfs.server.federation.store.protocol.EnterSafeModeRequ
 import org.apache.hadoop.hdfs.server.federation.store.protocol.EnterSafeModeResponse;
 import org.apache.hadoop.hdfs.server.federation.store.protocol.GetMountTableEntriesRequest;
 import org.apache.hadoop.hdfs.server.federation.store.protocol.GetMountTableEntriesResponse;
+import org.apache.hadoop.hdfs.server.federation.store.protocol.GetRemoteLocationRequest;
+import org.apache.hadoop.hdfs.server.federation.store.protocol.GetRemoteLocationResponse;
 import org.apache.hadoop.hdfs.server.federation.store.protocol.GetSafeModeRequest;
 import org.apache.hadoop.hdfs.server.federation.store.protocol.GetSafeModeResponse;
 import org.apache.hadoop.hdfs.server.federation.store.protocol.LeaveSafeModeRequest;
@@ -46,6 +52,7 @@ import org.apache.hadoop.hdfs.server.federation.store.protocol.RemoveMountTableE
 import org.apache.hadoop.hdfs.server.federation.store.protocol.RemoveMountTableEntryResponse;
 import org.apache.hadoop.hdfs.server.federation.store.protocol.UpdateMountTableEntryRequest;
 import org.apache.hadoop.hdfs.server.federation.store.protocol.UpdateMountTableEntryResponse;
+import org.apache.hadoop.hdfs.server.federation.store.protocol.impl.pb.GetRemoteLocationResponsePBImpl;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
@@ -302,4 +309,46 @@ public class RouterAdminServer extends AbstractService
   public static String getSuperGroup(){
     return superGroup;
   }
+
+  /**
+   * Wrap getLocationsForPath function in proto format.
+   *
+   * @param request proto class contains source path for getLocationsForPath method.
+   * @return A list of destinations for given path in proto class.
+   * @throws IOException
+   */
+  public GetRemoteLocationResponse getRemoteLocation(
+          GetRemoteLocationRequest request) throws IOException {
+    List<RemoteLocation> list = getLocationsForPath(request.getSrcPath());
+    GetRemoteLocationResponse resp = GetRemoteLocationResponsePBImpl.newInstance();
+    resp.setRemoteLocation(list);
+    return resp;
+  }
+
+  /**
+   * Get destination(s) for the given path.
+   *
+   * @param path Source path.
+   * @return A list of destinations for the given path.
+   * @throws IOException
+   */
+  public List<RemoteLocation> getLocationsForPath(
+          String path) throws IOException {
+    try {
+      // Check the location for this path
+      FileSubclusterResolver resolver = this.router.getSubclusterResolver();
+      final PathLocation location =
+              resolver.getDestinationForPath(path);
+      if (location == null) {
+        throw new IOException("Cannot find locations for " + path + " in " +
+                resolver);
+      }
+
+      return location.getDestinations();
+    } catch (IOException ioe) {
+      throw ioe;
+    }
+  }
+
+
 }

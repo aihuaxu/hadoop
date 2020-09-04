@@ -136,6 +136,7 @@ public class DistributedFileSystem extends FileSystem
       HdfsClientConfigKeys.DFS_USER_HOME_DIR_PREFIX_DEFAULT;
 
   DFSClient dfs;
+  RouterClient rc;
   private boolean verifyChecksum = true;
 
   private DFSOpsCountStatistics storageStatistics;
@@ -175,6 +176,13 @@ public class DistributedFileSystem extends FileSystem
         HdfsClientConfigKeys.DFS_USER_HOME_DIR_PREFIX_DEFAULT);
 
     this.dfs = new DFSClient(uri, conf, statistics);
+
+    InetSocketAddress routerRpcAddress = conf.getSocketAddr(
+            HdfsClientConfigKeys.Router.DFS_ROUTER_ADMIN_BIND_HOST_KEY,
+            HdfsClientConfigKeys.Router.DFS_ROUTER_ADMIN_ADDRESS_KEY,
+            HdfsClientConfigKeys.Router.DFS_ROUTER_ADMIN_ADDRESS_DEFAULT,
+            HdfsClientConfigKeys.Router.DFS_ROUTER_ADMIN_PORT_DEFAULT);
+    this.rc = new RouterClient(routerRpcAddress, conf);
     this.uri = URI.create(uri.getScheme()+"://"+uri.getAuthority());
     this.workingDir = getHomeDirectory();
 
@@ -3272,5 +3280,54 @@ public class DistributedFileSystem extends FileSystem
   @Override
   public HdfsDataOutputStreamBuilder appendFile(Path path) {
     return new HdfsDataOutputStreamBuilder(this, path).append();
+  }
+
+  /**
+   * Return the fully-qualified path, resolving the path
+   * through any symlinks or mount point. Support router path resolving.
+   *
+   * The function first check authority of a path. If it is
+   * recognized as router, then the function calls router client
+   * to resolve path. Otherwise use default resolvePath from FileSystem.
+   *
+   * For a router path, resolvePath gives the best guess. It resolves from initial
+   * path, following parent path and all the way up to root. At any point, if the
+   * path without scheme and authority exist in router mount table,
+   * take the actual path and append the skipped path as the final resolved path.
+   *
+   * Given below mount table in router, following examples are all valid:
+   *
+   *  Mount table
+   *     /aa -> ns-cluster-prod/aa
+   *
+   * Example 1:
+   *   Input:
+   *      hdfs://ns-cluster-prod/aa
+   *   Output:
+   *      hdfs://ns-cluster-prod/aa
+   *
+   * Example 2:
+   *   Input:
+   *      hdfs://ns-router-prod/aa/bb
+   *   Output:
+   *      hdfs://ns-cluster-prod/aa/bb
+   *
+   * Example 3:
+   *   Input:
+   *      hdfs://ns-router-prod/ab
+   *   Output:
+   *      hdfs://<default-ns>/ab
+   *
+   * @param p path to be resolved
+   * @return fully qualified path
+   * @throws FileNotFoundException if the path is not present
+   * @throws IOException for any other error
+   */
+  @Override
+  public Path resolvePath(Path p) throws IOException {
+    String authority = p.toUri().getAuthority();
+    if(authority == null || authority.isEmpty() || !authority.contains(HdfsConstants.ROUTER_AUTHORITY_KEYWORD))
+      return super.resolvePath(p);
+    return rc.getRemoteLocation(Path.getPathWithoutSchemeAndAuthority(p).toString());
   }
 }

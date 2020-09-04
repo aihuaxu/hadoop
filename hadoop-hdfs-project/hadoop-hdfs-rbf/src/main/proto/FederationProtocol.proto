@@ -219,6 +219,14 @@ message RouterHeartbeatResponseProto {
   optional bool status = 1;
 }
 
+message GetRemoteLocationRequestProto {
+  optional string srcPath = 1;
+}
+
+message GetRemoteLocationResponseProto {
+  repeated RemoteLocationProto remoteLocation = 1;
+}
+
 /////////////////////////////////////////////////
 // Route State
 /////////////////////////////////////////////////
