@@ -118,6 +118,7 @@ import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.OpenFi
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.RollingUpgradeActionProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.RollingUpgradeInfoProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.SafeModeActionProto;
+import org.apache.hadoop.hdfs.protocol.proto.ClientRouterProtocolProtos.RemoteLocationProto;
 import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.ShortCircuitShmIdProto;
 import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.ShortCircuitShmSlotProto;
 import org.apache.hadoop.hdfs.protocol.proto.EncryptionZonesProtos.EncryptionZoneProto;
@@ -175,6 +176,8 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.ChunkedArrayList;
 import org.apache.hadoop.util.DataChecksum;
 import org.apache.hadoop.util.LimitInputStream;
+
+import static org.apache.hadoop.hdfs.protocol.HdfsConstants.HDFS_URI_SCHEME;
 
 /**
  * Utilities for converting protobuf classes to and from hdfs-client side
@@ -2533,5 +2536,20 @@ public class PBHelperClient {
       }
     }
     return ret;
+  }
+
+  /**
+   * Convert a list of protobuf to a List of Path.
+   */
+  public static List<Path> convertRemoteLocationProto(
+          List<RemoteLocationProto> remoteLocationProtoList) {
+    List<Path> pathList = new ArrayList<>();
+    for (RemoteLocationProto remoteLocationProto : remoteLocationProtoList) {
+      String fullQualifiedPath = HDFS_URI_SCHEME + "://" +
+              remoteLocationProto.getNameserviceId() + "/" +
+              remoteLocationProto.getPath();
+      pathList.add(new Path(fullQualifiedPath));
+    }
+    return pathList;
   }
 }
