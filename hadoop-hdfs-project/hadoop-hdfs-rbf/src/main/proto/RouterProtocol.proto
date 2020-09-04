@@ -59,4 +59,9 @@ service RouterAdminProtocolService {
    * Verify if current Router state is safe mode state.
    */
   rpc getSafeMode(GetSafeModeRequestProto) returns (GetSafeModeResponseProto);
+
+  /**
+   * Get destination path for source path.
+   */
+  rpc getRemoteLocation(GetRemoteLocationRequestProto) returns (GetRemoteLocationResponseProto);
 }

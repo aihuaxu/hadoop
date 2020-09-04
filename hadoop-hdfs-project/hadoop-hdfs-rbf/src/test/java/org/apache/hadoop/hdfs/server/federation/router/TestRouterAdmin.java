@@ -32,6 +32,7 @@ import org.apache.hadoop.hdfs.server.federation.RouterConfigBuilder;
 import org.apache.hadoop.hdfs.server.federation.MiniRouterDFSCluster.RouterContext;
 import org.apache.hadoop.hdfs.server.federation.StateStoreDFSCluster;
 import org.apache.hadoop.hdfs.server.federation.resolver.MountTableManager;
+import org.apache.hadoop.hdfs.server.federation.resolver.MountTableResolver;
 import org.apache.hadoop.hdfs.server.federation.resolver.RemoteLocation;
 import org.apache.hadoop.hdfs.server.federation.resolver.order.DestinationOrder;
 import org.apache.hadoop.hdfs.server.federation.store.StateStoreService;
@@ -40,6 +41,8 @@ import org.apache.hadoop.hdfs.server.federation.store.protocol.AddMountTableEntr
 import org.apache.hadoop.hdfs.server.federation.store.protocol.AddMountTableEntryResponse;
 import org.apache.hadoop.hdfs.server.federation.store.protocol.GetMountTableEntriesRequest;
 import org.apache.hadoop.hdfs.server.federation.store.protocol.GetMountTableEntriesResponse;
+import org.apache.hadoop.hdfs.server.federation.store.protocol.GetRemoteLocationRequest;
+import org.apache.hadoop.hdfs.server.federation.store.protocol.GetRemoteLocationResponse;
 import org.apache.hadoop.hdfs.server.federation.store.protocol.RemoveMountTableEntryRequest;
 import org.apache.hadoop.hdfs.server.federation.store.protocol.RemoveMountTableEntryResponse;
 import org.apache.hadoop.hdfs.server.federation.store.protocol.UpdateMountTableEntryRequest;
@@ -298,6 +301,35 @@ public class TestRouterAdmin {
     MountTable entry = getMountTableEntry("/ns0");
     assertNotNull(entry);
     assertEquals(entry.getSourcePath(), "/ns0");
+  }
+
+  @Test
+  public void testGetRemoteLocation() throws IOException {
+    RouterAdminServer server = routerContext.getRouter().getAdminServer();
+    RouterClient client = routerContext.getAdminClient();
+    MountTableManager mountTable = client.getMountTableManager();
+    MountTableResolver resolver = (MountTableResolver) routerContext.getRouter().getSubclusterResolver();
+
+    // Add mount table entry for test.
+    MountTable newEntry = MountTable.newInstance("/testpath",
+            Collections.singletonMap("ns1", "/testdir"), Time.now(), Time.now());
+    resolver.addEntry(newEntry);
+    AddMountTableEntryRequest addRequest =
+            AddMountTableEntryRequest.newInstance(newEntry);
+    mountTable.addMountTableEntry(addRequest);
+
+    // Verify router mount table record.
+    stateStore.loadCache(MountTableStoreImpl.class, true);
+    List<RemoteLocation> remoteLocationList = server.getMountTableEntries(GetMountTableEntriesRequest.newInstance("/testpath")).getEntries().get(0).getDestinations();
+    assertEquals(
+            Collections.singletonList(new RemoteLocation("ns1", "/testdir")),
+            remoteLocationList);
+
+    // Verify getRemoteLocation result.
+    GetRemoteLocationRequest getRemoteLocationRequest = GetRemoteLocationRequest.newInstance("/testpath");
+    GetRemoteLocationResponse getRemoteLocationResponse = server.getRemoteLocation(getRemoteLocationRequest);
+    assertEquals(
+            remoteLocationList, getRemoteLocationResponse.getRemoteLocation());
   }
 
   /**
