@@ -414,4 +414,16 @@ public interface HdfsClientConfigKeys {
     String  FAILOVER_SLEEPTIME_MAX_KEY = PREFIX + "failover.sleep.max.millis";
     int     FAILOVER_SLEEPTIME_MAX_DEFAULT =  15000;
   }
+
+  /**
+   * Router configuration properties.
+   *
+   * This is duplicated from hadoop-hdfs-rbf: RBFConfigKeys.java to avoid circular dependencies.
+   */
+  interface Router {
+    int DFS_ROUTER_ADMIN_PORT_DEFAULT = 8111;
+    String DFS_ROUTER_ADMIN_BIND_HOST_KEY = "dfs.federation.router.admin-bind-host";
+    String DFS_ROUTER_ADMIN_ADDRESS_KEY = "dfs.federation.router.admin-address";
+    String DFS_ROUTER_ADMIN_ADDRESS_DEFAULT = "0.0.0.0:" + DFS_ROUTER_ADMIN_PORT_DEFAULT;
+  }
 }
