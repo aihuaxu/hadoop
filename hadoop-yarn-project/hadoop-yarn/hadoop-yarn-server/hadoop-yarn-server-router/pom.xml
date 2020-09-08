@@ -98,6 +98,12 @@
     </dependency>
 
     <dependency>
+      <groupId>org.apache.curator</groupId>
+      <artifactId>curator-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+
+    <dependency>
       <groupId>com.google.inject</groupId>
       <artifactId>guice</artifactId>
     </dependency>
@@ -134,6 +140,7 @@
                 <directory>${basedir}/src/main/proto</directory>
                 <includes>
                   <include>yarn_server_router_token.proto</include>
+                  <include>yarn_server_router.proto</include>
                 </includes>
               </source>
             </configuration>
