@@ -6,12 +6,17 @@ import org.apache.hadoop.store.record.BaseRecord;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.Assert.assertNotNull;
 
@@ -56,7 +61,7 @@ public final class StateStoreTestUtils {
     stateStore.start();
     assertTrue(stateStore.isDriverReady());
     // Wait for state store to connect
-//    waitStateStore(stateStore, TimeUnit.SECONDS.toMillis(10));
+    waitStateStore(stateStore, TimeUnit.SECONDS.toMillis(10));
 
     return stateStore;
   }
@@ -118,5 +123,28 @@ public final class StateStoreTestUtils {
       }
     }
     return false;
+  }
+
+  public static void verifyException(Object obj, String methodName,
+      Class<? extends Exception> exceptionClass, Class<?>[] parameterTypes,
+      Object[] arguments) {
+
+    Throwable triggeredException = null;
+    try {
+      Method m = obj.getClass().getMethod(methodName, parameterTypes);
+      m.invoke(obj, arguments);
+    } catch (InvocationTargetException ex) {
+      triggeredException = ex.getTargetException();
+    } catch (Exception e) {
+      triggeredException = e;
+    }
+    if (exceptionClass != null) {
+      assertNotNull("No exception was triggered, expected exception"
+          + exceptionClass.getName(), triggeredException);
+      assertEquals(exceptionClass, triggeredException.getClass());
+    } else {
+      assertNull("Exception was triggered but no exception was expected",
+          triggeredException);
+    }
   }
 }

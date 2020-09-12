@@ -37,6 +37,8 @@ public class RouterStateStoreService extends CompositeService {
 
   /** Driver for the back end connection. */
   private StateStoreDriver driver;
+  /** Service to maintain State Store caches. */
+  private StateStoreCacheUpdateService cacheUpdater;
   /** Time the cache was last successfully updated. */
   private long cacheLastUpdateTime;
   /** List of internal caches to update. */
@@ -78,12 +80,17 @@ public class RouterStateStoreService extends CompositeService {
     }
 
     // Add supported record stores
+    // Router record store
     addRecordStore(RouterRecordStoreImpl.class);
 
     RouterState.setExpirationMs(conf.getTimeDuration(
         RouterConfigKeys.ROUTER_STORE_ROUTER_EXPIRATION_MS,
         RouterConfigKeys.ROUTER_STORE_ROUTER_EXPIRATION_MS_DEFAULT,
         TimeUnit.MILLISECONDS));
+
+    // Cache update service
+    this.cacheUpdater = new StateStoreCacheUpdateService(this);
+    addService(this.cacheUpdater);
 
     super.serviceInit(this.conf);
   }

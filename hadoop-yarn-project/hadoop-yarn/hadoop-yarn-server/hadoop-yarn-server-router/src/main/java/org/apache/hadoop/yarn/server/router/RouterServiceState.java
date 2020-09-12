@@ -6,7 +6,6 @@ package org.apache.hadoop.yarn.server.router;
 public enum RouterServiceState {
   UNINITIALIZED,
   INITIALIZING,
-  SAFEMODE,
   RUNNING,
   STOPPING,
   SHUTDOWN,

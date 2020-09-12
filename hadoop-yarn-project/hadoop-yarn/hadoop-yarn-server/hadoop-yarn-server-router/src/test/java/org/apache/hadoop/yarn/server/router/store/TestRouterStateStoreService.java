@@ -29,7 +29,9 @@ public class TestRouterStateStoreService {
   private static TestingServer curatorTestingServer;
   private static CuratorFramework curatorFramework;
 
-
+  protected static RouterStateStoreService getStateStoreService() {
+    return stateStoreService;
+  }
   @BeforeClass
   public static void createBase() throws Exception {
     initDriverConnection(curatorTestingServer, curatorFramework);
