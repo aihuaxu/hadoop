@@ -44,3 +44,83 @@ message RouterHeartbeatRequestProto {
 message RouterHeartbeatResponseProto {
     optional bool status = 1;
 }
+///////////////////////////////////////
+///// Peloton protocol////////////////
+/////////////////////////////////////
+message PelotonZKConfProto {
+    optional string cluster = 1;
+    repeated PelotonZKInfoProto zkInfos= 2;
+    optional uint64 dateCreated = 3;
+    optional uint64 dateModified = 4;
+}
+
+message PelotonZKInfoProto {
+    optional string zkAddress = 1;
+    optional string zone = 2;
+    optional string region = 3;
+    optional uint64 dateCreated = 4;
+    optional uint64 dateModified = 5;
+}
+
+message GetPelotonZKConfListRequestProto {
+}
+
+message GetPelotonZKConfListResponseProto {
+    repeated PelotonZKConfProto zkConfs = 1;
+}
+
+message SavePelotonZKInfoToClusterRequestProto {
+    optional string cluster = 1;
+    optional bool isCreate = 2;
+    optional PelotonZKInfoProto zkInfo = 3;
+}
+
+message SavePelotonZKInfoToClusterResponseProto {
+    optional bool status = 1;
+    optional string errorMsg = 2;
+}
+
+message RemovePelotonZKInfoFromClusterRequestProto {
+    optional string cluster = 1;
+    optional string zkAddress = 2;
+}
+
+message RemovePelotonZKInfoFromClusterResponseProto {
+    optional bool status = 1;
+    optional string errorMsg = 2;
+}
+
+message SavePelotonZKConfRequestProto {
+    optional PelotonZKConfProto zkConf = 1;
+    optional bool isCreate = 2;
+}
+
+message SavePelotonZKConfResponseProto {
+    optional bool status = 1;
+    optional string errorMsg = 2;
+}
+
+message RemovePelotonZKConfByClusterRequestProto {
+    optional string cluster = 1;
+}
+
+message RemovePelotonZKConfByClusterResponseProto {
+    optional bool status = 1;
+    optional string errorMsg = 2;
+}
+
+message GetPelotonZKInfoListByClusterRequestProto {
+    optional string cluster = 1;
+}
+
+message GetPelotonZKInfoListByClusterResponseProto {
+    repeated PelotonZKInfoProto zkInfos = 1;
+}
+
+message ClearAllPelotonZKConfsRequestProto {
+}
+
+message ClearAllPelotonZKConfsResponseProto {
+    optional bool status = 1;
+    optional string errorMsg = 2;
+}

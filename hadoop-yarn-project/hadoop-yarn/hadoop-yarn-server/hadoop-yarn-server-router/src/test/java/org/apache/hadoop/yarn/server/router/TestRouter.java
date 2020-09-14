@@ -41,5 +41,11 @@ public class TestRouter {
     @Test
     public void testRouterService() throws InterruptedException, IOException {
         testRouterStartup(conf);
+        // Admin only
+        testRouterStartup(new RouterConfigBuilder(conf).build());
+        // Statestore only
+        testRouterStartup(new RouterConfigBuilder(conf).stateStore().build());
+        // Heartbeat only
+        testRouterStartup(new RouterConfigBuilder(conf).heartbeat().build());
     }
 }

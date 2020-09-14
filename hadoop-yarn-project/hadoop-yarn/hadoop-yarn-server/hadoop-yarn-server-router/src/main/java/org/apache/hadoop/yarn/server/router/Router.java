@@ -20,6 +20,7 @@ package org.apache.hadoop.yarn.server.router;
 
 import java.io.IOException;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -94,6 +95,10 @@ public class Router extends CompositeService {
   @VisibleForTesting
   protected String webAppAddress;
 
+  /** RPC interface for the admin. */
+  private RouterAdminServer adminServer;
+  private InetSocketAddress adminAddress;
+
   /**
    * Priority of the Router shutdown hook.
    */
@@ -138,6 +143,12 @@ public class Router extends CompositeService {
     webAppAddress = WebAppUtils.getWebAppBindURL(this.conf,
         YarnConfiguration.ROUTER_BIND_HOST,
         WebAppUtils.getRouterWebAppURLWithoutScheme(this.conf));
+    // Metrics
+    DefaultMetricsSystem.initialize(METRICS_NAME);
+
+    // Create admin server
+    adminServer = createAdminServer();
+    addService(adminServer);
     // Metrics
     DefaultMetricsSystem.initialize(METRICS_NAME);
 
@@ -290,12 +301,40 @@ public class Router extends CompositeService {
   }
 
   /**
+   * Set the current Admin socket for the router.
+   *
+   * @param address Admin RPC address.
+   */
+  protected void setAdminServerAddress(InetSocketAddress address) {
+    this.adminAddress = address;
+  }
+
+  /**
+   * Get the current Admin socket address for the router.
+   *
+   * @return InetSocketAddress Admin address.
+   */
+  public InetSocketAddress getAdminServerAddress() {
+    return adminAddress;
+  }
+
+  /**
    * Get the status of the router.
    *
    * @return Status of the router.
    */
   public RouterServiceState getRouterState() {
     return this.routerServiceState;
+  }
+
+  /**
+   * Create a new router admin server to handle the router admin interface.
+   *
+   * @return RouterAdminServer
+   * @throws IOException If the admin server was not successfully started.
+   */
+  protected RouterAdminServer createAdminServer() throws IOException {
+    return new RouterAdminServer(this.conf, this);
   }
 
   public static void main(String[] argv) {
