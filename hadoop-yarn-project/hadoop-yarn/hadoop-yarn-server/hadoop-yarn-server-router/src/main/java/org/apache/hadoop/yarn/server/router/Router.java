@@ -22,19 +22,24 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
+import java.security.SecureRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.apache.curator.framework.CuratorFramework;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.ha.HAServiceProtocol;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.service.CompositeService;
 import org.apache.hadoop.util.ShutdownHookManager;
 import org.apache.hadoop.util.StringUtils;
+import org.apache.hadoop.util.curator.ZKCuratorManager;
 import org.apache.hadoop.yarn.YarnUncaughtExceptionHandler;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
+import org.apache.hadoop.yarn.server.resourcemanager.EmbeddedElector;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.RMWebAppUtil;
 import org.apache.hadoop.yarn.server.router.clientrm.RouterClientRMService;
 import org.apache.hadoop.yarn.server.router.rmadmin.RouterRMAdminService;
@@ -49,6 +54,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.yarn.conf.YarnConfiguration.DEFAULT_ROUTER_CLIENTRM_PORT;
+import static org.apache.hadoop.yarn.conf.YarnConfiguration.ROUTER_HA_ENABLED;
+import static org.apache.hadoop.yarn.conf.YarnConfiguration.ROUTER_HA_ENABLED_DEFAULT;
 import static org.apache.hadoop.yarn.conf.YarnConfiguration.ROUTER_KERBEROS_PRINCIPAL_HOSTNAME_KEY;
 import static org.apache.hadoop.yarn.conf.YarnConfiguration.ROUTER_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.yarn.conf.YarnConfiguration.ROUTER_KEYTAB_FILE_KEY;
@@ -95,6 +102,14 @@ public class Router extends CompositeService {
   @VisibleForTesting
   protected String webAppAddress;
 
+  /** Leader election. */
+  private boolean routerHAEnabled = false;
+  private RouterHAContext routerHAContext;
+  private RouterActiveServices activeServices;
+  private ZKCuratorManager zkManager;
+  private final String zkRootNodePassword =
+      Long.toString(new SecureRandom().nextLong());
+
   /** RPC interface for the admin. */
   private RouterAdminServer adminServer;
   private InetSocketAddress adminAddress;
@@ -122,6 +137,8 @@ public class Router extends CompositeService {
   @Override
   protected void serviceInit(Configuration config) throws Exception {
     this.conf = config;
+    this.routerHAContext = new RouterHAContext();
+    routerHAContext.setRouter(this);
     updateRouterState(RouterServiceState.INITIALIZING);
     String hostName = getHostName(conf);
     setRouterId(hostName + ":" + DEFAULT_ROUTER_CLIENTRM_PORT);
@@ -149,6 +166,8 @@ public class Router extends CompositeService {
     // Create admin server
     adminServer = createAdminServer();
     addService(adminServer);
+    // add to routerHAContext for leader election
+    routerHAContext.setRouterAdminServer(adminServer);
     // Metrics
     DefaultMetricsSystem.initialize(METRICS_NAME);
 
@@ -159,6 +178,16 @@ public class Router extends CompositeService {
       this.routerHeartbeatService = new RouterHeartbeatService(this);
       addService(this.routerHeartbeatService);
     }
+    // Add leader election service and Router activities to be managed by leader
+    routerHAEnabled = conf.getBoolean(ROUTER_HA_ENABLED, ROUTER_HA_ENABLED_DEFAULT);
+    routerHAContext.setHAEnabled(routerHAEnabled);
+    if (routerHAEnabled) {
+      EmbeddedElector elector = createEmbeddedElector();
+      addIfService(elector);
+      routerHAContext.setLeaderElectorService(elector);
+    }
+
+    createAndInitActiveServices(conf, clientRMProxyService);
 
     super.serviceInit(conf);
   }
@@ -186,6 +215,7 @@ public class Router extends CompositeService {
     if (isStopping.getAndSet(true)) {
       return;
     }
+    transitionToStandby();
     super.serviceStop();
     DefaultMetricsSystem.shutdown();
   }
@@ -359,6 +389,114 @@ public class Router extends CompositeService {
     } catch (Throwable t) {
       LOG.error("Error starting Router", t);
       System.exit(-1);
+    }
+  }
+
+  /**
+   * Leader election
+   */
+  protected EmbeddedElector createEmbeddedElector() throws IOException {
+    EmbeddedElector elector;
+    this.zkManager = createAndStartZKManager(conf);
+    elector = new RouterElectorBasedElectorService(this, adminServer);
+    return elector;
+  }
+
+  public CuratorFramework getCurator() {
+    if (this.zkManager == null) {
+      return null;
+    }
+    return this.zkManager.getCurator();
+  }
+
+  public RouterHAContext getRouterHAContext() {
+    return this.routerHAContext;
+  }
+
+  synchronized void transitionToActive() throws Exception {
+    if (routerHAContext.getHAServiceState() == HAServiceProtocol.HAServiceState.ACTIVE) {
+      LOG.info("Already in active state");
+      return;
+    }
+    LOG.info("Transitioning to active state");
+    startActiveServices();
+    routerHAContext.setHAServiceState(HAServiceProtocol.HAServiceState.ACTIVE);
+    LOG.info("Transitioned to active state");
+  }
+
+  synchronized void transitionToStandby()
+      throws Exception {
+    if (routerHAContext.getHAServiceState() ==
+        HAServiceProtocol.HAServiceState.STANDBY) {
+      LOG.info("Already in standby state");
+      return;
+    }
+
+    LOG.info("Transitioning to standby state");
+    HAServiceProtocol.HAServiceState state = routerHAContext.getHAServiceState();
+    routerHAContext.setHAServiceState(HAServiceProtocol.HAServiceState.STANDBY);
+    if (state == HAServiceProtocol.HAServiceState.ACTIVE) {
+      stopActiveServices();
+      createAndInitActiveServices(conf, clientRMProxyService);
+    }
+    LOG.info("Transitioned to standby state");
+  }
+
+  private void createAndInitActiveServices(Configuration conf, RouterClientRMService clientRMService) {
+    activeServices = new RouterActiveServices(clientRMService);
+    activeServices.init(conf);
+  }
+  /**
+   * Get ZooKeeper Curator manager, creating and starting if not exists.
+   * @param config Configuration for the ZooKeeper curator.
+   * @return ZooKeeper Curator manager.
+   * @throws IOException If it cannot create the manager.
+   */
+  public ZKCuratorManager createAndStartZKManager(Configuration
+      config) throws IOException {
+    ZKCuratorManager manager = new ZKCuratorManager(config);
+//    TODO: add fencing action
+    manager.start();
+    return manager;
+  }
+
+  /**
+   * Helper method to start {@link #activeServices}.
+   * @throws Exception
+   */
+  void startActiveServices() throws Exception {
+    if (activeServices != null) {
+      activeServices.start();
+    }
+  }
+
+  /**
+   * Helper method to stop {@link #activeServices}.
+   * @throws Exception
+   */
+  void stopActiveServices() {
+    if (activeServices != null) {
+      activeServices.stop();
+      activeServices = null;
+    }
+  }
+
+  @Private
+  public class RouterActiveServices extends CompositeService {
+    //TODO: integrate with YOP
+//    private YoPService yopService;
+    private RouterClientRMService clientRMService;
+
+    RouterActiveServices(RouterClientRMService clientRMService) {
+      super("RouterActiveServices");
+      this.clientRMService = clientRMService;
+    }
+
+    @Override
+    protected void serviceInit(Configuration configuration) throws Exception {
+//      yopService = createYoPService(clientRMService);
+//      yopService.init(conf);
+//      addService(yopService);
     }
   }
 }

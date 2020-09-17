@@ -3,8 +3,13 @@ package org.apache.hadoop.yarn.server.router;
 import com.google.protobuf.BlockingService;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import org.apache.hadoop.ha.HAServiceProtocol;
+import org.apache.hadoop.ha.HAServiceStatus;
+import org.apache.hadoop.ha.HealthCheckFailedException;
+import org.apache.hadoop.ha.ServiceFailedException;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.service.AbstractService;
 import org.apache.hadoop.yarn.proto.RouterAdministrationProtocol;
 import org.apache.hadoop.yarn.server.router.external.peloton.PelotonZKConfManager;
@@ -36,7 +41,7 @@ import java.net.InetSocketAddress;
  * This class is responsible for handling all of the Admin calls to the YARN
  * router. It is created, started, and stopped by {@link Router}.
  */
-public class RouterAdminServer extends AbstractService implements PelotonZKConfManager {
+public class RouterAdminServer extends AbstractService implements HAServiceProtocol, PelotonZKConfManager {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(RouterAdminServer.class);
@@ -186,4 +191,51 @@ public class RouterAdminServer extends AbstractService implements PelotonZKConfM
     return this.pelotonZKConfRecordStore;
   }
 
+  @Override
+  public synchronized void monitorHealth() throws HealthCheckFailedException, AccessControlException, IOException {
+    if(isRouterActive()) {
+      throw new HealthCheckFailedException(
+          "Active Router services are not running!");
+    }
+  }
+
+  @Override
+  public synchronized void transitionToActive(
+      StateChangeRequestInfo reqInfo)
+      throws ServiceFailedException, AccessControlException, IOException {
+    if (isRouterActive()) {
+      return;
+    }
+    try {
+      router.transitionToActive();
+    } catch (Exception e) {
+      throw new ServiceFailedException("Can not active", e);
+    }
+  }
+
+  @Override
+  public synchronized void transitionToStandby(StateChangeRequestInfo reqInfo)
+      throws ServiceFailedException, AccessControlException, IOException {
+    try {
+      router.transitionToStandby();
+    } catch (Exception e) {
+      throw new ServiceFailedException("Can not standby", e);
+    }
+  }
+
+  @Override
+  public HAServiceStatus getServiceStatus() throws AccessControlException, IOException {
+    HAServiceState haState = router.getRouterHAContext().getHAServiceState();
+    HAServiceStatus ret = new HAServiceStatus(haState);
+    if (isRouterActive() || haState == HAServiceState.STANDBY) {
+      ret.setReadyToBecomeActive();
+    } else {
+      ret.setNotReadyToBecomeActive("State is " + haState);
+    }
+    return ret;
+  }
+
+  private synchronized boolean isRouterActive() {
+    return HAServiceState.ACTIVE == router.getRouterHAContext().getHAServiceState();
+  }
 }

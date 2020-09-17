@@ -2968,6 +2968,9 @@ public class YarnConfiguration extends Configuration {
 
   public static final String ROUTER_BIND_HOST = ROUTER_PREFIX + "bind-host";
 
+  public static final String ROUTER_ADDRESS =
+      ROUTER_PREFIX + "address";
+
   public static final String ROUTER_CLIENTRM_PREFIX =
       ROUTER_PREFIX + "clientrm.";
 
@@ -3000,6 +3003,21 @@ public class YarnConfiguration extends Configuration {
   public static final String DEFAULT_ROUTER_RMADMIN_INTERCEPTOR_CLASS =
       "org.apache.hadoop.yarn.server.router.rmadmin."
           + "DefaultRMAdminRequestInterceptor";
+
+  /**
+   * Router HA configuration
+   */
+  public static final String ROUTER_HA_PREFIX = ROUTER_PREFIX + "ha.";
+  public static final String ROUTER_HA_IDS = ROUTER_HA_PREFIX + "router-ids";
+  public static final String ROUTER_HA_ID = ROUTER_HA_PREFIX + "id";
+
+  public static final String ROUTER_HA_ENABLED = ROUTER_HA_PREFIX + "enabled";
+  public static final boolean ROUTER_HA_ENABLED_DEFAULT = true;
+
+  public static final String ROUTER_AUTO_FAILOVER_ZK_BASE_PATH =
+      ROUTER_HA_PREFIX + "automatic-failover." + "zk-base-path";
+  public static final String ROUTER_DEFAULT_AUTO_FAILOVER_ZK_BASE_PATH =
+      "/router-leader-election";
 
   /**
    * The number of retries for GetNewApplication and SubmitApplication in

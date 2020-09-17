@@ -160,6 +160,49 @@ public class HAUtil {
   }
 
   /**
+      * @param conf Configuration. Please use getRouterHAIds to check.
+   * @return Router Ids on success
+   */
+  public static Collection<String> getRouterHAIds(Configuration conf) {
+    return  conf.getStringCollection(YarnConfiguration.ROUTER_HA_IDS);
+  }
+
+  /**
+   * @param conf Configuration
+   * @return Router Id on success
+   */
+  public static String getRouterHAId(Configuration conf) {
+    int found = 0;
+    String currentRouterId = conf.getTrimmed(YarnConfiguration.ROUTER_HA_ID);
+    if(currentRouterId == null) {
+      for(String routerId : getRouterHAIds(conf)) {
+        String key = addSuffix(YarnConfiguration.ROUTER_ADDRESS, routerId);
+        String addr = conf.get(key);
+        if (addr == null) {
+          continue;
+        }
+        InetSocketAddress s;
+        try {
+          s = NetUtils.createSocketAddr(addr);
+        } catch (Exception e) {
+          LOG.warn("Exception in creating socket address " + addr, e);
+          continue;
+        }
+        if (!s.isUnresolved() && NetUtils.isLocalAddress(s.getAddress())) {
+          currentRouterId = routerId.trim();
+          found++;
+        }
+      }
+    }
+    if (found > 1) { // Only one address must match the local address
+      String msg = "The HA Configuration has multiple addresses that match "
+          + "local node's address.";
+      throw new HadoopIllegalArgumentException(msg);
+    }
+    return currentRouterId;
+  }
+
+  /**
    * This method validates that some leader election service is enabled. YARN
    * allows leadership election to be disabled in the configuration, which
    * breaks automatic failover. If leadership election is disabled, this
