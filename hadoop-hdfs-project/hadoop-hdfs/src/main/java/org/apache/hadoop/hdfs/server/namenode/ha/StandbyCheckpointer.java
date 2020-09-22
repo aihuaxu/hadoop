@@ -493,7 +493,7 @@ public class StandbyCheckpointer {
           // Probably requested shutdown.
           continue;
         } catch (Throwable t) {
-          LOG.error("Exception in doCheckpoint", t);
+          LOG.error("Exception in doCheckpoint:" + t.getMessage(), t);
         } finally {
           synchronized (cancelLock) {
             canceler = null;
