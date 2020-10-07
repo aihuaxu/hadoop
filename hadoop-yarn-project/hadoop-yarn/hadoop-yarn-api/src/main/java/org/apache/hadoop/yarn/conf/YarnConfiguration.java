@@ -3074,6 +3074,14 @@ public class YarnConfiguration extends Configuration {
   public static final boolean DEFAULT_ROUTER_WEBAPP_PARTIAL_RESULTS_ENABLED =
       false;
 
+  /**
+   * The langley path of YARN user credential on Peloton
+   */
+  public static final String ROUTER_YARN_USER_ON_PELOTON_PATH =
+    ROUTER_PREFIX + "yarn-credential-on-peloton.path";
+  public static final String DEFAULT_ROUTER_YARN_USER_ON_PELOTON_PATH =
+    "/langley/current/yarn_credential_on_peloton/yarn_credential_on_peloton.yaml";
+
   ////////////////////////////////
   // Other Configs
   ////////////////////////////////

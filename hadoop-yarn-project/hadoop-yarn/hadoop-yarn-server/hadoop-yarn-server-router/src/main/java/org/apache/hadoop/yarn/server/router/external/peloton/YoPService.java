@@ -32,9 +32,6 @@ public class YoPService extends AbstractService {
 
   @Override
   protected void serviceInit(Configuration conf) throws Exception {
-    // TODO:
-    // add Peloton clusters (zk conn) to yarn conf
-
     super.serviceInit(conf);
   }
 

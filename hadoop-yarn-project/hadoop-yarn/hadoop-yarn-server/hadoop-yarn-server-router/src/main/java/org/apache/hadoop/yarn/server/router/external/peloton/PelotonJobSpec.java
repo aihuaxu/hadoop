@@ -97,7 +97,9 @@ public class PelotonJobSpec {
     /**
      * Peloton Pool information
      */
-    public static final String RESPOOL = "/StatelessResPool";
+    //TODO: The stateless resource pool name on Peloton can be different.
+    //RESPOOL needs to be configurable as long with zk conn in Router zk statestore
+    public static final String RESPOOL = "/Coconut";
     public static final String PELOTON_HOST_POOL_SHARED_TO_YARN = "shared";
 
     /**

@@ -1,5 +1,7 @@
 package org.apache.hadoop.yarn.server.router.external.peloton;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.peloton.api.v0.host.svc.pb.HostSvc;
 import com.peloton.api.v0.host.svc.pb.HostSvc.SetReclaimHostOrderRequest;
 import com.peloton.api.v0.host.svc.pb.HostServiceGrpc.HostServiceBlockingStub;
@@ -9,12 +11,14 @@ import com.uber.peloton.client.HostManager;
 import com.uber.peloton.client.ResourceManager;
 import com.uber.peloton.client.StatelessJobService;
 import com.uber.peloton.client.shaded.com.google.protobuf.ProtocolStringList;
+import java.io.FileInputStream;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.api.protocolrecords.GetOrderedHostsRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.GetOrderedHostsResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.IncludeExternalHostsRequest;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.server.router.clientrm.RouterClientRMService;
+import org.apache.hadoop.yarn.server.router.external.peloton.PelotonJobSpec.Constants;
 import org.apache.hadoop.yarn.server.router.external.peloton.protocol.GetPelotonZKInfoListByClusterRequest;
 import org.apache.hadoop.yarn.server.router.external.peloton.protocol.GetPelotonZKInfoListByClusterResponse;
 import org.apache.hadoop.yarn.server.router.external.peloton.records.PelotonZKInfo;
@@ -51,11 +55,9 @@ public class PelotonHelper {
   private List<PelotonClientWrapper> pelotonClientWrapperList;
   private Configuration conf;
 
-  /** ToDo - pgolash@uber.com
-   * This will come from langley
-   */
-  private static String USERNAME = "user";
-  private static String PASSWORD = "password";
+  //username and password for Peloton gRPC connection
+  private String yarnUser = "";
+  private static String yarnPassword = "";
 
   private Peloton.JobID pelotonJobId;
   private boolean isInitialized = false;
@@ -73,6 +75,7 @@ public class PelotonHelper {
     GetOrderedHostsRequest request = GetOrderedHostsRequest.newInstance();
     List<String> orderedList = null;
     try {
+      //TODO: getOrderedHosts needs to be improved to get ordered hosts from each Peloton cluster separately
       GetOrderedHostsResponse response = clientRMService.getOrderedHosts(request);
       orderedList = response.getOrderedHosts();
     } catch (Exception e) {
@@ -102,6 +105,24 @@ public class PelotonHelper {
     }
   }
 
+  protected boolean getYarnCredentialOnPeloton() {
+    String yopCredentialPath = conf.get(YarnConfiguration.ROUTER_YARN_USER_ON_PELOTON_PATH,
+      YarnConfiguration.DEFAULT_ROUTER_YARN_USER_ON_PELOTON_PATH);
+    try {
+      FileInputStream file = new FileInputStream(yopCredentialPath);
+      ObjectMapper om = new ObjectMapper(new YAMLFactory());
+      YarnCredentialOnPeloton yopCredential = om.readValue(file, YarnCredentialOnPeloton.class);
+      yarnUser = yopCredential.getUsername();
+      yarnPassword = yopCredential.getPassword();
+      file.close();
+    } catch (Exception e) {
+      LOG.error("Failed to load Yarn credential on Peloton from Langley", e);
+      return false;
+    }
+    LOG.info("Got yarn credential on Peloton from langley successfully, user={}", yarnUser);
+    return true;
+  }
+
   protected void initialize(Configuration conf) {
     // initialize connections to peloton services
     if (!routerStateStore.isDriverReady()) {
@@ -110,7 +131,10 @@ public class PelotonHelper {
     }
 
     this.conf = conf;
-    // NOTE: need to update this if we support multiple cluster.
+    if (!getYarnCredentialOnPeloton()) {
+      LOG.error("Initialize failed because not able to load yarn credential on Peloton");
+      return;
+    };
     List<PelotonZKInfo> zkInfoList = getPelotonZkList(YarnConfiguration.getClusterId(conf));
     LOG.info("Configured Peloton clusters in Router zk: " + zkInfoList);
     if (zkInfoList != null && !zkInfoList.isEmpty()) {
@@ -125,8 +149,11 @@ public class PelotonHelper {
         clientWrapper.setPelotonZKInfo(zkInfo);
         //Create Peloton gRPC clients, will connect to gRPC servers in the monitoring thread
         clientWrapper.setHostManagerClient(new HostManager(CLIENT_NAME, pelotonZK));
+        clientWrapper.getHostManagerClient().setAuth(yarnUser, yarnPassword);
         clientWrapper.setResourceManagerClient(new ResourceManager(CLIENT_NAME, pelotonZK));
+        clientWrapper.getResourceManagerClient().setAuth(yarnUser, yarnPassword);
         clientWrapper.setStatelessSvcClient(new StatelessJobService(CLIENT_NAME, pelotonZK));
+        clientWrapper.getStatelessSvcClient().setAuth(yarnUser, yarnPassword);
         pelotonClientWrapperList.add(clientWrapper);
         LOG.info("Initialized Peloton client successfully for " + clientWrapper.getPelotonZKInfo());
       }
@@ -147,7 +174,7 @@ public class PelotonHelper {
       clientWrapper.setHostService(clientWrapper.getHostManagerClient().blockingConnect());
       clientWrapper.setJobSvc(clientWrapper.getStatelessSvcClient().blockingConnect());
       clientWrapper.setResourceManager(clientWrapper.getResourceManagerClient().blockingConnect());
-      LOG.info("Connected to Peloton gRPC services successfully", clientWrapper.getPelotonZKInfo());
+      LOG.info("Connected to Peloton gRPC services successfully: " + clientWrapper.getPelotonZKInfo());
     }
   }
 
@@ -178,6 +205,7 @@ public class PelotonHelper {
       return;
     }
     for (PelotonClientWrapper clientWrapper: pelotonClientWrapperList) {
+      LOG.info("startNMsOnPeloton in Peloton cluster " + clientWrapper.getPelotonZKInfo());
       try {
         int instanceNumber = 0;
         ListHostPoolsResponse pools = listHostsPools(clientWrapper.getHostService());
@@ -221,6 +249,7 @@ public class PelotonHelper {
       ResourceManagerBlockingStub resourceManager,
       JobServiceBlockingStub jobSvc,
       PelotonZKInfo zkInfo) throws IOException {
+    LOG.info("createNMJob in Peloton cluster " + zkInfo);
     /**
      * Initialize job spec from Peloton Job spec
      */
