@@ -72,6 +72,12 @@ public class ObserverReadProxyProvider<T>
   static final Logger LOG = LoggerFactory.getLogger(
       ObserverReadProxyProvider.class);
 
+  /** Configuration key for {@link #observerReadEnabled}. */
+  static final String DFS_CLIENT_OBSERVER_READS_ENABLED =
+          HdfsClientConfigKeys.PREFIX + "observer.reads.enabled";
+  /** Reading from observers are enabled by default */
+  static final boolean DFS_CLIENT_OBSERVER_READS_ENABLED_DEFAULT = true;
+
   /** Configuration key for {@link #autoMsyncPeriodMs}. */
   static final String AUTO_MSYNC_PERIOD_KEY_PREFIX =
       HdfsClientConfigKeys.Failover.PREFIX + "observer.auto-msync-period";
@@ -188,13 +194,12 @@ public class ObserverReadProxyProvider<T>
         AUTO_MSYNC_PERIOD_KEY_PREFIX + "." + uri.getHost(),
         AUTO_MSYNC_PERIOD_DEFAULT, TimeUnit.MILLISECONDS);
 
-    // TODO : make this configurable or remove this variable
-    if (wrappedProxy instanceof ClientProtocol) {
-      this.observerReadEnabled = true;
-    } else {
-      LOG.info("Disabling observer reads for {} because the requested proxy "
-          + "class does not implement {}", uri, ClientProtocol.class.getName());
-      this.observerReadEnabled = false;
+    observerReadEnabled = conf.getBoolean(
+            DFS_CLIENT_OBSERVER_READS_ENABLED,
+            DFS_CLIENT_OBSERVER_READS_ENABLED_DEFAULT);
+
+    if (observerReadEnabled) {
+      LOG.debug("Reading from observer namenode is enabled");
     }
   }
 
