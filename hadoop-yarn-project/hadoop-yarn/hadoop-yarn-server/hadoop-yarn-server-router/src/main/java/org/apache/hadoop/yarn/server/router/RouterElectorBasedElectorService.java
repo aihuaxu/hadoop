@@ -46,7 +46,6 @@ public class RouterElectorBasedElectorService extends AbstractService implements
         YarnConfiguration.ROUTER_DEFAULT_AUTO_FAILOVER_ZK_BASE_PATH);
     latchPath = zkBasePath + "/" + clusterId;
     curator = router.getCurator();
-    initAndStartLeaderLatch();
     super.serviceInit(conf);
   }
 
@@ -54,6 +53,12 @@ public class RouterElectorBasedElectorService extends AbstractService implements
     leaderLatch = new LeaderLatch(curator, latchPath, routerId);
     leaderLatch.addListener(this);
     leaderLatch.start();
+  }
+
+  @Override
+  protected void serviceStart() throws Exception {
+    initAndStartLeaderLatch();
+    super.serviceStart();
   }
 
   @Override

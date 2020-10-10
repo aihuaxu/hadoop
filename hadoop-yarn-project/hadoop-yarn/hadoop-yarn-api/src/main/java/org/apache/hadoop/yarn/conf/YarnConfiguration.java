@@ -3004,6 +3004,10 @@ public class YarnConfiguration extends Configuration {
       "org.apache.hadoop.yarn.server.router.rmadmin."
           + "DefaultRMAdminRequestInterceptor";
 
+  public static final String PELOTON_DOCKER_IMAGE_NAME = NM_PREFIX + "peloton.image.name";
+  public static final String PELOTON_DOCKER_IMAGE_TAG = NM_PREFIX + "peloton.image.tag";
+  public static final String PELOTON_CLUSTER_ID = NM_PREFIX + "peloton.cluster-id";
+
   /**
    * Router HA configuration
    */

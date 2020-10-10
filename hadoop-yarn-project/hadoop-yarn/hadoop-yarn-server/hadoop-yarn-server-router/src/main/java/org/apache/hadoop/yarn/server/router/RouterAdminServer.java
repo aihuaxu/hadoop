@@ -109,7 +109,7 @@ public class RouterAdminServer extends AbstractService implements HAServiceProto
     // Enable service authorization?
     if (conf.getBoolean(
         CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION,
-        true)) {
+        false)) {
       adminServer.refreshServiceAclWithLoadedConfiguration(conf, RouterAdminPolicyProvider.getInstance());
     }
 

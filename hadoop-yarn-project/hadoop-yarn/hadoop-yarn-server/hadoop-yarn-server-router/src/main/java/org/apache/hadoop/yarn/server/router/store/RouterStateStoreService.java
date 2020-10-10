@@ -11,6 +11,7 @@ import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.yarn.server.router.RouterConfigKeys;
 import org.apache.hadoop.yarn.server.router.store.records.RouterState;
+import org.apache.hadoop.yarn.server.router.external.peloton.PelotonZKConfRecordStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -82,6 +83,13 @@ public class RouterStateStoreService extends CompositeService {
     // Add supported record stores
     // Router record store
     addRecordStore(RouterRecordStoreImpl.class);
+
+    boolean isPelotonZKConfStoreEnabled = conf.getBoolean(
+        RouterConfigKeys.ROUTER_PELOTON_ZK_STORE_ENABLED,
+        RouterConfigKeys.ROUTER_PELOTON_ZK_STORE_ENABLED_DEFAULT);
+    if (isPelotonZKConfStoreEnabled) {
+      addRecordStore(PelotonZKConfRecordStore.class);
+    }
 
     RouterState.setExpirationMs(conf.getTimeDuration(
         RouterConfigKeys.ROUTER_STORE_ROUTER_EXPIRATION_MS,

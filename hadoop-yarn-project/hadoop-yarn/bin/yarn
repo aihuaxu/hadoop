@@ -73,6 +73,7 @@ function print_usage(){
   echo "  timelineserver                        run the timeline server"
   echo "  rmadmin                               admin tools"
   echo "  router                                run the Router daemon"
+  echo "  routeradmin                           router admin tools"
   echo "  sharedcachemanager                    run the SharedCacheManager daemon"
   echo "  scmadmin                              SharedCacheManager admin tools"
   echo "  version                               print the version"
@@ -230,6 +231,9 @@ elif [ "$COMMAND" = "router" ] ; then
   CLASSPATH=${CLASSPATH}:$YARN_CONF_DIR/rt-config/log4j.properties
   CLASS='org.apache.hadoop.yarn.server.router.Router'
   YARN_OPTS="$YARN_OPTS $YARN_ROUTER_OPTS"
+elif [ "$COMMAND" = "routeradmin" ] ; then
+  CLASS='org.apache.hadoop.yarn.server.router.tools.RouterAdminCLI'
+  YARN_OPTS="$YARN_OPTS $YARN_CLIENT_OPTS"
 elif [ "$COMMAND" = "scmadmin" ] ; then
   CLASS='org.apache.hadoop.yarn.client.SCMAdmin'
   YARN_OPTS="$YARN_OPTS $YARN_CLIENT_OPTS"

@@ -155,7 +155,7 @@ if "%1" == "--loglevel" (
 
   set yarncommands=resourcemanager nodemanager proxyserver rmadmin version jar ^
      application applicationattempt cluster container node queue logs daemonlog historyserver ^
-     timelineserver router timelinereader classpath
+     timelineserver router routeradmin timelinereader classpath
   for %%i in ( %yarncommands% ) do (
     if %yarn-command% == %%i set yarncommand=true
   )
@@ -181,6 +181,11 @@ goto :eof
 
 :rmadmin
   set CLASS=org.apache.hadoop.yarn.client.cli.RMAdminCLI
+  set YARN_OPTS=%YARN_OPTS% %YARN_CLIENT_OPTS%
+  goto :eof
+
+:routerrmadmin
+  set CLASS=org.apache.hadoop.yarn.server.router.tools.RouterAdminCLI
   set YARN_OPTS=%YARN_OPTS% %YARN_CLIENT_OPTS%
   goto :eof
 
@@ -341,6 +346,7 @@ goto :eof
   @echo   timelineserver       run the timeline server
   @echo   timelinereader       run the timeline reader server
   @echo   rmadmin              admin tools
+  @echo   routeradmin          admin tools for router
   @echo   version              print the version
   @echo   jar ^<jar^>          run a jar file
   @echo   application          prints application(s) report/kill application

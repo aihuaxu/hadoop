@@ -46,6 +46,7 @@ import org.apache.hadoop.yarn.server.router.rmadmin.RouterRMAdminService;
 import org.apache.hadoop.yarn.server.router.store.RouterRecordStore;
 import org.apache.hadoop.yarn.server.router.store.RouterStateStoreService;
 import org.apache.hadoop.yarn.server.router.webapp.RouterWebApp;
+import org.apache.hadoop.yarn.server.router.external.peloton.YoPService;
 import org.apache.hadoop.yarn.webapp.WebApp;
 import org.apache.hadoop.yarn.webapp.WebApps;
 import org.apache.hadoop.yarn.webapp.WebApps.Builder;
@@ -160,6 +161,7 @@ public class Router extends CompositeService {
     webAppAddress = WebAppUtils.getWebAppBindURL(this.conf,
         YarnConfiguration.ROUTER_BIND_HOST,
         WebAppUtils.getRouterWebAppURLWithoutScheme(this.conf));
+
     // Metrics
     DefaultMetricsSystem.initialize(METRICS_NAME);
 
@@ -188,7 +190,6 @@ public class Router extends CompositeService {
     }
 
     createAndInitActiveServices(conf, clientRMProxyService);
-
     super.serviceInit(conf);
   }
 
@@ -200,9 +201,9 @@ public class Router extends CompositeService {
       throw new YarnRuntimeException("Failed Router login", e);
     }
     startWepApp();
+    super.serviceStart();
     // Router is running now
     updateRouterState(RouterServiceState.RUNNING);
-    super.serviceStart();
   }
 
   @Override
@@ -235,6 +236,10 @@ public class Router extends CompositeService {
 
   protected RouterRMAdminService createRMAdminProxyService() {
     return new RouterRMAdminService();
+  }
+
+  protected YoPService createYoPService(RouterClientRMService RouterClientRMService) {
+    return new YoPService(stateStoreService, clientRMProxyService);
   }
 
   @Private
@@ -483,8 +488,7 @@ public class Router extends CompositeService {
 
   @Private
   public class RouterActiveServices extends CompositeService {
-    //TODO: integrate with YOP
-//    private YoPService yopService;
+    private YoPService yopService;
     private RouterClientRMService clientRMService;
 
     RouterActiveServices(RouterClientRMService clientRMService) {
@@ -494,9 +498,9 @@ public class Router extends CompositeService {
 
     @Override
     protected void serviceInit(Configuration configuration) throws Exception {
-//      yopService = createYoPService(clientRMService);
-//      yopService.init(conf);
-//      addService(yopService);
+      yopService = createYoPService(clientRMService);
+      yopService.init(conf);
+      addService(yopService);
     }
   }
 }

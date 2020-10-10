@@ -132,17 +132,22 @@
       <artifactId>protobuf-java</artifactId>
     </dependency>
 
+    <!-- YoP -->
     <dependency>
-      <groupId>org.json</groupId>
-      <artifactId>json</artifactId>
-      <version>20090211</version>
+      <groupId>com.uber.peloton</groupId>
+      <artifactId>peloton-client-shade</artifactId>
+      <version>0.9.9.1</version>
     </dependency>
-
     <dependency>
       <groupId>io.perfmark</groupId>
       <artifactId>perfmark-api</artifactId>
       <version>0.22.0</version>
       <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.json</groupId>
+      <artifactId>json</artifactId>
+      <version>20090211</version>
     </dependency>
   </dependencies>
 

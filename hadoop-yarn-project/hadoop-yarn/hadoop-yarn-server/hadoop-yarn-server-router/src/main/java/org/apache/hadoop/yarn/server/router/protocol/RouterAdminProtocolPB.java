@@ -16,7 +16,7 @@ import static org.apache.hadoop.yarn.conf.YarnConfiguration.ROUTER_KERBEROS_PRIN
 @KerberosInfo(
     serverPrincipal = ROUTER_KERBEROS_PRINCIPAL_KEY)
 @ProtocolInfo(
-    protocolName = "org.apache.hadoop.yarn.server.router.protocolPB.RouterAdminProtocolPB",
+    protocolName = "org.apache.hadoop.yarn.server.router.protocol.RouterAdminProtocolPB",
     protocolVersion = 1)
 public interface RouterAdminProtocolPB extends
     RouterAdministrationProtocolService.BlockingInterface {

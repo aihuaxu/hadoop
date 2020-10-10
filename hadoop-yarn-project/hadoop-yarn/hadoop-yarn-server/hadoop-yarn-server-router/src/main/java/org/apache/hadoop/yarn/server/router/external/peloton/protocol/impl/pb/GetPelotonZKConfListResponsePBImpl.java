@@ -15,22 +15,17 @@ import java.util.List;
 public class GetPelotonZKConfListResponsePBImpl extends GetPelotonZKConfListResponse implements PBRecord {
 
   private RouterProtocolPBTranslator<YarnServerRouterProtos.GetPelotonZKConfListResponseProto,
-        YarnServerRouterProtos.GetPelotonZKConfListResponseProto.Builder,
-        YarnServerRouterProtos.GetPelotonZKConfListResponseProtoOrBuilder> translator;
+      YarnServerRouterProtos.GetPelotonZKConfListResponseProto.Builder,
+      YarnServerRouterProtos.GetPelotonZKConfListResponseProtoOrBuilder> translator =
+      new RouterProtocolPBTranslator<YarnServerRouterProtos.GetPelotonZKConfListResponseProto,
+          YarnServerRouterProtos.GetPelotonZKConfListResponseProto.Builder,
+          YarnServerRouterProtos.GetPelotonZKConfListResponseProtoOrBuilder>(
+          YarnServerRouterProtos.GetPelotonZKConfListResponseProto.class);
 
-  public GetPelotonZKConfListResponsePBImpl() {
-    translator = new RouterProtocolPBTranslator<YarnServerRouterProtos.GetPelotonZKConfListResponseProto,
-        YarnServerRouterProtos.GetPelotonZKConfListResponseProto.Builder,
-        YarnServerRouterProtos.GetPelotonZKConfListResponseProtoOrBuilder>(
-        YarnServerRouterProtos.GetPelotonZKConfListResponseProto.class);
-  }
+  public GetPelotonZKConfListResponsePBImpl() {}
 
   public GetPelotonZKConfListResponsePBImpl(YarnServerRouterProtos.GetPelotonZKConfListResponseProto proto) {
     setProto(proto);
-    translator = new RouterProtocolPBTranslator<YarnServerRouterProtos.GetPelotonZKConfListResponseProto,
-        YarnServerRouterProtos.GetPelotonZKConfListResponseProto.Builder,
-        YarnServerRouterProtos.GetPelotonZKConfListResponseProtoOrBuilder>(
-        YarnServerRouterProtos.GetPelotonZKConfListResponseProto.class);
   }
   @Override
   public List<PelotonZKConf> getPelotonZKConfList() {
