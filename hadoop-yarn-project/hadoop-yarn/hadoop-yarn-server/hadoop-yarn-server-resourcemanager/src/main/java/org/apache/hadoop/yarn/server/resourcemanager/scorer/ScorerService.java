@@ -40,7 +40,6 @@ import org.apache.hadoop.service.AbstractService;
 import org.apache.hadoop.yarn.api.protocolrecords.GetExternalIncludedHostsResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.GetExternalIncludedHostsRequestPBImpl;
 import org.apache.hadoop.yarn.api.records.ContainerId;
-import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.event.EventHandler;
 import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer;
@@ -93,6 +92,7 @@ public class ScorerService extends AbstractService implements EventHandler<Score
   private volatile boolean stopped = false;
   private Timer scoreUpdateTimer;
   private ScoreUpdateTimerTask scoreUpdateTimerTask;
+  private ScorerEventDispatcherMetrics scorerMetrics;
 
   /**
    * Information used by host score sorting
@@ -182,7 +182,7 @@ public class ScorerService extends AbstractService implements EventHandler<Score
       LOG.info("Received exclude hosts is null");
       return;
     }
-    LOG.debug("Received {} exclude hosts : {}", excludeHosts.size(), excludeHosts);
+    LOG.info("Received {} exclude hosts : {}", excludeHosts.size(), excludeHosts);
 
     try {
       writeLock.lock();
@@ -244,7 +244,7 @@ public class ScorerService extends AbstractService implements EventHandler<Score
    */
   public List<String> getOrderedHostList() {
     LOG.debug("getOrderedHostList: start sorting");
-    long startTime = System.currentTimeMillis();
+    long startTime = System.nanoTime();
     List<String> hostsList = new ArrayList<>();
     try {
       readLock.lock();
@@ -261,7 +261,9 @@ public class ScorerService extends AbstractService implements EventHandler<Score
     } finally {
       readLock.unlock();
     }
-    LOG.info("getOrderedHostList takes {} ms", System.currentTimeMillis() - startTime);
+    long processTimeUs = (System.nanoTime() - startTime) / 1000;
+    scorerMetrics.setGetOrderedHostsListTimeUs(processTimeUs);
+    LOG.info("getOrderedHostList took {} us", processTimeUs);
 
     return hostsList;
   }
@@ -335,8 +337,10 @@ public class ScorerService extends AbstractService implements EventHandler<Score
     synchronized (hostScoreInfo) {
       if (isAMContainer) {
         hostScoreInfo.numAMs++;
+        scorerMetrics.incrAmContainerAddedCountFromPeloton();
       } else {
         hostScoreInfo.numContainers++;
+        scorerMetrics.incrContainerAddedCountFromPeloton();
         try {
           if (rmContext.getScheduler().getQueueInfo(container.getQueueName(), false, false)
             .getPreemptionDisabled()) {
@@ -361,6 +365,7 @@ public class ScorerService extends AbstractService implements EventHandler<Score
       return;
     }
 
+    scorerMetrics.incrAmContainerFinishedCountFromPeloton();
     //lock this object in case more than one containers added to this host from different threads
     synchronized (hostScoreInfo) {
       hostScoreInfo.numAMs--;
@@ -378,6 +383,7 @@ public class ScorerService extends AbstractService implements EventHandler<Score
       return;
     }
 
+    scorerMetrics.incrContainerFinishedCountFromPeloton();
     //lock this object in case more than one containers added to this host from different threads
     synchronized (hostScoreInfo) {
       if (container.isAMContainer()) {
@@ -437,6 +443,13 @@ public class ScorerService extends AbstractService implements EventHandler<Score
   }
 
   /**
+   * Set Scorer metrics
+   */
+  public void setScorerMetrics(ScorerEventDispatcherMetrics metrics) {
+    this.scorerMetrics = metrics;
+  }
+
+  /**
    * TimerTask to update container running time in host score
    */
   private class ScoreUpdateTimerTask extends TimerTask {
@@ -444,9 +457,11 @@ public class ScorerService extends AbstractService implements EventHandler<Score
     @Override
     public void run() {
       LOG.debug("ScoreUpdateTimerTask: Start updating host score...");
-      long startTime = System.currentTimeMillis();
+      long startTime = System.nanoTime();
       updateContainerRunningTime();
-      LOG.info("ScoreUpdateTimerTask takes {} ms", System.currentTimeMillis() - startTime);
+      long processTimeUs = (System.nanoTime() - startTime) / 1000;
+      scorerMetrics.setUpdateRunningContainerTimeUs(processTimeUs);
+      LOG.info("ScoreUpdateTimerTask took {} us", processTimeUs);
     }
   }
 

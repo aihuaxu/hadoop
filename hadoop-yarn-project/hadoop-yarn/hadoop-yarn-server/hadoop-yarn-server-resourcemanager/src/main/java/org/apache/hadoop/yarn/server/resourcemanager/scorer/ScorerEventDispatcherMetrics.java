@@ -44,6 +44,7 @@ public class ScorerEventDispatcherMetrics extends DispatcherMetrics {
       "Metrics for scorer async dispatcher");
 
   static boolean initialized;
+  static ScorerEventDispatcherMetrics metrics = null;
 
   @Metric("Container added event count") MutableCounterLong containerAddedCount;
   @Metric("Container added processing time") MutableCounterLong containerAddedTimeUs;
@@ -61,6 +62,14 @@ public class ScorerEventDispatcherMetrics extends DispatcherMetrics {
   @Metric("Number of exclude hosts") MutableCounterLong numberOfExcludeHosts;
   @Metric("Exclude hosts event processing time") MutableCounterLong excludeHostsTimeUs;
 
+  @Metric("Container added event count from Peloton") MutableCounterLong containerAddedCountFromPeloton;
+  @Metric("AM Container added event count from Peloton") MutableCounterLong amContainerAddedCountFromPeloton;
+  @Metric("Container finished event count from Peloton") MutableCounterLong containerFinishedCountFromPeloton;
+  @Metric("AM Container finished event count from Peloton") MutableCounterLong amContainerFinishedCountFromPeloton;
+
+  @Metric("getOrderedHostsList processing time") MutableGaugeLong getOrderedHostsListTimeUs;
+  @Metric("updateRunningContainerTask processing time") MutableGaugeLong updateRunningContainerTimeUs;
+
   protected ScorerEventDispatcherMetrics(MetricsSystem ms) {
     super(ms, RECORD_INFO);
   }
@@ -71,7 +80,6 @@ public class ScorerEventDispatcherMetrics extends DispatcherMetrics {
 
   public synchronized
   static ScorerEventDispatcherMetrics registerMetrics() {
-    ScorerEventDispatcherMetrics metrics = null;
     MetricsSystem ms = DefaultMetricsSystem.instance();
     if (!initialized) {
       // Register with the MetricsSystems
@@ -82,6 +90,8 @@ public class ScorerEventDispatcherMetrics extends DispatcherMetrics {
             sourceName().toString(),
             "Metrics for scorer async dispatcher", metrics);
         initialized = true;
+      } else {
+        LOG.warn("Failed to initialize ScorerEventDispatcherMetrics because DefaultMetricsSystem is null ");
       }
     }
 
@@ -124,5 +134,29 @@ public class ScorerEventDispatcherMetrics extends DispatcherMetrics {
       default:
         break;
     }
+  }
+
+  public void incrContainerAddedCountFromPeloton() {
+    containerAddedCountFromPeloton.incr();
+  }
+
+  public void incrAmContainerAddedCountFromPeloton() {
+    amContainerAddedCountFromPeloton.incr();
+  }
+
+  public void incrContainerFinishedCountFromPeloton() {
+    containerFinishedCountFromPeloton.incr();
+  }
+
+  public void incrAmContainerFinishedCountFromPeloton() {
+    amContainerFinishedCountFromPeloton.incr();
+  }
+
+  public void setGetOrderedHostsListTimeUs(long processTimeUs) {
+    getOrderedHostsListTimeUs.set(processTimeUs);
+  }
+
+  public void setUpdateRunningContainerTimeUs(long processTimeUs) {
+    updateRunningContainerTimeUs.set(processTimeUs);
   }
 }

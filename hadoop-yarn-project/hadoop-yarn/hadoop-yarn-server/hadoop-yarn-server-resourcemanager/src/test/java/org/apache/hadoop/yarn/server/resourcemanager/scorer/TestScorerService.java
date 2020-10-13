@@ -54,6 +54,7 @@ public class TestScorerService {
   GetExternalIncludedHostsResponse getExternalIncludedHostsResponse;
   RMContainer mockRMContainer;
   NodeId nodeId;
+  ScorerEventDispatcherMetrics metrics = ScorerEventDispatcherMetrics.registerMetrics();
 
   @Before
   public void setup() throws IOException {
@@ -79,6 +80,7 @@ public class TestScorerService {
 
     scorerService = new ScorerService();
     scorerService.setRMContext(mockRMContext);
+    scorerService.setScorerMetrics(metrics);
 
     mockDispatcher = mock(Dispatcher.class);
     when(mockRMContext.getDispatcher()).thenReturn(mockDispatcher);

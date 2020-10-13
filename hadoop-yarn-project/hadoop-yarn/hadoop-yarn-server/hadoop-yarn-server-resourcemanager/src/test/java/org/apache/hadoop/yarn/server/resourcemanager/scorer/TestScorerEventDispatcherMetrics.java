@@ -21,6 +21,7 @@ public class TestScorerEventDispatcherMetrics {
         metrics.incrementEventType(event, 10);
         Assert.assertEquals(1, metrics.containerAddedCount.value());
         Assert.assertEquals(10, metrics.containerAddedTimeUs.value());
+        Assert.assertEquals(0, metrics.containerAddedCountFromPeloton.value());
 
         event = new ScorerContainerEvent(mock(RMContainer.class), ScorerEventType.CONTAINER_RECOVERED);
         metrics.incrementEventType(event, 10);
@@ -31,11 +32,13 @@ public class TestScorerEventDispatcherMetrics {
         metrics.incrementEventType(event, 10);
         Assert.assertEquals(1, metrics.amContainerAddedCount.value());
         Assert.assertEquals(10, metrics.amContainerAddedTimeUs.value());
+        Assert.assertEquals(0, metrics.amContainerAddedCountFromPeloton.value());
 
         event = new ScorerContainerEvent(mock(RMContainer.class), ScorerEventType.CONTAINER_FINISHED);
         metrics.incrementEventType(event, 10);
         Assert.assertEquals(1, metrics.containerFinishedCount.value());
         Assert.assertEquals(10, metrics.containerFinishedTimeUs.value());
+        Assert.assertEquals(0, metrics.containerFinishedCountFromPeloton.value());
 
         Set<String> include = new HashSet<>(Arrays.asList("a", "b", "c"));
         event = new ScorerHostEvent(include, ScorerEventType.INCLUDE_HOSTS_UPDATE);
@@ -48,5 +51,17 @@ public class TestScorerEventDispatcherMetrics {
         metrics.incrementEventType(event, 10);
         Assert.assertEquals(2, metrics.numberOfExcludeHosts.value());
         Assert.assertEquals(10, metrics.excludeHostsTimeUs.value());
+
+        metrics.incrContainerAddedCountFromPeloton();
+        Assert.assertEquals(1, metrics.containerAddedCountFromPeloton.value());
+
+        metrics.incrContainerFinishedCountFromPeloton();
+        Assert.assertEquals(1, metrics.containerFinishedCountFromPeloton.value());
+
+        metrics.incrAmContainerAddedCountFromPeloton();
+        Assert.assertEquals(1, metrics.amContainerAddedCountFromPeloton.value());
+
+        metrics.incrAmContainerFinishedCountFromPeloton();
+        Assert.assertEquals(1, metrics.amContainerFinishedCountFromPeloton.value());
     }
 }

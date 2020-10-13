@@ -424,8 +424,9 @@ public class ResourceManager extends CompositeService implements Recoverable {
 
   protected EventHandler<ScorerEvent> createScorerEventDispatcher() {
     EventDispatcher dispatcher = new EventDispatcher(this.scorerService, "ScorerEventDispatcher");
-    DispatcherMetrics metrics = ScorerEventDispatcherMetrics.registerMetrics();
+    ScorerEventDispatcherMetrics metrics = ScorerEventDispatcherMetrics.registerMetrics();
     dispatcher.setMetrics(metrics);
+    this.scorerService.setScorerMetrics(metrics);
     return dispatcher;
   }
 
