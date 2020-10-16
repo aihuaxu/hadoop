@@ -78,6 +78,25 @@ public class PelotonZKInfoPBImpl extends PelotonZKInfo implements PBRecord {
   }
 
   @Override
+  public String getResourcePoolPath() {
+    YarnServerRouterProtos.PelotonZKInfoProtoOrBuilder proto = translator.getProtoOrBuilder();
+    if (!proto.hasResourcePoolPath()) {
+      return null;
+    }
+    return proto.getResourcePoolPath();
+  }
+
+  @Override
+  public void setResourcePoolPath(String resourcePoolPath) {
+    YarnServerRouterProtos.PelotonZKInfoProto.Builder builder = translator.getBuilder();
+    if (resourcePoolPath == null || resourcePoolPath.isEmpty()) {
+      builder.clearResourcePoolPath();
+    } else {
+      builder.setResourcePoolPath(resourcePoolPath);
+    }
+  }
+
+  @Override
   public void setDateModified(long time) {
     translator.getBuilder().setDateModified(time);
   }

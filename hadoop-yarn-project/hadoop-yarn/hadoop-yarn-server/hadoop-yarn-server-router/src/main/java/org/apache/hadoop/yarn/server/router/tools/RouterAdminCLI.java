@@ -61,11 +61,11 @@ public class RouterAdminCLI extends Configured implements Tool {
     String usage = "Router Admin Tools:\n"
         + "\t Router operation \n"
         + "\t PelotonZK Usage: yarn routeradmin -pelotonZK\n"
-        + "\t[-batchCreateJson \"{cluster: <cluster_name>, zkList: [{zone: <zone>, region: <region>, zk: <zk_address>}]}\"\n"
-        + "\t[-batchUpdateJson \"{cluster: <cluster_name>, zkList: [{zone: <zone>, region: <region>, zk: <zk_address>}]}\"\n"
+        + "\t[-batchCreateJson \"{cluster: <cluster_name>, zkList: [{zone: <zone>, region: <region>, zk: <zk_address>, resPool: <resource_pool_path>}]}\"\n"
+        + "\t[-batchUpdateJson \"{cluster: <cluster_name>, zkList: [{zone: <zone>, region: <region>, zk: <zk_address>, resPool: <resource_pool_path>}]}\"\n"
         + "\t[-remove --cluster <cluster_name>]\n"
-        + "\t[-addZK --cluster <cluster_name> --zkJson \"{zone: <zone>, region: <region>, zk:<zk_address>}\"\n"
-        + "\t[-updateZK --cluster <cluster_name> --zkJson \"{zone: <zone>, region: <region>, zk:<zk_address>}\"\n"
+        + "\t[-addZK --cluster <cluster_name> --zkJson \"{zone: <zone>, region: <region>, zk:<zk_address>, resPool: <resource_pool_path>}\"\n"
+        + "\t[-updateZK --cluster <cluster_name> --zkJson \"{zone: <zone>, region: <region>, zk:<zk_address>, resPool: <resource_pool_path>}\"\n"
         + "\t[-rmZK --cluster <cluster_name> --zkAddress <zkAddress>\n"
         + "\t[-listZK --cluster <cluster_name>\n"
         + "\t[-clearAll\n"
@@ -197,13 +197,16 @@ public class RouterAdminCLI extends Configured implements Tool {
         String zone = jsonArray.getJSONObject(idx).getString("zone");
         String region = jsonArray.getJSONObject(idx).getString("region");
         String zkAddress = jsonArray.getJSONObject(idx).getString("zk");
-        if (zone == null || zone.isEmpty() || region == null || region.isEmpty() || zkAddress == null || zkAddress.isEmpty()) {
+        String resPool = jsonArray.getJSONObject(idx).getString("resPool");
+        if (zone == null || zone.isEmpty() || region == null || region.isEmpty()
+          || zkAddress == null || zkAddress.isEmpty() || resPool == null || resPool.isEmpty()) {
           errorMsg.append(idx).append(" zk conf is missing parameters");
           continue;
         }
         System.out.println(String.format(
-            "Adding to cluster %s with zone: %s, region: %s, zkAddress: %s", cluster, zone, region, zkAddress));
-        zkInfoObjs.add(PelotonZKInfo.newInstance(zone, region, zkAddress));
+            "Adding to cluster %s with zone: %s, region: %s, zkAddress: %s, resPool: %s",
+          cluster, zone, region, zkAddress, resPool));
+        zkInfoObjs.add(PelotonZKInfo.newInstance(zone, region, zkAddress, resPool));
       }
     }
     SavePelotonZKConfRequest request = SavePelotonZKConfRequest.newInstance(PelotonZKConf.newInstance(
@@ -244,7 +247,9 @@ public class RouterAdminCLI extends Configured implements Tool {
     String zone = zkInfObj.getString("zone");
     String region = zkInfObj.getString("region");
     String zkAddress = zkInfObj.getString("zk");
-    if (zone == null || region == null || zkAddress == null) {
+    String resPool = zkInfObj.getString("resPool");
+    if (zone == null || region == null || zkAddress == null || zkAddress.isEmpty()
+      || resPool == null || resPool.isEmpty()) {
       System.err.println(" zk conf is missing parameters");
       return false;
     }
@@ -252,7 +257,7 @@ public class RouterAdminCLI extends Configured implements Tool {
         "Adding to cluster %s with zone: %s, region: %s, zkAddress: %s",
         cluster, zone, region, zkAddress));
     PelotonZKConfManager pelotonZKConfManager = client.getPelotonZKConfManager();
-    PelotonZKInfo zkInfo = PelotonZKInfo.newInstance(zone, region, zkAddress);
+    PelotonZKInfo zkInfo = PelotonZKInfo.newInstance(zone, region, zkAddress, resPool);
     SavePelotonZKInfoToClusterRequest request = SavePelotonZKInfoToClusterRequest.newInstance(
         cluster, zkInfo, isCreate
     );
@@ -343,14 +348,15 @@ public class RouterAdminCLI extends Configured implements Tool {
     List<PelotonZKInfo> results = response.getPelotonZKInfoList();
     System.out.println("Peloton ZK List in cluster: " + cluster);
     System.out.println(String.format(
-        "%-25s %-25s %-25s",
-        "zkAddress", "zone", "region"));
+        "%-25s %-25s %-25s %-25s",
+        "zkAddress", "resPool", "zone", "region"));
     for(PelotonZKInfo zkInfo: results) {
       String zone = zkInfo.getZone();
       String region = zkInfo.getRegion();
       String zkAddress = zkInfo.getZKAddress();
-      System.out.print(String.format("%-25s %-25s %-25s\n",
-          zkAddress, zone, region));
+      String resPool = zkInfo.getResourcePoolPath();
+      System.out.print(String.format("%-25s %-25s %-25s %-25s\n",
+          zkAddress, resPool, zone, region));
     }
   }
 

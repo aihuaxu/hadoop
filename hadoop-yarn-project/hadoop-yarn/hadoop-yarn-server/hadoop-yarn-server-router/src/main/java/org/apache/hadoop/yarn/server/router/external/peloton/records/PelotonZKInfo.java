@@ -24,11 +24,12 @@ public abstract class PelotonZKInfo extends BaseRecord {
     return zkInfo;
   }
 
-  public static PelotonZKInfo newInstance(String zone, String region, String zkAddress) {
+  public static PelotonZKInfo newInstance(String zone, String region, String zkAddress, String resourcePoolPath) {
     PelotonZKInfo zkInfo = newInstance();
     zkInfo.setZone(zone);
     zkInfo.setRegion(region);
     zkInfo.setZKAddress(zkAddress);
+    zkInfo.setResourcePoolPath(resourcePoolPath);
     return zkInfo;
   }
 
@@ -38,6 +39,8 @@ public abstract class PelotonZKInfo extends BaseRecord {
   public abstract void setRegion(String region);
   public abstract String getZKAddress();
   public abstract void setZKAddress(String zkAddress);
+  public abstract String getResourcePoolPath();
+  public abstract void setResourcePoolPath(String resourcePoolPath);
 
   @Override
   public Map<String, String> getPrimaryKeys() {

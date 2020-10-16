@@ -267,7 +267,7 @@ public class PelotonHelper {
         addLdapGroups(PelotonJobSpec.getLdapGroups()).
         setDescription(PelotonJobSpec.getDescription()).
         addAllLabels(PelotonJobSpec.getLabels()).
-        setRespoolId(PelotonJobSpec.getRespoolId(resourceManager)).
+        setRespoolId(PelotonJobSpec.getRespoolId(resourceManager, zkInfo.getResourcePoolPath())).
         setHostpool(PelotonJobSpec.getHostPool()).
         setInstanceCount(instanceCount).
         setDefaultSpec(PelotonJobSpec.getPodSpec(getConf())).

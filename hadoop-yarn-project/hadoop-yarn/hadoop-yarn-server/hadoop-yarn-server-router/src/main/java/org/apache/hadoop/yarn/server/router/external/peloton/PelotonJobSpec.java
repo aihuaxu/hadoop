@@ -97,11 +97,8 @@ public class PelotonJobSpec {
     public static final String LABEL_VALUE_SERVICE = "NodeManager";
 
     /**
-     * Peloton Pool information
+     * Peloton host pool
      */
-    //TODO: The stateless resource pool name on Peloton can be different.
-    //RESPOOL needs to be configurable as long with zk conn in Router zk statestore
-    public static final String RESPOOL = "/Coconut";
     public static final String PELOTON_HOST_POOL_SHARED_TO_YARN = "shared";
 
     /**
@@ -215,9 +212,10 @@ public class PelotonJobSpec {
    * @return
    */
   public static Peloton.ResourcePoolID getRespoolId
-          (ResourceManagerGrpc.ResourceManagerBlockingStub resourceManager) {
+          (ResourceManagerGrpc.ResourceManagerBlockingStub resourceManager,
+            String resourcePoolPath) {
     return Peloton.ResourcePoolID.newBuilder().
-            setValue(lookupPool(resourceManager)).
+            setValue(lookupPool(resourceManager, resourcePoolPath)).
             build();
   }
 
@@ -405,16 +403,17 @@ public class PelotonJobSpec {
   }
 
   /** Look up respool **/
-  public static String lookupPool(ResourceManagerGrpc.ResourceManagerBlockingStub resourceManager) {
+  public static String lookupPool(ResourceManagerGrpc.ResourceManagerBlockingStub resourceManager,
+    String resourcePoolPath) {
     Respool.LookupRequest request = Respool.LookupRequest.newBuilder()
             .setPath(Respool.ResourcePoolPath.newBuilder()
-                    .setValue(Constants.RESPOOL)
+                    .setValue(resourcePoolPath)
                     .build())
             .build();
 
     Respool.LookupResponse response = resourceManager.lookupResourcePoolID(request);
     LOG.info(String
-            .format("Looked up pool successfully: name=%s, id=%s", Constants.RESPOOL,
+            .format("Looked up pool successfully: name=%s, id=%s", resourcePoolPath,
                     response.getId().toString()));
     return response.getId().getValue();
   }

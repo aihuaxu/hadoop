@@ -56,10 +56,11 @@ message PelotonZKConfProto {
 
 message PelotonZKInfoProto {
     optional string zkAddress = 1;
-    optional string zone = 2;
-    optional string region = 3;
-    optional uint64 dateCreated = 4;
-    optional uint64 dateModified = 5;
+    optional string resourcePoolPath = 2;
+    optional string zone = 3;
+    optional string region = 4;
+    optional uint64 dateCreated = 5;
+    optional uint64 dateModified = 6;
 }
 
 message GetPelotonZKConfListRequestProto {

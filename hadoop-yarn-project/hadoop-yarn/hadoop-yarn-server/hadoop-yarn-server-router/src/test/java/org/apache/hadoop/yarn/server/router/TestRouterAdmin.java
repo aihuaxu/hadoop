@@ -79,7 +79,7 @@ public class TestRouterAdmin {
   public List<PelotonZKConf> generateZKConf() {
     List<PelotonZKConf> zkConfs = new ArrayList<>();
     List<PelotonZKInfo> zkInfos = new ArrayList<>();
-    zkInfos.add(PelotonZKInfo.newInstance("testZone", "testRegion", "testZK"));
+    zkInfos.add(PelotonZKInfo.newInstance("testZone", "testRegion", "testZK", "testResPool"));
     zkConfs.add(PelotonZKConf.newInstance("test", zkInfos));
     return zkConfs;
   }
