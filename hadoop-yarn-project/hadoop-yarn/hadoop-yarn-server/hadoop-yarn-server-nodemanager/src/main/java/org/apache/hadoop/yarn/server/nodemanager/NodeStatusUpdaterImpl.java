@@ -266,7 +266,7 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
       if (this.registeredWithRM && !this.isStopped
               && !isNMUnderSupervisionWithRecoveryEnabled()
               && !context.getDecommissioned() && !failedToConnect) {
-        unRegisterNM();
+        unRegisterNM(false);
       }
       // Interrupt the updater.
       this.isStopped = true;
@@ -279,7 +279,7 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
   public boolean unregister() {
     boolean unregistered = false;
     try {
-      unRegisterNM();
+      unRegisterNM(true);
       unregistered = true;
     } catch (Exception ex) {
       LOG.info("Failed unregistering the Node " + this.nodeId
@@ -297,12 +297,12 @@ public class NodeStatusUpdaterImpl extends AbstractService implements
             YarnConfiguration.DEFAULT_NM_RECOVERY_SUPERVISED);
   }
 
-
-  private void unRegisterNM() throws Exception {
+  private void unRegisterNM(boolean external) throws Exception {
     RecordFactory recordFactory = RecordFactoryPBImpl.get();
     UnRegisterNodeManagerRequest request = recordFactory
             .newRecordInstance(UnRegisterNodeManagerRequest.class);
     request.setNodeId(this.nodeId);
+    request.setExternal(external);
     resourceTracker.unRegisterNodeManager(request);
     LOG.info("Successfully Unregistered the Node " + this.nodeId
             + " with ResourceManager.");

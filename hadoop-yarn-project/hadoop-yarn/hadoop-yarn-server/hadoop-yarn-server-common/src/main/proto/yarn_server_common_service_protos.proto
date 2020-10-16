@@ -81,6 +81,7 @@ message RegisterNodeManagerResponseProto {
 
 message UnRegisterNodeManagerRequestProto {
   optional NodeIdProto node_id = 1;
+  optional bool external = 2;
 }
 
 message UnRegisterNodeManagerResponseProto {

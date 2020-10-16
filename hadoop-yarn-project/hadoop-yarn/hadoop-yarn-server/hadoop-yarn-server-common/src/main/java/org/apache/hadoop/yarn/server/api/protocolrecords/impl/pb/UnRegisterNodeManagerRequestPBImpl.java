@@ -36,6 +36,7 @@ public class UnRegisterNodeManagerRequestPBImpl extends
   private boolean viaProto = false;
 
   private NodeId nodeId = null;
+  private Boolean external = null;
 
   public UnRegisterNodeManagerRequestPBImpl() {
     builder = UnRegisterNodeManagerRequestProto.newBuilder();
@@ -57,6 +58,9 @@ public class UnRegisterNodeManagerRequestPBImpl extends
   private void mergeLocalToBuilder() {
     if (this.nodeId != null) {
       builder.setNodeId(convertToProtoFormat(this.nodeId));
+    }
+    if (this.external != null) {
+      builder.setExternal(this.external);
     }
   }
 
@@ -96,6 +100,28 @@ public class UnRegisterNodeManagerRequestPBImpl extends
       builder.clearNodeId();
     }
     this.nodeId = updatedNodeId;
+  }
+
+  @Override
+  public Boolean getExternal() {
+    UnRegisterNodeManagerRequestProtoOrBuilder p = viaProto ? proto : builder;
+    if (this.external != null) {
+      return this.external;
+    }
+    if (!p.hasExternal()) {
+      return null;
+    }
+    this.external = p.getExternal();
+    return this.external;
+  }
+
+  @Override
+  public void setExternal(Boolean external) {
+    maybeInitBuilder();
+    if (external == null) {
+      builder.clearExternal();
+    }
+    this.external = external;
   }
 
   private NodeIdPBImpl convertFromProtoFormat(NodeIdProto p) {

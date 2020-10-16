@@ -35,4 +35,8 @@ public abstract class UnRegisterNodeManagerRequest {
   public abstract NodeId getNodeId();
 
   public abstract void setNodeId(NodeId nodeId);
+
+  public abstract Boolean getExternal();
+
+  public abstract void setExternal(Boolean external);
 }

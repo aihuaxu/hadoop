@@ -732,6 +732,7 @@ public class ResourceTrackerService extends AbstractService implements
     UnRegisterNodeManagerResponse response = recordFactory
         .newRecordInstance(UnRegisterNodeManagerResponse.class);
     NodeId nodeId = request.getNodeId();
+    Boolean external = request.getExternal();
     RMNode rmNode = this.rmContext.getRMNodes().get(nodeId);
     if (rmNode == null) {
       LOG.info("Node not found, ignoring the unregister from node id : "
@@ -741,12 +742,16 @@ public class ResourceTrackerService extends AbstractService implements
     LOG.info("Node with node id : " + nodeId
         + " has shutdown, hence unregistering the node.");
     this.nmLivelinessMonitor.unregister(nodeId);
-    /**
-     * Exclude the node from the node list manager
-     */
-    Set<String> excludedExternalNodes = new HashSet<>();
-    excludedExternalNodes.add(rmNode.getHostName());
-    this.nodesListManager.excludeExternalNodes(excludedExternalNodes);
+    // If unregister is from external API's (for e.g. Peloton)
+    // Also remove from ZK
+    if (external != null &&
+            external) {
+      LOG.info("Node with node id : " + nodeId
+              + " was added as part of external process. Removing from ZK");
+      Set<String> excludedExternalNodes = new HashSet<>();
+      excludedExternalNodes.add(rmNode.getHostName());
+      this.nodesListManager.excludeExternalNodes(excludedExternalNodes);
+    }
     this.rmContext.getDispatcher().getEventHandler()
         .handle(new RMNodeEvent(nodeId, RMNodeEventType.SHUTDOWN));
     return response;

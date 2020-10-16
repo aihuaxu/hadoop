@@ -1307,6 +1307,7 @@ public class TestResourceTrackerService extends NodeLabelTestBase {
     UnRegisterNodeManagerRequest request = Records
         .newRecord(UnRegisterNodeManagerRequest.class);
     request.setNodeId(nm1.getNodeId());
+    request.setExternal(true);
     resourceTrackerService.unRegisterNodeManager(request);
     checkShutdownNMCount(rm, ++shutdownNMsCount);
 
