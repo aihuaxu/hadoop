@@ -270,7 +270,6 @@ public class PelotonHelper {
         setRespoolId(PelotonJobSpec.getRespoolId(resourceManager)).
         setHostpool(PelotonJobSpec.getHostPool()).
         setInstanceCount(instanceCount).
-        setSla(PelotonJobSpec.getSlaSpec()).
         setDefaultSpec(PelotonJobSpec.getPodSpec(getConf())).
         build();
 

@@ -34,6 +34,8 @@ public class PelotonJobSpec {
   public static final Map<String, String> POD_LABEL_MAP;
   static {
     POD_LABEL_MAP = new HashMap<>();
+    POD_LABEL_MAP.put("YARNService", "NodeManager");
+    POD_LABEL_MAP.put("com.uber.peloton.metadata.nodefaultmaximumunavailableinstances", "true");
     // Set of labels required for CLH to fetch pool secrets and keytab.
     POD_LABEL_MAP.put("org.apache.aurora.metadata.udeploy", "{\"svc_pconfig_dict\":{\"tier\":2}}");
     POD_LABEL_MAP.put("org.apache.aurora.metadata.udeploy_task", "{\"application_id\":\"yarn\",\"service_id\":\"yarn\"}");
@@ -101,13 +103,6 @@ public class PelotonJobSpec {
     //RESPOOL needs to be configurable as long with zk conn in Router zk statestore
     public static final String RESPOOL = "/Coconut";
     public static final String PELOTON_HOST_POOL_SHARED_TO_YARN = "shared";
-
-    /**
-     * SLA Spec
-     */
-    public static final int SLA_SPEC_PRIORITY = 22;
-    public static final boolean SLA_SPEC_PREEMPTIPLE = false;
-    public static final int SLA_SPEC_MIN_RUNNING_INSTANCES = 1;
 
     /**
      * Container Info
@@ -232,18 +227,6 @@ public class PelotonJobSpec {
    */
   public static String getHostPool() {
     return Constants.PELOTON_HOST_POOL_SHARED_TO_YARN;
-  }
-
-  /**
-   * SLA Spec
-   * @return
-   */
-  public static Stateless.SlaSpec getSlaSpec() {
-    return Stateless.SlaSpec.newBuilder().
-            setPriority(Constants.SLA_SPEC_PRIORITY).
-            setPreemptible(Constants.SLA_SPEC_PREEMPTIPLE).
-            setMaximumUnavailableInstances(Constants.SLA_SPEC_MIN_RUNNING_INSTANCES).
-            build();
   }
 
   /**
