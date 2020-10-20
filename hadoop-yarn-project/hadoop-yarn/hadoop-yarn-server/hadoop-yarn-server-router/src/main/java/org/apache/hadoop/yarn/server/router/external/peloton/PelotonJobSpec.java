@@ -65,6 +65,8 @@ public class PelotonJobSpec {
     ENVIRONMENT_PARAM_MAP.put("EXTERNAL_SECRETS_ROOT", "/run/.secrets/yarn");
     ENVIRONMENT_PARAM_MAP.put("EXTERNAL_SECRETS_PATH", "/run/.secrets/yarn");
     ENVIRONMENT_PARAM_MAP.put("INTERNAL_SECRETS_PATH", "/secrets");
+    ENVIRONMENT_PARAM_MAP.put("EXTERNAL_UCS_PATH", "/var/cache/ucs");
+    ENVIRONMENT_PARAM_MAP.put("INTERNAL_UCS_PATH", "/var/cache/ucs");
   }
 
   /**
