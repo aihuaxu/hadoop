@@ -328,16 +328,10 @@ public class PelotonJobSpec {
    */
   public static Pod.ContainerSpec getContainerSpec(Configuration conf) throws IOException {
     Pod.ContainerSpec.Builder containerSpecBuilder = Pod.ContainerSpec.newBuilder();
-
-    String imageName = conf.get(YarnConfiguration.PELOTON_DOCKER_IMAGE_NAME);
-    String imageTag = conf.get(YarnConfiguration.PELOTON_DOCKER_IMAGE_TAG);
-    if (imageName == null || imageTag == null) {
-      throw new IOException("Missing peloton docker image");
-    }
     List<VolumeSpec> volumeSpecs = VolumeSpec.getAllVolumes();
     containerSpecBuilder.
             setName(Constants.CONTAINER_INFO_NAME).
-            setImage(imageName + imageTag).
+            setImage(getNMImage(conf)).
             setEntrypoint(getCommandSpec()).
             setResource(getResourceSpec());
 
@@ -351,6 +345,15 @@ public class PelotonJobSpec {
     }
 
     return containerSpecBuilder.build();
+  }
+
+  public static String getNMImage(Configuration conf) throws IOException {
+    String imageName = conf.get(YarnConfiguration.PELOTON_DOCKER_IMAGE_NAME);
+    String imageTag = conf.get(YarnConfiguration.PELOTON_DOCKER_IMAGE_TAG);
+    if (imageName == null || imageTag == null) {
+      throw new IOException("Missing NM docker image for Peloton");
+    }
+    return imageName + imageTag;
   }
 
   /**

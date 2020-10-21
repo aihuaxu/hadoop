@@ -11,7 +11,6 @@ import com.peloton.api.v0.host.svc.pb.HostSvc.ListHostPoolsResponse;
 import com.uber.peloton.client.HostManager;
 import com.uber.peloton.client.ResourceManager;
 import com.uber.peloton.client.StatelessJobService;
-import com.uber.peloton.client.shaded.com.google.protobuf.ProtocolStringList;
 import java.io.FileInputStream;
 import java.util.Arrays;
 import org.apache.hadoop.conf.Configuration;
@@ -20,7 +19,6 @@ import org.apache.hadoop.yarn.api.protocolrecords.GetOrderedHostsResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.IncludeExternalHostsRequest;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.server.router.clientrm.RouterClientRMService;
-import org.apache.hadoop.yarn.server.router.external.peloton.PelotonJobSpec.Constants;
 import org.apache.hadoop.yarn.server.router.external.peloton.protocol.GetPelotonZKInfoListByClusterRequest;
 import org.apache.hadoop.yarn.server.router.external.peloton.protocol.GetPelotonZKInfoListByClusterResponse;
 import org.apache.hadoop.yarn.server.router.external.peloton.records.PelotonZKInfo;
@@ -259,10 +257,10 @@ public class PelotonHelper {
   /**
    * This can go to config file and basic on getFields GRPC functions, the values can be populated in a more
    * automated way
-   * @param instanceCount
+   * @param desiredInstanceCount the desired NM instance count in Peloton shared pool
    */
   protected void createNMJob(
-      int instanceCount,
+      int desiredInstanceCount,
       ResourceManagerBlockingStub resourceManager,
       JobServiceBlockingStub jobSvc,
       PelotonZKInfo zkInfo) throws IOException {
@@ -271,7 +269,7 @@ public class PelotonHelper {
      * Initialize job spec from Peloton Job spec
      */
     // Start 10% of NM instances in a batch
-    int batchSize = (int) (instanceCount * 0.1);
+    int batchSize = (int) (desiredInstanceCount * 0.1);
     if (batchSize < 1) {
       batchSize = 1;
     }
@@ -286,7 +284,7 @@ public class PelotonHelper {
         addAllLabels(PelotonJobSpec.getLabels()).
         setRespoolId(PelotonJobSpec.getRespoolId(resourceManager, zkInfo.getResourcePoolPath())).
         setHostpool(PelotonJobSpec.getHostPool()).
-        setInstanceCount(instanceCount).
+        setInstanceCount(desiredInstanceCount).
         setDefaultSpec(PelotonJobSpec.getPodSpec(getConf())).
         build();
 
@@ -305,20 +303,31 @@ public class PelotonHelper {
       LOG.info("Create Job Response - JobId: {}", response.getJobId());
     } else {
       // Update Job
-      LOG.info("Job exists in the Peloton cluster");
+      LOG.info("NM stateless job exists in the Peloton cluster");
 
-      // TODO: queryNMJob response also has an instance count, need to check with Peloton team
-      // whether it is desired count or running count
-      // if it is desired, then no need to call getJob API
       Stateless.JobInfo jobInfo = getJob(existingJob, jobSvc);
       int existingInstanceCount = jobInfo.getSpec().getInstanceCount();
-      if (existingInstanceCount == instanceCount) {
-        LOG.info("Existing NM job already has the desired instance count {}, no need to refresh", instanceCount);
+      String runningNMImage = jobInfo.getSpec().getDefaultSpec().getContainers(0).getImage();
+      String desiredNMImage = PelotonJobSpec.getNMImage(conf);
+
+      if ((existingInstanceCount == desiredInstanceCount)
+        && (runningNMImage.equals(desiredNMImage))) {
+        LOG.info("Existing NM job already has the desired instance count {} and NM image {}, no need to refresh",
+          desiredInstanceCount, desiredNMImage);
         return;
       }
 
-      LOG.info("Updating Peloton job {} for the node manager, current instance count: {}, instance count in shared pool: {}",
-          existingJob.getValue(), existingInstanceCount, instanceCount);
+      if (!runningNMImage.equals(desiredNMImage)) {
+        LOG.info("Current running NM image {} is different from conf {}, need to replace NM stateless job",
+          runningNMImage, desiredNMImage);
+      }
+      if (existingInstanceCount != desiredInstanceCount) {
+        LOG.info("Current NM instance count {} is different from desired count {}, need to replace NM stateless job",
+          existingInstanceCount, desiredInstanceCount);
+      }
+
+      LOG.info("Replacing NM stateless job {} on Peloton with desired instance count {} and NM image {}",
+          existingJob.getValue(), desiredInstanceCount, desiredNMImage);
       UpdateSpec updateSpec = Stateless.UpdateSpec.newBuilder().setBatchSize(batchSize).build();
       StatelessSvc.ReplaceJobRequest req = StatelessSvc.ReplaceJobRequest.newBuilder().
           setJobId(existingJob).
@@ -326,9 +335,6 @@ public class PelotonHelper {
           setUpdateSpec(updateSpec).
           setSpec(jobSpec).
           build();
-      // ToDo - Replace or Refresh ?
-      // How to update just hostInstance ? Better way ??
-      // Replace Job
       StatelessSvc.ReplaceJobResponse res = jobSvc.replaceJob(req);
       LOG.info("Replace Job Response: {}", res);
     }
