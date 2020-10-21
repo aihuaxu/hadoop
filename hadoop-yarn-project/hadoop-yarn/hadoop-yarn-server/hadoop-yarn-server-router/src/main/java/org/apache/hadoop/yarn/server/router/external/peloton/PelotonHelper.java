@@ -2,7 +2,8 @@ package org.apache.hadoop.yarn.server.router.external.peloton;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
-import com.peloton.api.v0.host.svc.pb.HostSvc;
+import com.peloton.api.v0.host.svc.pb.HostSvc.QueryHostsRequest;
+import com.peloton.api.v0.host.svc.pb.HostSvc.QueryHostsResponse;
 import com.peloton.api.v0.host.svc.pb.HostSvc.SetReclaimHostOrderRequest;
 import com.peloton.api.v0.host.svc.pb.HostServiceGrpc.HostServiceBlockingStub;
 import com.peloton.api.v0.host.svc.pb.HostSvc.ListHostPoolsRequest;
@@ -12,6 +13,7 @@ import com.uber.peloton.client.ResourceManager;
 import com.uber.peloton.client.StatelessJobService;
 import com.uber.peloton.client.shaded.com.google.protobuf.ProtocolStringList;
 import java.io.FileInputStream;
+import java.util.Arrays;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.api.protocolrecords.GetOrderedHostsRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.GetOrderedHostsResponse;
@@ -25,7 +27,9 @@ import org.apache.hadoop.yarn.server.router.external.peloton.records.PelotonZKIn
 import org.apache.hadoop.yarn.server.router.store.RouterStateStoreService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import peloton.api.v0.host.Host.HostInfo;
 import peloton.api.v0.host.Host.HostPoolInfo;
+import peloton.api.v0.host.Host.HostState;
 import peloton.api.v0.respool.ResourceManagerGrpc.ResourceManagerBlockingStub;
 import peloton.api.v1alpha.job.stateless.Stateless;
 import peloton.api.v1alpha.job.stateless.svc.JobServiceGrpc.JobServiceBlockingStub;
@@ -184,6 +188,22 @@ public class PelotonHelper {
     return response;
   }
 
+  /**
+   * Query only active hosts in Peloton shared host pool, to filter those hosts being evicted
+   * @param hostService
+   * @return list of active hosts in shared pool
+   */
+  protected QueryHostsResponse queryActiveHostsInSharedPool(HostServiceBlockingStub hostService) {
+    QueryHostsRequest request = QueryHostsRequest.newBuilder()
+      .addAllHostStates(Arrays.asList(HostState.HOST_STATE_UP))
+      .addHostGoalStates(HostState.HOST_STATE_UP)
+      .addAllCurrentHostPools(Arrays.asList(PelotonJobSpec.Constants.PELOTON_HOST_POOL_SHARED_TO_YARN))
+      .build();
+    QueryHostsResponse response = hostService.queryHosts(request);
+    LOG.info("queryHosts returned {} active hosts", response.getHostInfosCount());
+    return response;
+  }
+
   protected void setJobId(Peloton.JobID jobID) {
     pelotonJobId = jobID;
   }
@@ -208,35 +228,32 @@ public class PelotonHelper {
       LOG.info("startNMsOnPeloton in Peloton cluster " + clientWrapper.getPelotonZKInfo());
       try {
         int instanceNumber = 0;
-        ListHostPoolsResponse pools = listHostsPools(clientWrapper.getHostService());
+        QueryHostsResponse queryHostsResponse = queryActiveHostsInSharedPool(clientWrapper.getHostService());
         Set<String> hostSetToInclude = new HashSet<>();
-        for (HostPoolInfo poolInfo : pools.getPoolsList()) {
-          if (poolInfo.getName().equals(PelotonJobSpec.Constants.PELOTON_HOST_POOL_SHARED_TO_YARN)) {
-            instanceNumber = poolInfo.getHostsCount();
-            ProtocolStringList hostList = poolInfo.getHostsList();
-            hostSetToInclude.addAll(hostList);
-            try {
-              IncludeExternalHostsRequest request = IncludeExternalHostsRequest.newInstance(hostSetToInclude);
-              clientRMService.includeExternalHosts(request);
-              LOG.info("includeExternalHosts request succeed.");
-            } catch (Exception e) {
-              LOG.error("Failed to include hosts");
-            }
-            LOG.info("Found {} hosts in pool {} for YARN", instanceNumber,
-                PelotonJobSpec.Constants.PELOTON_HOST_POOL_SHARED_TO_YARN);
-            createNMJob(
-                instanceNumber,
-                clientWrapper.getResourceManager(),
-                clientWrapper.getJobSvc(),
-                clientWrapper.getPelotonZKInfo());
-            break;
+        if (queryHostsResponse.getHostInfosList() != null) {
+          instanceNumber = queryHostsResponse.getHostInfosCount();
+          for (HostInfo hostInfo : queryHostsResponse.getHostInfosList()) {
+            hostSetToInclude.add(hostInfo.getHostname());
           }
+          LOG.debug("Peloton {} pool has {} active hosts for YARN: {}",
+            PelotonJobSpec.Constants.PELOTON_HOST_POOL_SHARED_TO_YARN, instanceNumber, hostSetToInclude);
+          try {
+            IncludeExternalHostsRequest request = IncludeExternalHostsRequest.newInstance(hostSetToInclude);
+            clientRMService.includeExternalHosts(request);
+            LOG.info("includeExternalHosts request succeed.");
+          } catch (Exception e) {
+            LOG.error("Failed to include hosts");
+          }
+          createNMJob(
+            instanceNumber,
+            clientWrapper.getResourceManager(),
+            clientWrapper.getJobSvc(),
+            clientWrapper.getPelotonZKInfo());
         }
       } catch (Exception e) {
         LOG.error("Exception occurred", e);
       }
     }
-
   }
 
   /**
