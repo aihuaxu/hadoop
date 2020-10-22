@@ -18,7 +18,9 @@
 package org.apache.hadoop.hdfs.server.balancer;
 
 import static org.junit.Assert.assertEquals;
+import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyLong;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
@@ -40,6 +42,7 @@ import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
 import org.apache.hadoop.hdfs.protocol.ClientProtocol;
 import org.apache.hadoop.hdfs.protocol.DatanodeID;
 import org.apache.hadoop.hdfs.qjournal.MiniQJMHACluster;
+import org.apache.hadoop.hdfs.server.blockmanagement.BlockManager;
 import org.apache.hadoop.hdfs.server.namenode.FSNamesystem;
 import org.apache.hadoop.hdfs.server.namenode.NameNodeAdapter;
 import org.apache.hadoop.hdfs.server.namenode.ha.HATestUtil;
@@ -153,11 +156,14 @@ public class TestBalancerWithHANameNodes {
       cluster = qjmhaCluster.getDfsCluster();
       cluster.waitClusterUp();
       cluster.waitActive();
-      List<FSNamesystem> namesystemSpies = new ArrayList<>();
+      List<BlockManager> blockManagerSpies = new ArrayList<>();
       for (int i = 0; i < cluster.getNumNameNodes(); i++) {
-        namesystemSpies.add(
-            NameNodeAdapter.spyOnNamesystem(cluster.getNameNode(i)));
+        FSNamesystem namesystemSpy = NameNodeAdapter.spyOnNamesystem(cluster.getNameNode(i));
+        BlockManager newBlkManager = spy(namesystemSpy.getBlockManager());
+        namesystemSpy.setBlockManagerForTesting(newBlkManager);
+        blockManagerSpies.add(newBlkManager);
       }
+
       if (withObserverFailure) {
         // First observer NN is at index 2
         cluster.shutdownNameNode(2);
@@ -168,13 +174,15 @@ public class TestBalancerWithHANameNodes {
       client = dfs.getClient().getNamenode();
 
       doTest(conf);
+
+      // First observer node is at idx 2, or 3 if 2 has been shut down
+      // It should get both getBlocks calls, all other NNs should see 0 calls
+      int expectedObserverIdx = withObserverFailure ? 3 : 2;
       for (int i = 0; i < cluster.getNumNameNodes(); i++) {
-        // First observer node is at idx 2, or 3 if 2 has been shut down
-        // It should get both getBlocks calls, all other NNs should see 0 calls
-        int expectedObserverIdx = withObserverFailure ? 3 : 2;
         int expectedCount = (i == expectedObserverIdx) ? 2 : 0;
-        verify(namesystemSpies.get(i), times(expectedCount))
-            .getBlockManager().getBlocks(Matchers.<DatanodeID>any(), anyLong());
+
+        verify(blockManagerSpies.get(i), times(expectedCount))
+            .getBlocks(any(DatanodeID.class), anyLong());
       }
     } finally {
       if (qjmhaCluster != null) {
