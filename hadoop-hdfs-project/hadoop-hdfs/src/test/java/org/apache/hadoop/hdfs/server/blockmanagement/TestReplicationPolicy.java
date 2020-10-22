@@ -1321,6 +1321,7 @@ public class TestReplicationPolicy extends BaseReplicationPolicyTest {
     when(mockNS.hasWriteLock()).thenReturn(true);
     when(mockNS.hasReadLock()).thenReturn(true);
     BlockManager bm = new BlockManager(mockNS, new HdfsConfiguration());
+    when(mockNS.getBlockIdManager()).thenReturn(new BlockIdManager(bm));
     UnderReplicatedBlocks underReplicatedBlocks = bm.neededReplications;
 
     BlockInfo block1 = genBlockInfo(ThreadLocalRandom.current().nextLong());
@@ -1371,6 +1372,8 @@ public class TestReplicationPolicy extends BaseReplicationPolicyTest {
     when(mockNS.hasReadLock()).thenReturn(true);
 
     BlockManager bm = new BlockManager(mockNS, new HdfsConfiguration());
+    when(mockNS.getBlockIdManager()).thenReturn(new BlockIdManager(bm));
+
     UnderReplicatedBlocks underReplicatedBlocks = bm.neededReplications;
 
     BlockInfo block1 = genBlockInfo(ThreadLocalRandom.current().nextLong());
