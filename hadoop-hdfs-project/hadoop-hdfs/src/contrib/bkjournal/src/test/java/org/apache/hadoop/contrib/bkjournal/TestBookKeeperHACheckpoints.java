@@ -37,10 +37,6 @@ import java.util.Random;
  * using a bookkeeper journal manager as the shared directory
  */
 public class TestBookKeeperHACheckpoints extends TestStandbyCheckpoints {
-  //overwrite the nn count
- static{
-   TestStandbyCheckpoints.NUM_NNS = 2;
- }
   private static BKJMUtil bkutil = null;
   static int numBookies = 3;
   static int journalCount = 0;
@@ -65,7 +61,8 @@ public class TestBookKeeperHACheckpoints extends TestStandbyCheckpoints {
         MiniDFSNNTopology topology = new MiniDFSNNTopology()
           .addNameservice(new MiniDFSNNTopology.NSConf("ns1")
             .addNN(new MiniDFSNNTopology.NNConf("nn1").setHttpPort(basePort))
-            .addNN(new MiniDFSNNTopology.NNConf("nn2").setHttpPort(basePort + 1)));
+            .addNN(new MiniDFSNNTopology.NNConf("nn2").setHttpPort(basePort + 1))
+            .addNN(new MiniDFSNNTopology.NNConf("nn3").setHttpPort(basePort + 2)));
 
         cluster = new MiniDFSCluster.Builder(conf)
           .nnTopology(topology)

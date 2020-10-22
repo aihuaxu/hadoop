@@ -261,7 +261,7 @@ public class TestStandbyCheckpoints {
   @Test(timeout = 300000)
   public void testStandbyAndObserverState() throws Exception {
     // Transition 2 to observer
-    cluster.transitionToObserver(1);
+    cluster.transitionToObserver(2);
     doEdits(0, 10);
     // After a rollEditLog, Standby(nn1) 's next checkpoint would be
     // ahead of observer(nn2).
