@@ -166,7 +166,7 @@ public class CapacityScheduler extends
   // timeout to join when we stop this service
   protected final long THREAD_JOIN_TIMEOUT_MS = 1000;
 
-  private final int MAXIMUM_ALLOCATION_QUEUE_SORTING_EXCEPTIONS = 3;
+  private final int MAXIMUM_ALLOCATION_QUEUE_SORTING_EXCEPTIONS = 100;
 
   private int allocationQueueSortingExceptions = 0;
 
