@@ -1,7 +1,5 @@
 package org.apache.hadoop.yarn.server.router.external.peloton;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.peloton.api.v0.host.svc.pb.HostSvc.QueryHostsRequest;
 import com.peloton.api.v0.host.svc.pb.HostSvc.QueryHostsResponse;
 import com.peloton.api.v0.host.svc.pb.HostSvc.SetReclaimHostOrderRequest;
@@ -11,7 +9,8 @@ import com.peloton.api.v0.host.svc.pb.HostSvc.ListHostPoolsResponse;
 import com.uber.peloton.client.HostManager;
 import com.uber.peloton.client.ResourceManager;
 import com.uber.peloton.client.StatelessJobService;
-import java.io.FileInputStream;
+import java.io.BufferedReader;
+import java.io.FileReader;
 import java.util.Arrays;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.api.protocolrecords.GetOrderedHostsRequest;
@@ -110,16 +109,22 @@ public class PelotonHelper {
   protected boolean getYarnCredentialOnPeloton() {
     String yopCredentialPath = conf.get(YarnConfiguration.ROUTER_YARN_USER_ON_PELOTON_PATH,
       YarnConfiguration.DEFAULT_ROUTER_YARN_USER_ON_PELOTON_PATH);
+    BufferedReader br = null;
     try {
-      FileInputStream file = new FileInputStream(yopCredentialPath);
-      ObjectMapper om = new ObjectMapper(new YAMLFactory());
-      YarnCredentialOnPeloton yopCredential = om.readValue(file, YarnCredentialOnPeloton.class);
-      yarnUser = yopCredential.getUsername();
-      yarnPassword = yopCredential.getPassword();
-      file.close();
+      br = new BufferedReader(new FileReader(yopCredentialPath));
+      yarnUser = br.readLine().substring("username: ".length());
+      yarnPassword = br.readLine().substring("password: ".length());
     } catch (Exception e) {
       LOG.error("Failed to load Yarn credential on Peloton from Langley", e);
       return false;
+    } finally {
+      if (br != null) {
+        try {
+          br.close();
+        } catch(IOException e) {
+          LOG.warn("Failed to close buffer reader of Yarn credential file", e);
+        }
+      }
     }
     LOG.info("Got yarn credential on Peloton from langley successfully, user={}", yarnUser);
     return true;
