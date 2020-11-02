@@ -32,8 +32,7 @@ import static org.apache.hadoop.fs.permission.FsAction.READ_WRITE;
 import static org.apache.hadoop.fs.permission.FsAction.WRITE;
 import static org.apache.hadoop.fs.permission.FsAction.WRITE_EXECUTE;
 import static org.apache.hadoop.hdfs.server.namenode.AclTestHelpers.aclEntry;
-import static org.junit.Assert.fail;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
@@ -52,6 +51,9 @@ import org.apache.hadoop.hdfs.server.namenode.FSDirectory.DirOp;
 import org.apache.hadoop.hdfs.server.namenode.snapshot.Snapshot;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.log4j.Level;
+import org.apache.log4j.LogManager;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.invocation.InvocationOnMock;
@@ -352,6 +354,39 @@ public class TestFSPermissionChecker {
     assertPermissionDenied(DIANA, "/dir1/file1", READ_EXECUTE);
     assertPermissionDenied(DIANA, "/dir1/file1", WRITE_EXECUTE);
     assertPermissionDenied(DIANA, "/dir1/file1", ALL);
+  }
+
+  @Test
+  public void testAclNamedGroupDebug() throws IOException {
+    INodeDirectory inodeDir = createINodeDirectory(inodeRoot, "dir1", "bruce",
+            "execs", (short)0755);
+    INodeFile inodeFile = createINodeFile(inodeDir, "file1", "bruce", "execs",
+            (short)0644);
+    addAcl(inodeDir,
+            aclEntry(ACCESS, USER, ALL),
+            aclEntry(ACCESS, GROUP, READ_EXECUTE),
+            aclEntry(ACCESS, GROUP, "dev", NONE),
+            aclEntry(ACCESS, MASK, READ_EXECUTE),
+            aclEntry(ACCESS, OTHER, READ_EXECUTE));
+
+    GenericTestUtils.LogCapturer log =
+            GenericTestUtils.LogCapturer.captureLogs(FSPermissionChecker.LOG);
+
+    LogManager.getLogger("org.apache.hadoop.security.UserGroupInformation").setLevel(Level.DEBUG);
+    assertPermissionDenied(
+            UserGroupInformation.createUserForTesting("storage-platform", new String[] {"dev"}),
+            "/dir1/file1", WRITE);
+    assertTrue(
+            log.getOutput().contains("storage-platform permission - Groups:[dev], ACL:group::r-xgroup:dev:---"));
+
+    log.clearOutput();
+    LogManager.getLogger("org.apache.hadoop.security.UserGroupInformation").setLevel(Level.INFO);
+    assertPermissionDenied(
+            UserGroupInformation.createUserForTesting("storage-platform", new String[] {"dev"}),
+            "/dir1/file1", WRITE);
+    assertFalse(
+            log.getOutput().contains("storage-platform permission - Groups:[dev], ACL:group::r-xgroup:dev:---"));
+
   }
 
   @Test

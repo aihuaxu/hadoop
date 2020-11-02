@@ -414,7 +414,21 @@ class FSPermissionChecker implements AccessControlEnforcer {
     }
 
     // Use other entry if user was not denied by an earlier match.
-    return !foundMatch && mode.getOtherAction().implies(access);
+    boolean hasPermission = !foundMatch && mode.getOtherAction().implies(access);
+
+    // To debug user permission issue
+    if (LOG.isDebugEnabled() && !hasPermission) {
+      String aclString = "";
+
+      for (int pos = 0, entry; pos < aclFeature.getEntriesSize(); pos++) {
+        entry = aclFeature.getEntryAt(pos);
+        aclString += AclEntryStatusFormat.toAclEntry(entry);
+      }
+
+      LOG.debug(getUser() + " permission - Groups:" + groups + ", ACL:" + aclString);
+    }
+
+    return hasPermission;
   }
 
   /** Guarded by {@link FSNamesystem#readLock()} */
