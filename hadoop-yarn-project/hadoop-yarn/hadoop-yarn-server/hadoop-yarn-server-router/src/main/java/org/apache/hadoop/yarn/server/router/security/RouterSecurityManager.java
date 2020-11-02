@@ -3,7 +3,6 @@ package org.apache.hadoop.yarn.server.router.security;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.ipc.StandbyException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.SecretManager;
 import org.apache.hadoop.security.token.Token;
@@ -106,8 +105,6 @@ public class RouterSecurityManager {
       realRouterToken = new Token<RouterDelegationTokenIdentifier>(tokenIdentifier,
           dtSecretManager);
       return realRouterToken;
-    } catch (Exception e) {
-      throw new StandbyException("secret manager slowness, failover and retry on a separate router");
     } finally {
       logAuditEvent(success, operationName, tokenId);
     }

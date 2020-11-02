@@ -145,9 +145,6 @@ public abstract class ZKDelegationTokenSecretManager<TokenIdent extends Abstract
   private ExecutorService listenerThreadPool;
   private final long shutdownTimeout;
 
-  private final long backoffSeedMillis;
-  private final int maxRetries;
-
   private final int seqNumBatchSize;
   private int currentSeqNum;
   private int currentMaxSeqNum;
@@ -165,11 +162,6 @@ public abstract class ZKDelegationTokenSecretManager<TokenIdent extends Abstract
             DelegationTokenManager.REMOVAL_SCAN_INTERVAL_DEFAULT) * 1000);
     shutdownTimeout = conf.getLong(ZK_DTSM_ZK_SHUTDOWN_TIMEOUT,
         ZK_DTSM_ZK_SHUTDOWN_TIMEOUT_DEFAULT);
-
-    backoffSeedMillis = conf.getLong(DelegationTokenManager.BACKOFF_INTERVAL_SEED,
-        DelegationTokenManager.BACKOFF_INTERVAL_SEED_DEFAULT);
-    maxRetries = conf.getInt(DelegationTokenManager.MAX_RETRY,
-        DelegationTokenManager.MAX_RETRY_DEFAULT);
 
     seqNumBatchSize = conf.getInt(ZK_DTSM_SEQNUM_BATCH_SIZE,
         ZK_DTSM_SEQNUM_BATCH_SIZE_DEFAULT);
@@ -592,21 +584,13 @@ public abstract class ZKDelegationTokenSecretManager<TokenIdent extends Abstract
 
   private int incrSharedCount(SharedCount sharedCount, int batchSize)
       throws Exception {
-    int loop = 0;
-    long startMillis = Time.now();
-    for (; loop < maxRetries; loop++) {
+    while (true) {
       // Loop until we successfully increment the counter
       VersionedValue<Integer> versionedValue = sharedCount.getVersionedValue();
       if (sharedCount.trySetCount(versionedValue, versionedValue.getValue() + batchSize)) {
         return versionedValue.getValue();
       }
-      long backoffMillis = backoffSeedMillis + (long) (Math.random() * backoffSeedMillis);
-      LOG.info("Token generation backoff {} millisecond", backoffMillis);
-      Thread.sleep(backoffMillis);
     }
-    long duration = Time.now() - startMillis;
-    LOG.info("Sequence number sharedcount took {} times to retry after {} millis", loop, duration);
-    throw new IOException("Zookeeper is slow generating tokens");
   }
 
   @Override

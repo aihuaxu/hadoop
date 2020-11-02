@@ -65,12 +65,6 @@ public class DelegationTokenManager {
       "removal-scan-interval.sec";
   public static final long REMOVAL_SCAN_INTERVAL_DEFAULT = 60 * 60;
 
-  public static final String BACKOFF_INTERVAL_SEED = PREFIX + "backoff-interval.millis";
-  public static final long BACKOFF_INTERVAL_SEED_DEFAULT = 100;
-
-  public static final String MAX_RETRY = PREFIX + "max-retry";
-  public static final int MAX_RETRY_DEFAULT = 5;
-
   private static class DelegationTokenSecretManager
       extends AbstractDelegationTokenSecretManager<DelegationTokenIdentifier> {
 
