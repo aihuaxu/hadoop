@@ -46,6 +46,7 @@ import java.util.concurrent.Callable;
 
 import com.google.common.collect.Lists;
 
+import org.apache.commons.lang.NotImplementedException;
 import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
@@ -2505,5 +2506,10 @@ public class NameNodeRpcServer implements NamenodeProtocols {
     List<String> result = Lists.newArrayList(nn.getReconfigurableProperties());
     namesystem.logAuditEvent(true, operationName, null);
     return result;
+  }
+
+  @Override // ClientProtocol
+  public List<Path> getRemoteLocation(String src) throws IOException {
+    throw new NotImplementedException("getRemoteLocation is not implemented in Namenode RPC server. It's intended to be sent to HDFS router");
   }
 }

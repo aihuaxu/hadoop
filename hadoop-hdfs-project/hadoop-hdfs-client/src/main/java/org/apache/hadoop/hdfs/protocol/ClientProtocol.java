@@ -25,18 +25,9 @@ import java.util.Map;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.crypto.CryptoProtocolVersion;
+import org.apache.hadoop.fs.*;
 import org.apache.hadoop.fs.BatchedRemoteIterator.BatchedEntries;
-import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.hdfs.AddBlockFlag;
-import org.apache.hadoop.fs.CacheFlag;
-import org.apache.hadoop.fs.ContentSummary;
-import org.apache.hadoop.fs.CreateFlag;
-import org.apache.hadoop.fs.FsServerDefaults;
-import org.apache.hadoop.fs.Options;
-import org.apache.hadoop.fs.QuotaUsage;
-import org.apache.hadoop.fs.StorageType;
-import org.apache.hadoop.fs.XAttr;
-import org.apache.hadoop.fs.XAttrSetFlag;
 import org.apache.hadoop.fs.permission.AclEntry;
 import org.apache.hadoop.fs.permission.AclStatus;
 import org.apache.hadoop.fs.permission.FsAction;
@@ -1733,4 +1724,15 @@ public interface ClientProtocol {
   @Idempotent
   BatchedEntries<OpenFileEntry> listOpenFiles(long prevId,
       EnumSet<OpenFilesType> openFilesTypes, String path) throws IOException;
+
+  /**
+   * Call router to parse given path.
+   *
+   *
+   * @param src source router path
+   * @return A list of resolved paths that are (supposed to be) the destinations of src
+   * @throws IOException
+   */
+  @Idempotent
+  List<Path> getRemoteLocation(String src) throws IOException;
 }

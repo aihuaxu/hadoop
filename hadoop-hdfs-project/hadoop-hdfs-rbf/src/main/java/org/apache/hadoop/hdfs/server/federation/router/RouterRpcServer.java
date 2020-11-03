@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdfs.server.federation.router;
 
+import static org.apache.hadoop.hdfs.protocol.HdfsConstants.HDFS_URI_SCHEME;
 import static org.apache.hadoop.hdfs.server.federation.router.FederationUtil.newSecretManager;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION;
 import static org.apache.hadoop.hdfs.server.federation.router.RBFConfigKeys.DFS_ROUTER_HANDLER_COUNT_DEFAULT;
@@ -32,19 +33,8 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.lang.reflect.Array;
 import java.net.InetSocketAddress;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.Set;
-import java.util.TreeMap;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.crypto.CryptoProtocolVersion;
@@ -2482,5 +2472,67 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol {
    */
   public FederationRPCMetrics getRPCMetrics() {
     return this.rpcMonitor.getRPCMetrics();
+  }
+
+  /**
+   * Get destination(s) for the given path.
+   *
+   * @param path Source path.
+   * @return A list of destinations for the given path.
+   * @throws IOException
+   */
+  public List<RemoteLocation> getLocationsForPath(
+          String path) throws IOException {
+    try {
+      // Check the location for this path
+      FileSubclusterResolver resolver = this.router.getSubclusterResolver();
+      final PathLocation location =
+              resolver.getDestinationForPath(path);
+      if (location == null) {
+        throw new IOException("Cannot find locations for " + path + " in " +
+                resolver);
+      }
+
+      return location.getDestinations();
+    } catch (IOException ioe) {
+      throw ioe;
+    }
+  }
+
+  /**
+   * Fetch actual remote locations for given router-ns src.
+   *
+   * @param src source router path
+   * @return A list of resolved destination paths.
+   * @throws IOException
+   */
+  @Override
+  public List<Path> getRemoteLocation(String src) throws IOException {
+    try {
+      // Check the location for this path
+      FileSubclusterResolver resolver = this.router.getSubclusterResolver();
+      final PathLocation location =
+              resolver.getDestinationForPath(src);
+      if (location == null) {
+        throw new IOException("Cannot find locations for " + src + " in " +
+                resolver);
+      }
+
+      List<RemoteLocation> remoteLocations = location.getDestinations();
+      if (remoteLocations == null || remoteLocations.size() == 0) {
+        throw new IOException("No resolved path found");
+      }
+
+      List<Path> resolvedPathList = new ArrayList<>();
+      for (RemoteLocation rl : remoteLocations) {
+        String fullQualifiedPath = HDFS_URI_SCHEME + "://" +
+                rl.getNameserviceId() + "/" +
+                rl.getDest();
+        resolvedPathList.add(new Path(fullQualifiedPath));
+      }
+      return resolvedPathList;
+    } catch (IOException ioe) {
+      throw ioe;
+    }
   }
 }

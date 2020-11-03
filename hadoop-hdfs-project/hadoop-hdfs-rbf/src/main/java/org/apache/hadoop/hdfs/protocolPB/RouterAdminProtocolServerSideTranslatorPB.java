@@ -29,8 +29,6 @@ import org.apache.hadoop.hdfs.federation.protocol.proto.HdfsServerFederationProt
 import org.apache.hadoop.hdfs.federation.protocol.proto.HdfsServerFederationProtos.GetMountTableEntriesResponseProto;
 import org.apache.hadoop.hdfs.federation.protocol.proto.HdfsServerFederationProtos.GetSafeModeRequestProto;
 import org.apache.hadoop.hdfs.federation.protocol.proto.HdfsServerFederationProtos.GetSafeModeResponseProto;
-import org.apache.hadoop.hdfs.federation.protocol.proto.HdfsServerFederationProtos.GetRemoteLocationRequestProto;
-import org.apache.hadoop.hdfs.federation.protocol.proto.HdfsServerFederationProtos.GetRemoteLocationResponseProto;
 import org.apache.hadoop.hdfs.federation.protocol.proto.HdfsServerFederationProtos.LeaveSafeModeRequestProto;
 import org.apache.hadoop.hdfs.federation.protocol.proto.HdfsServerFederationProtos.LeaveSafeModeResponseProto;
 import org.apache.hadoop.hdfs.federation.protocol.proto.HdfsServerFederationProtos.RemoveMountTableEntryRequestProto;
@@ -44,8 +42,6 @@ import org.apache.hadoop.hdfs.server.federation.store.protocol.EnterSafeModeRequ
 import org.apache.hadoop.hdfs.server.federation.store.protocol.EnterSafeModeResponse;
 import org.apache.hadoop.hdfs.server.federation.store.protocol.GetMountTableEntriesRequest;
 import org.apache.hadoop.hdfs.server.federation.store.protocol.GetMountTableEntriesResponse;
-import org.apache.hadoop.hdfs.server.federation.store.protocol.GetRemoteLocationRequest;
-import org.apache.hadoop.hdfs.server.federation.store.protocol.GetRemoteLocationResponse;
 import org.apache.hadoop.hdfs.server.federation.store.protocol.GetSafeModeRequest;
 import org.apache.hadoop.hdfs.server.federation.store.protocol.GetSafeModeResponse;
 import org.apache.hadoop.hdfs.server.federation.store.protocol.LeaveSafeModeRequest;
@@ -60,8 +56,6 @@ import org.apache.hadoop.hdfs.server.federation.store.protocol.impl.pb.EnterSafe
 import org.apache.hadoop.hdfs.server.federation.store.protocol.impl.pb.EnterSafeModeResponsePBImpl;
 import org.apache.hadoop.hdfs.server.federation.store.protocol.impl.pb.GetMountTableEntriesRequestPBImpl;
 import org.apache.hadoop.hdfs.server.federation.store.protocol.impl.pb.GetMountTableEntriesResponsePBImpl;
-import org.apache.hadoop.hdfs.server.federation.store.protocol.impl.pb.GetRemoteLocationRequestPBImpl;
-import org.apache.hadoop.hdfs.server.federation.store.protocol.impl.pb.GetRemoteLocationResponsePBImpl;
 import org.apache.hadoop.hdfs.server.federation.store.protocol.impl.pb.GetSafeModeRequestPBImpl;
 import org.apache.hadoop.hdfs.server.federation.store.protocol.impl.pb.GetSafeModeResponsePBImpl;
 import org.apache.hadoop.hdfs.server.federation.store.protocol.impl.pb.LeaveSafeModeRequestPBImpl;
@@ -209,24 +203,6 @@ public class RouterAdminProtocolServerSideTranslatorPB implements
       GetSafeModeResponse response = server.getSafeMode(req);
       GetSafeModeResponsePBImpl responsePB =
           (GetSafeModeResponsePBImpl) response;
-      return responsePB.getProto();
-    } catch (IOException e) {
-      throw new ServiceException(e);
-    }
-  }
-
-  /**
-   * Get destination for given source path.
-   */
-  @Override
-  public GetRemoteLocationResponseProto getRemoteLocation(RpcController controller, GetRemoteLocationRequestProto request)
-      throws ServiceException {
-    try {
-      GetRemoteLocationRequest req =
-          new GetRemoteLocationRequestPBImpl(request);
-      GetRemoteLocationResponse response = server.getRemoteLocation(req);
-      GetRemoteLocationResponsePBImpl responsePB =
-          (GetRemoteLocationResponsePBImpl) response;
       return responsePB.getProto();
     } catch (IOException e) {
       throw new ServiceException(e);

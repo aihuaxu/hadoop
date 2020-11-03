@@ -35,17 +35,8 @@ import static org.junit.Assert.assertTrue;
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.net.URISyntaxException;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.EnumSet;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.Random;
-import java.util.Set;
-import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.conf.Configuration;
@@ -1165,5 +1156,30 @@ public class TestRouterRpc {
       }
     }
     return null;
+  }
+
+  @Test
+  public void testGetRemoteLocation() throws IOException {
+    // Verify getRemoteLocation result.
+    RouterRpcServer rpcServer = router.getRouter().getRpcServer();
+    // mount point /ns1 -> ns1/target-ns1 is pre-defined in testSetup().
+    String src = "/ns1";
+    List<Path> resolvedPaths = rpcServer.getRemoteLocation(src);
+    assertEquals(1, resolvedPaths.size());
+    assertEquals("hdfs://ns1/target-ns1", resolvedPaths.get(0).toString());
+
+    // If a path doesn't exist in mount table, it should be resolved under default namespace ns0
+    String noEntrySrc = "/no-entry";
+    resolvedPaths = rpcServer.getRemoteLocation(noEntrySrc);
+    assertEquals(1, resolvedPaths.size());
+    assertEquals("hdfs://ns0/no-entry", resolvedPaths.get(0).toString());
+
+    // Expect expcetion when routing the request to namenode
+    try {
+      nnProtocol.getRemoteLocation(src);
+    } catch (Exception e) {
+      assertNotNull(e);
+      assertTrue(e.getMessage().contains("getRemoteLocation is not implemented"));
+    }
   }
 }
