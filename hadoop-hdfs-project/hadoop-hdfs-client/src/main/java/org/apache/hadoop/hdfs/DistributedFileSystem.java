@@ -112,13 +112,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.URI;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.EnumSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 
 /****************************************************************
  * Implementation of the abstract FileSystem for the DFS system.
@@ -136,10 +130,14 @@ public class DistributedFileSystem extends FileSystem
       HdfsClientConfigKeys.DFS_USER_HOME_DIR_PREFIX_DEFAULT;
 
   DFSClient dfs;
-  RouterClient rc;
   private boolean verifyChecksum = true;
 
   private DFSOpsCountStatistics storageStatistics;
+
+  /**
+   * resolvePath indicates whether the give authority should be resolved at remote NN or router.
+   */
+  private boolean resolvePath;
 
   static{
     HdfsConfiguration.init();
@@ -175,14 +173,9 @@ public class DistributedFileSystem extends FileSystem
         HdfsClientConfigKeys.DFS_USER_HOME_DIR_PREFIX_KEY,
         HdfsClientConfigKeys.DFS_USER_HOME_DIR_PREFIX_DEFAULT);
 
-    this.dfs = new DFSClient(uri, conf, statistics);
+    resolvePath = isResolvePath(uri.getAuthority(), conf);
 
-    InetSocketAddress routerRpcAddress = conf.getSocketAddr(
-            HdfsClientConfigKeys.Router.DFS_ROUTER_ADMIN_BIND_HOST_KEY,
-            HdfsClientConfigKeys.Router.DFS_ROUTER_ADMIN_ADDRESS_KEY,
-            HdfsClientConfigKeys.Router.DFS_ROUTER_ADMIN_ADDRESS_DEFAULT,
-            HdfsClientConfigKeys.Router.DFS_ROUTER_ADMIN_PORT_DEFAULT);
-    this.rc = new RouterClient(routerRpcAddress, conf);
+    this.dfs = new DFSClient(uri, conf, statistics);
     this.uri = URI.create(uri.getScheme()+"://"+uri.getAuthority());
     this.workingDir = getHomeDirectory();
 
@@ -194,6 +187,40 @@ public class DistributedFileSystem extends FileSystem
               return new DFSOpsCountStatistics();
             }
           });
+  }
+
+  /**
+   * isResolvePath checks if the given URI for this client is defined in configuration
+   * dfs.namenode.resolve-path.enabled.nameservices. Return true if yes.
+   *
+   * The expected value from dfs.namenode.resolve-path.enabled.nameservices property should be
+   * a comma-delimited string, e.g., "ns1, ns2, ns3", with or without space in between.
+   *
+   * To be noticed that this function may not work as expected if a client uri is initialize
+   * with the actual host.
+   *
+   * @param conf HDFS configuration for this client
+   * @return where the uri for this client should be resolved at remote or not
+   */
+  private boolean isResolvePath(String authority, Configuration conf) {
+    String resolvePathNSValue = conf.getTrimmed(
+            HdfsClientConfigKeys.DFS_NAMENODE_RESOLVE_PATH_ENABLED_NAMESERVICES,
+            HdfsClientConfigKeys.DFS_NAMENODE_RESOLVE_PATH_ENABLED_NAMESERVICES_DEFAULT);
+    String s = conf.get(HdfsClientConfigKeys.DFS_NAMENODE_RESOLVE_PATH_ENABLED_NAMESERVICES);
+    String[] enabledNSs = resolvePathNSValue.split(",");
+    for (String enabledNS : enabledNSs) {
+      if(authority.equals(enabledNS.trim())) return true;
+    }
+    return false;
+  }
+
+  /**
+   * return whether the resolvePath boolean for this client.
+   *
+   * @return the boolean field resolvePath
+   */
+  public boolean getResolvePath() {
+    return this.resolvePath;
   }
 
   @Override
@@ -3286,11 +3313,10 @@ public class DistributedFileSystem extends FileSystem
    * Return the fully-qualified path, resolving the path
    * through any symlinks or mount point. Support router path resolving.
    *
-   * The function first check authority of a path. If it is
-   * recognized as router, then the function calls router client
-   * to resolve path. Otherwise use default resolvePath from FileSystem.
+   * The function routes request based resolvePath boolean variable, if true then
+   * it calls router to resolve path. Otherwise use default resolvePath implementation from FileSystem.
    *
-   * For a router path, resolvePath gives the best guess. It resolves from initial
+   * For a router path (or to-be-resolved path), resolvePath gives the best guess. It resolves from initial
    * path, following parent path and all the way up to root. At any point, if the
    * path without scheme and authority exist in router mount table,
    * take the actual path and append the skipped path as the final resolved path.
@@ -3326,8 +3352,8 @@ public class DistributedFileSystem extends FileSystem
   @Override
   public Path resolvePath(Path p) throws IOException {
     String authority = p.toUri().getAuthority();
-    if(authority == null || authority.isEmpty() || !authority.contains(HdfsConstants.ROUTER_AUTHORITY_KEYWORD))
+    if(authority == null || authority.isEmpty() || !resolvePath)
       return super.resolvePath(p);
-    return rc.getRemoteLocation(Path.getPathWithoutSchemeAndAuthority(p).toString());
+    return dfs.getRemoteLocation(Path.getPathWithoutSchemeAndAuthority(p).toString());
   }
 }

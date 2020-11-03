@@ -185,6 +185,9 @@ public interface HdfsClientConfigKeys {
       "dfs.namenode.snapshot.capture.openfiles";
   boolean DFS_NAMENODE_SNAPSHOT_CAPTURE_OPENFILES_DEFAULT = false;
 
+  String DFS_NAMENODE_RESOLVE_PATH_ENABLED_NAMESERVICES = "dfs.namenode.resolve-path.enabled.nameservices";
+  String DFS_NAMENODE_RESOLVE_PATH_ENABLED_NAMESERVICES_DEFAULT = "ns-router";
+
   /**
    * These are deprecated config keys to client code.
    */
