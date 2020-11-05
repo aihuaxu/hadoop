@@ -109,6 +109,7 @@ import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
 import org.apache.hadoop.yarn.ipc.RPCUtil;
 import org.apache.hadoop.yarn.ipc.YarnRPC;
 import org.apache.hadoop.yarn.server.resourcemanager.security.authorize.RMPolicyProvider;
+import org.apache.hadoop.yarn.server.router.metrics.RouterRPCPerformanceMonitor;
 import org.apache.hadoop.yarn.server.router.security.RouterDelegationTokenIdentifier;
 import org.apache.hadoop.yarn.server.router.security.RouterSecurityManager;
 import org.apache.hadoop.yarn.server.utils.BuilderUtils;
@@ -118,6 +119,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.annotations.VisibleForTesting;
+
+import static org.apache.hadoop.util.Time.monotonicNow;
 
 /**
  * RouterClientRMService is a service that runs on each router that can be used
@@ -188,7 +191,6 @@ public class RouterClientRMService extends AbstractService
     if (serviceAuthEnabled) {
       server.refreshServiceAclWithLoadedConfiguration(conf, RMPolicyProvider.getInstance());
     }
-
     this.server.start();
     LOG.info("Router ClientRMService listening on address: "
         + this.server.getListenerAddress());
@@ -230,6 +232,7 @@ public class RouterClientRMService extends AbstractService
   public GetNewApplicationResponse getNewApplication(
       GetNewApplicationRequest request) throws YarnException, IOException {
     RequestInterceptorChainWrapper pipeline = getInterceptorChain();
+    checkInterceptor(pipeline);
     return pipeline.getRootInterceptor().getNewApplication(request);
   }
 
@@ -237,6 +240,7 @@ public class RouterClientRMService extends AbstractService
   public SubmitApplicationResponse submitApplication(
       SubmitApplicationRequest request) throws YarnException, IOException {
     RequestInterceptorChainWrapper pipeline = getInterceptorChain();
+    checkInterceptor(pipeline);
     return pipeline.getRootInterceptor().submitApplication(request);
   }
 
@@ -244,6 +248,7 @@ public class RouterClientRMService extends AbstractService
   public KillApplicationResponse forceKillApplication(
       KillApplicationRequest request) throws YarnException, IOException {
     RequestInterceptorChainWrapper pipeline = getInterceptorChain();
+    checkInterceptor(pipeline);
     return pipeline.getRootInterceptor().forceKillApplication(request);
   }
 
@@ -251,6 +256,7 @@ public class RouterClientRMService extends AbstractService
   public GetClusterMetricsResponse getClusterMetrics(
       GetClusterMetricsRequest request) throws YarnException, IOException {
     RequestInterceptorChainWrapper pipeline = getInterceptorChain();
+    checkInterceptor(pipeline);
     return pipeline.getRootInterceptor().getClusterMetrics(request);
   }
 
@@ -258,6 +264,7 @@ public class RouterClientRMService extends AbstractService
   public GetClusterNodesResponse getClusterNodes(GetClusterNodesRequest request)
       throws YarnException, IOException {
     RequestInterceptorChainWrapper pipeline = getInterceptorChain();
+    checkInterceptor(pipeline);
     return pipeline.getRootInterceptor().getClusterNodes(request);
   }
 
@@ -265,6 +272,7 @@ public class RouterClientRMService extends AbstractService
   public GetQueueInfoResponse getQueueInfo(GetQueueInfoRequest request)
       throws YarnException, IOException {
     RequestInterceptorChainWrapper pipeline = getInterceptorChain();
+    checkInterceptor(pipeline);
     return pipeline.getRootInterceptor().getQueueInfo(request);
   }
 
@@ -272,6 +280,7 @@ public class RouterClientRMService extends AbstractService
   public GetQueueUserAclsInfoResponse getQueueUserAcls(
       GetQueueUserAclsInfoRequest request) throws YarnException, IOException {
     RequestInterceptorChainWrapper pipeline = getInterceptorChain();
+    checkInterceptor(pipeline);
     return pipeline.getRootInterceptor().getQueueUserAcls(request);
   }
 
@@ -280,6 +289,7 @@ public class RouterClientRMService extends AbstractService
       MoveApplicationAcrossQueuesRequest request)
       throws YarnException, IOException {
     RequestInterceptorChainWrapper pipeline = getInterceptorChain();
+    checkInterceptor(pipeline);
     return pipeline.getRootInterceptor().moveApplicationAcrossQueues(request);
   }
 
@@ -287,6 +297,7 @@ public class RouterClientRMService extends AbstractService
   public GetNewReservationResponse getNewReservation(
       GetNewReservationRequest request) throws YarnException, IOException {
     RequestInterceptorChainWrapper pipeline = getInterceptorChain();
+    checkInterceptor(pipeline);
     return pipeline.getRootInterceptor().getNewReservation(request);
   }
 
@@ -294,6 +305,7 @@ public class RouterClientRMService extends AbstractService
   public ReservationSubmissionResponse submitReservation(
       ReservationSubmissionRequest request) throws YarnException, IOException {
     RequestInterceptorChainWrapper pipeline = getInterceptorChain();
+    checkInterceptor(pipeline);
     return pipeline.getRootInterceptor().submitReservation(request);
   }
 
@@ -301,6 +313,7 @@ public class RouterClientRMService extends AbstractService
   public ReservationListResponse listReservations(
       ReservationListRequest request) throws YarnException, IOException {
     RequestInterceptorChainWrapper pipeline = getInterceptorChain();
+    checkInterceptor(pipeline);
     return pipeline.getRootInterceptor().listReservations(request);
   }
 
@@ -308,6 +321,7 @@ public class RouterClientRMService extends AbstractService
   public ReservationUpdateResponse updateReservation(
       ReservationUpdateRequest request) throws YarnException, IOException {
     RequestInterceptorChainWrapper pipeline = getInterceptorChain();
+    checkInterceptor(pipeline);
     return pipeline.getRootInterceptor().updateReservation(request);
   }
 
@@ -315,6 +329,7 @@ public class RouterClientRMService extends AbstractService
   public ReservationDeleteResponse deleteReservation(
       ReservationDeleteRequest request) throws YarnException, IOException {
     RequestInterceptorChainWrapper pipeline = getInterceptorChain();
+    checkInterceptor(pipeline);
     return pipeline.getRootInterceptor().deleteReservation(request);
   }
 
@@ -322,6 +337,7 @@ public class RouterClientRMService extends AbstractService
   public GetNodesToLabelsResponse getNodeToLabels(
       GetNodesToLabelsRequest request) throws YarnException, IOException {
     RequestInterceptorChainWrapper pipeline = getInterceptorChain();
+    checkInterceptor(pipeline);
     return pipeline.getRootInterceptor().getNodeToLabels(request);
   }
 
@@ -329,6 +345,7 @@ public class RouterClientRMService extends AbstractService
   public GetLabelsToNodesResponse getLabelsToNodes(
       GetLabelsToNodesRequest request) throws YarnException, IOException {
     RequestInterceptorChainWrapper pipeline = getInterceptorChain();
+    checkInterceptor(pipeline);
     return pipeline.getRootInterceptor().getLabelsToNodes(request);
   }
 
@@ -336,6 +353,7 @@ public class RouterClientRMService extends AbstractService
   public GetClusterNodeLabelsResponse getClusterNodeLabels(
       GetClusterNodeLabelsRequest request) throws YarnException, IOException {
     RequestInterceptorChainWrapper pipeline = getInterceptorChain();
+    checkInterceptor(pipeline);
     return pipeline.getRootInterceptor().getClusterNodeLabels(request);
   }
 
@@ -343,6 +361,7 @@ public class RouterClientRMService extends AbstractService
   public GetApplicationReportResponse getApplicationReport(
       GetApplicationReportRequest request) throws YarnException, IOException {
     RequestInterceptorChainWrapper pipeline = getInterceptorChain();
+    checkInterceptor(pipeline);
     return pipeline.getRootInterceptor().getApplicationReport(request);
   }
 
@@ -350,6 +369,7 @@ public class RouterClientRMService extends AbstractService
   public GetApplicationsResponse getApplications(GetApplicationsRequest request)
       throws YarnException, IOException {
     RequestInterceptorChainWrapper pipeline = getInterceptorChain();
+    checkInterceptor(pipeline);
     return pipeline.getRootInterceptor().getApplications(request);
   }
 
@@ -358,6 +378,7 @@ public class RouterClientRMService extends AbstractService
       GetApplicationAttemptReportRequest request)
       throws YarnException, IOException {
     RequestInterceptorChainWrapper pipeline = getInterceptorChain();
+    checkInterceptor(pipeline);
     return pipeline.getRootInterceptor().getApplicationAttemptReport(request);
   }
 
@@ -365,6 +386,7 @@ public class RouterClientRMService extends AbstractService
   public GetApplicationAttemptsResponse getApplicationAttempts(
       GetApplicationAttemptsRequest request) throws YarnException, IOException {
     RequestInterceptorChainWrapper pipeline = getInterceptorChain();
+    checkInterceptor(pipeline);
     return pipeline.getRootInterceptor().getApplicationAttempts(request);
   }
 
@@ -372,6 +394,7 @@ public class RouterClientRMService extends AbstractService
   public GetContainerReportResponse getContainerReport(
       GetContainerReportRequest request) throws YarnException, IOException {
     RequestInterceptorChainWrapper pipeline = getInterceptorChain();
+    checkInterceptor(pipeline);
     return pipeline.getRootInterceptor().getContainerReport(request);
   }
 
@@ -379,13 +402,21 @@ public class RouterClientRMService extends AbstractService
   public GetContainersResponse getContainers(GetContainersRequest request)
       throws YarnException, IOException {
     RequestInterceptorChainWrapper pipeline = getInterceptorChain();
+    checkInterceptor(pipeline);
     return pipeline.getRootInterceptor().getContainers(request);
   }
 
   @Override
   public GetDelegationTokenResponse getDelegationToken(
       GetDelegationTokenRequest request) throws YarnException {
-
+    long start = monotonicNow();
+    RouterRPCPerformanceMonitor rpcMonitor = null;
+    try {
+      RequestInterceptorChainWrapper pipeline = getInterceptorChain();
+      rpcMonitor = pipeline.getRpcMonitor();
+    } catch (IOException e) {
+      LOG.info("Cannot get rpcMonitor for getDelegationToken");
+    }
     try {
       GetDelegationTokenResponse response =
               recordFactory.newRecordInstance(GetDelegationTokenResponse.class);
@@ -397,8 +428,15 @@ public class RouterClientRMService extends AbstractService
               realRouterDToken.getPassword(),
               realRouterDToken.getService().toString()
       ));
+      long end = monotonicNow();
+      if (rpcMonitor != null) {
+        rpcMonitor.getRPCMetrics().succeededDTRetrieved(end - start);
+      }
       return response;
     } catch(IOException io) {
+      if (rpcMonitor != null) {
+        rpcMonitor.getRPCMetrics().incrDTRetrievedFailure();
+      }
       throw RPCUtil.getRemoteException(io);
     }
   }
@@ -406,6 +444,14 @@ public class RouterClientRMService extends AbstractService
   @Override
   public RenewDelegationTokenResponse renewDelegationToken(
       RenewDelegationTokenRequest request) throws YarnException {
+    long start = monotonicNow();
+    RouterRPCPerformanceMonitor rpcMonitor = null;
+    try {
+      RequestInterceptorChainWrapper pipeline = getInterceptorChain();
+      rpcMonitor = pipeline.getRpcMonitor();
+    } catch (IOException e) {
+      LOG.info("Cannot get rpcMonitor for renewDelegationToken");
+    }
     try {
       org.apache.hadoop.yarn.api.records.Token protoToken = request.getDelegationToken();
       Token<RouterDelegationTokenIdentifier> token = new Token<RouterDelegationTokenIdentifier>(
@@ -415,8 +461,15 @@ public class RouterClientRMService extends AbstractService
       RenewDelegationTokenResponse renewResponse = Records
               .newRecord(RenewDelegationTokenResponse.class);
       renewResponse.setNextExpirationTime(nextExpTime);
+      long end = monotonicNow();
+      if (rpcMonitor != null) {
+        rpcMonitor.getRPCMetrics().succeededDTRenewed(end - start);
+      }
       return renewResponse;
     } catch (IOException e) {
+      if (rpcMonitor != null) {
+        rpcMonitor.getRPCMetrics().incrDTRenewFailure();
+      }
       throw RPCUtil.getRemoteException(e);
     }
   }
@@ -424,14 +477,29 @@ public class RouterClientRMService extends AbstractService
   @Override
   public CancelDelegationTokenResponse cancelDelegationToken(
       CancelDelegationTokenRequest request) throws YarnException {
+    long start = monotonicNow();
+    RouterRPCPerformanceMonitor rpcMonitor = null;
+    try {
+      RequestInterceptorChainWrapper pipeline = getInterceptorChain();
+      rpcMonitor = pipeline.getRpcMonitor();
+    } catch (IOException e) {
+      LOG.info("Cannot get rpcMonitor for renewDelegationToken");
+    }
     try {
       org.apache.hadoop.yarn.api.records.Token protoToken = request.getDelegationToken();
       Token<RouterDelegationTokenIdentifier> token = new Token<RouterDelegationTokenIdentifier>(
               protoToken.getIdentifier().array(), protoToken.getPassword().array(),
               new Text(protoToken.getKind()), new Text(protoToken.getService()));
       securityManager.cancelDelegationToken(token);
+      long end = monotonicNow();
+      if (rpcMonitor != null) {
+        rpcMonitor.getRPCMetrics().succeededDTCancelled(end - start);
+      }
       return Records.newRecord(CancelDelegationTokenResponse.class);
     } catch (IOException e) {
+      if (rpcMonitor != null) {
+        rpcMonitor.getRPCMetrics().incrDTCancelFailure();
+      }
       throw RPCUtil.getRemoteException(e);
     }
   }
@@ -440,6 +508,7 @@ public class RouterClientRMService extends AbstractService
   public FailApplicationAttemptResponse failApplicationAttempt(
       FailApplicationAttemptRequest request) throws YarnException, IOException {
     RequestInterceptorChainWrapper pipeline = getInterceptorChain();
+    checkInterceptor(pipeline);
     return pipeline.getRootInterceptor().failApplicationAttempt(request);
   }
 
@@ -448,6 +517,7 @@ public class RouterClientRMService extends AbstractService
       UpdateApplicationPriorityRequest request)
       throws YarnException, IOException {
     RequestInterceptorChainWrapper pipeline = getInterceptorChain();
+    checkInterceptor(pipeline);
     return pipeline.getRootInterceptor().updateApplicationPriority(request);
   }
 
@@ -455,6 +525,7 @@ public class RouterClientRMService extends AbstractService
   public SignalContainerResponse signalToContainer(
       SignalContainerRequest request) throws YarnException, IOException {
     RequestInterceptorChainWrapper pipeline = getInterceptorChain();
+    checkInterceptor(pipeline);
     return pipeline.getRootInterceptor().signalToContainer(request);
   }
 
@@ -463,6 +534,7 @@ public class RouterClientRMService extends AbstractService
       UpdateApplicationTimeoutsRequest request)
       throws YarnException, IOException {
     RequestInterceptorChainWrapper pipeline = getInterceptorChain();
+    checkInterceptor(pipeline);
     return pipeline.getRootInterceptor().updateApplicationTimeouts(request);
   }
 
@@ -471,6 +543,7 @@ public class RouterClientRMService extends AbstractService
           IncludeExternalHostsRequest request)
           throws YarnException, IOException {
     RequestInterceptorChainWrapper pipeline = getInterceptorChain();
+    checkInterceptor(pipeline);
     return pipeline.getRootInterceptor().includeExternalHosts(request);
   }
 
@@ -479,6 +552,7 @@ public class RouterClientRMService extends AbstractService
           GetExternalIncludedHostsRequest request)
           throws YarnException, IOException {
     RequestInterceptorChainWrapper pipeline = getInterceptorChain();
+    checkInterceptor(pipeline);
     return pipeline.getRootInterceptor().getExternalIncludedHosts(request);
   }
 
@@ -487,6 +561,7 @@ public class RouterClientRMService extends AbstractService
     GetOrderedHostsRequest request)
     throws YarnException, IOException {
     RequestInterceptorChainWrapper pipeline = getInterceptorChain();
+    checkInterceptor(pipeline);
     return pipeline.getRootInterceptor().getOrderedHosts(request);
   }
 
@@ -523,6 +598,8 @@ public class RouterClientRMService extends AbstractService
 
     ClientRequestInterceptor pipeline = null;
     ClientRequestInterceptor current = null;
+    RouterRPCPerformanceMonitor rpcMonitor = new RouterRPCPerformanceMonitor();
+    rpcMonitor.init();
     for (String interceptorClassName : interceptorClassNames) {
       try {
         Class<?> interceptorClass = conf.getClassByName(interceptorClassName);
@@ -530,6 +607,7 @@ public class RouterClientRMService extends AbstractService
           ClientRequestInterceptor interceptorInstance =
               (ClientRequestInterceptor) ReflectionUtils
                   .newInstance(interceptorClass, conf);
+          interceptorInstance.setRpcMonitor(rpcMonitor);
           if (pipeline == null) {
             pipeline = interceptorInstance;
             current = interceptorInstance;
@@ -556,6 +634,16 @@ public class RouterClientRMService extends AbstractService
           "RequestInterceptor pipeline is not configured in the system");
     }
     return pipeline;
+  }
+
+  /**
+   * Allow access to the client RPC server for testing.
+   *
+   * @return The RPC server.
+   */
+  @VisibleForTesting
+  public Server getServer() {
+    return server;
   }
 
   /**
@@ -596,6 +684,15 @@ public class RouterClientRMService extends AbstractService
     }
   }
 
+  private void checkInterceptor(RequestInterceptorChainWrapper pipeline) throws YarnException {
+    if (pipeline == null || pipeline.getRootInterceptor() == null) {
+      LOG.warn("Interceptor not initialized yet.");
+      throw new YarnException("Client RM not initialized yet.");
+    }
+    pipeline.getRpcMonitor().startOp();
+    pipeline.getRpcMonitor().getRPCMetrics().setCurrentDTCount(securityManager.getCurrentDelegationTokenCount());
+  }
+
   /**
    * Private structure for encapsulating RequestInterceptor and user instances.
    *
@@ -622,6 +719,9 @@ public class RouterClientRMService extends AbstractService
       return rootInterceptor;
     }
 
+    public synchronized RouterRPCPerformanceMonitor getRpcMonitor() {
+      return rootInterceptor.getRpcMonitor();
+    }
     /**
      * Shutdown the chain of interceptors when the object is destroyed.
      */

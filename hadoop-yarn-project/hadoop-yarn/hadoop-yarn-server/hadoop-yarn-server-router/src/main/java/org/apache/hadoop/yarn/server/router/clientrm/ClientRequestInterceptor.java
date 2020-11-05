@@ -20,6 +20,7 @@ package org.apache.hadoop.yarn.server.router.clientrm;
 
 import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.yarn.api.ApplicationClientProtocol;
+import org.apache.hadoop.yarn.server.router.metrics.RouterRPCPerformanceMonitor;
 
 /**
  * Defines the contract to be implemented by the request intercepter classes,
@@ -62,4 +63,7 @@ public interface ClientRequestInterceptor
    */
   ClientRequestInterceptor getNextInterceptor();
 
+  void setRpcMonitor(RouterRPCPerformanceMonitor monitor);
+
+  RouterRPCPerformanceMonitor getRpcMonitor();
 }

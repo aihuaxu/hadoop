@@ -85,6 +85,7 @@ import org.apache.hadoop.yarn.api.protocolrecords.UpdateApplicationPriorityRespo
 import org.apache.hadoop.yarn.api.protocolrecords.UpdateApplicationTimeoutsRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.UpdateApplicationTimeoutsResponse;
 import org.apache.hadoop.yarn.exceptions.YarnException;
+import org.apache.hadoop.yarn.server.router.metrics.RouterRPCPerformanceMonitor;
 
 /**
  * Mock intercepter that does not do anything other than forwarding it to the
@@ -290,5 +291,15 @@ public class PassThroughClientRequestInterceptor
     GetOrderedHostsRequest request)
     throws YarnException, IOException {
     return getNextInterceptor().getOrderedHosts(request);
+  }
+
+  @Override
+  public void setRpcMonitor(RouterRPCPerformanceMonitor monitor) {
+
+  }
+
+  @Override
+  public RouterRPCPerformanceMonitor getRpcMonitor() {
+    return null;
   }
 }

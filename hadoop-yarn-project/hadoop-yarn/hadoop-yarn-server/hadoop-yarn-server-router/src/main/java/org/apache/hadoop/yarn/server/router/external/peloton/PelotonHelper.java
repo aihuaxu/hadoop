@@ -21,6 +21,7 @@ import org.apache.hadoop.yarn.server.router.clientrm.RouterClientRMService;
 import org.apache.hadoop.yarn.server.router.external.peloton.protocol.GetPelotonZKInfoListByClusterRequest;
 import org.apache.hadoop.yarn.server.router.external.peloton.protocol.GetPelotonZKInfoListByClusterResponse;
 import org.apache.hadoop.yarn.server.router.external.peloton.records.PelotonZKInfo;
+import org.apache.hadoop.yarn.server.router.metrics.YoPMetrics;
 import org.apache.hadoop.yarn.server.router.store.RouterStateStoreService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,6 +42,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import static org.apache.hadoop.util.Time.monotonicNow;
+
 /**
  * This class provides functions to call Peloton APIs for get hosts, create jobs, etc
  */
@@ -55,6 +58,7 @@ public class PelotonHelper {
   private static String CLIENT_NAME = "Yarn Router";
   private List<PelotonClientWrapper> pelotonClientWrapperList;
   private Configuration conf;
+  private YoPMetrics metrics;
 
   //username and password for Peloton gRPC connection
   private String yarnUser = "";
@@ -66,6 +70,7 @@ public class PelotonHelper {
   public PelotonHelper(RouterStateStoreService routerStateStore, RouterClientRMService clientRMService){
     this.routerStateStore = routerStateStore;
     this.clientRMService = clientRMService;
+    this.metrics = YoPMetrics.getMetrics();
   }
 
   protected void getOrderedHosts() {
@@ -73,14 +78,17 @@ public class PelotonHelper {
       LOG.warn("not initialized.");
       return;
     }
+    long getHostOrderStartTime = monotonicNow();
     GetOrderedHostsRequest request = GetOrderedHostsRequest.newInstance();
     List<String> orderedList = null;
     try {
       //TODO: getOrderedHosts needs to be improved to get ordered hosts from each Peloton cluster separately
       GetOrderedHostsResponse response = clientRMService.getOrderedHosts(request);
       orderedList = response.getOrderedHosts();
+      metrics.setSucceedGetOrderedHostsFromRM(monotonicNow() - getHostOrderStartTime);
     } catch (Exception e) {
       LOG.error("Error getting OrderedHosts", e);
+      metrics.incrGetOrderedHostsFromRMFailure();
     }
     if (orderedList != null && !orderedList.isEmpty()) {
       for (PelotonClientWrapper clientWrapper : pelotonClientWrapperList) {
@@ -90,17 +98,20 @@ public class PelotonHelper {
           for (HostPoolInfo poolInfo : pools.getPoolsList()) {
             if (poolInfo.getName()
               .equals(PelotonJobSpec.Constants.PELOTON_HOST_POOL_SHARED_TO_YARN)) {
+              long getSetReclaimStart = monotonicNow();
               SetReclaimHostOrderRequest claimerRequest = SetReclaimHostOrderRequest.newBuilder()
                 .setHostpool(poolInfo.getName())
                 .addAllHosts(orderedList).build();
               hostService.setReclaimHostOrder(claimerRequest);
               LOG.info("setReclaimHostOrder call succeeded for Peloton cluster "
                 + clientWrapper.getPelotonZKInfo());
+              metrics.setSucceedReclaimHostOrder(monotonicNow() - getSetReclaimStart);
             }
           }
         } catch(Exception e){
           LOG.error("Failed to setReclaimHostOrder for Peloton cluster "
             + clientWrapper.getPelotonZKInfo(), e);
+          metrics.incrSetReclaimHostFailure();
         }
       }
     }
@@ -116,6 +127,7 @@ public class PelotonHelper {
       yarnPassword = br.readLine().substring("password: ".length());
     } catch (Exception e) {
       LOG.error("Failed to load Yarn credential on Peloton from Langley", e);
+      metrics.incrFetchPelotonCredstFailure();
       return false;
     } finally {
       if (br != null) {
@@ -173,7 +185,7 @@ public class PelotonHelper {
       LOG.warn("not initialized.");
       return;
     }
-
+    long start = monotonicNow();
     // Call Peloton client API to connect its gRPC service,
     // Client API blockingConnect will take care of gRPC&zk timeout or failover.
     // Router can directly call this API without worrying about the connection issues.
@@ -183,6 +195,8 @@ public class PelotonHelper {
       clientWrapper.setResourceManager(clientWrapper.getResourceManagerClient().blockingConnect());
       LOG.info("Connected to Peloton gRPC services successfully: " + clientWrapper.getPelotonZKInfo());
     }
+    long end = monotonicNow();
+    metrics.connectPelotonServices(end - start);
   }
 
   protected ListHostPoolsResponse listHostsPools(HostServiceBlockingStub hostService) {
@@ -352,6 +366,7 @@ public class PelotonHelper {
    */
   public Peloton.JobID queryNMJob(JobServiceBlockingStub jobSvc, String pelotonZK) {
     // TODO: this should be improved to persist and query job using job id
+    long start = monotonicNow();
     StatelessSvc.QueryJobsRequest req =
         StatelessSvc.QueryJobsRequest.newBuilder().
             setSpec(Stateless.QuerySpec.newBuilder().
@@ -365,14 +380,17 @@ public class PelotonHelper {
     if (res.getRecordsCount() == 1) {
       LOG.info("Query result is successful and NM job does exist in Peloton Cluster, job id: {}",
           res.getRecords(0).getJobId().getValue());
+      metrics.queryNMJob(monotonicNow() - start);
       return res.getRecords(0).getJobId();
     } else if (res.getRecordsCount() > 1) {
       LOG.error("Peloton cluster {} has more than one NM job running, please fix this! "
               + "Returning the first NM job {}", pelotonZK,
           res.getRecords(0).getJobId().getValue());
+      metrics.incrQueryJobFailure();
       return res.getRecords(0).getJobId();
     }
     LOG.info("Query result is not-successful and NM job does not exist in Peloton Cluster");
+    metrics.incrQueryJobFailure();
     return null;
   }
 

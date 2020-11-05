@@ -130,6 +130,10 @@ public class RouterSecurityManager {
     dtSecretManager.cancelToken(token, user);
   }
 
+  public int getCurrentDelegationTokenCount() {
+    return dtSecretManager.getCurrentTokensCount();
+  }
+
   private String getRenewerForToken(Token<RouterDelegationTokenIdentifier> token)
       throws IOException {
     UserGroupInformation user = UserGroupInformation.getCurrentUser();

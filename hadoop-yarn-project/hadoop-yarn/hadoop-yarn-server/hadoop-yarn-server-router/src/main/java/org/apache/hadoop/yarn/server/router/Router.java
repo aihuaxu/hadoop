@@ -29,10 +29,13 @@ import org.apache.curator.framework.CuratorFramework;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.ha.HAServiceProtocol;
+import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.metrics2.source.JvmMetrics;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.service.CompositeService;
+import org.apache.hadoop.util.JvmPauseMonitor;
 import org.apache.hadoop.util.ShutdownHookManager;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.curator.ZKCuratorManager;
@@ -102,6 +105,7 @@ public class Router extends CompositeService {
   private RouterServiceState routerServiceState = RouterServiceState.UNINITIALIZED;
   @VisibleForTesting
   protected String webAppAddress;
+  private JvmMetrics jvmMetrics;
 
   /** Leader election. */
   private boolean routerHAEnabled = false;
@@ -162,16 +166,19 @@ public class Router extends CompositeService {
         YarnConfiguration.ROUTER_BIND_HOST,
         WebAppUtils.getRouterWebAppURLWithoutScheme(this.conf));
 
-    // Metrics
-    DefaultMetricsSystem.initialize(METRICS_NAME);
-
     // Create admin server
     adminServer = createAdminServer();
     addService(adminServer);
     // add to routerHAContext for leader election
     routerHAContext.setRouterAdminServer(adminServer);
+
     // Metrics
-    DefaultMetricsSystem.initialize(METRICS_NAME);
+    MetricsSystem ms = DefaultMetricsSystem.initialize(METRICS_NAME);
+    jvmMetrics = JvmMetrics.initSingleton("Router", null);
+
+    JvmPauseMonitor pauseMonitor = new JvmPauseMonitor();
+    addService(pauseMonitor);
+    jvmMetrics.setPauseMonitor(pauseMonitor);
 
     // Router heartbeat service to periodically update the router status asynchronously in state store
     if (conf.getBoolean(

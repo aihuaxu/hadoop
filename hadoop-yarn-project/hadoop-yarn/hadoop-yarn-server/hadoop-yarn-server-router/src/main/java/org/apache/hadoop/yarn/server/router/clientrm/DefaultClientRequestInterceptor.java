@@ -87,11 +87,18 @@ import org.apache.hadoop.yarn.api.protocolrecords.UpdateApplicationPriorityReque
 import org.apache.hadoop.yarn.api.protocolrecords.UpdateApplicationPriorityResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.UpdateApplicationTimeoutsRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.UpdateApplicationTimeoutsResponse;
+import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.client.ClientRMProxy;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.yarn.server.router.RouterServerUtil;
+import org.apache.hadoop.yarn.server.router.metrics.RouterRPCPerformanceMonitor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import static org.apache.hadoop.util.Time.monotonicNow;
 
 /**
  * Extends the {@code AbstractRequestInterceptorClient} class and provides an
@@ -102,6 +109,10 @@ import com.google.common.annotations.VisibleForTesting;
 public class DefaultClientRequestInterceptor
     extends AbstractClientRequestInterceptor {
   private ApplicationClientProtocol clientRMProxy;
+  private RouterRPCPerformanceMonitor monitor;
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(DefaultClientRequestInterceptor.class);
 
   @Override
   public void init(String userName) {
@@ -132,21 +143,102 @@ public class DefaultClientRequestInterceptor
   }
 
   @Override
+  public void setRpcMonitor(RouterRPCPerformanceMonitor monitor) {
+    this.monitor = monitor;
+  }
+
+  @Override
+  public RouterRPCPerformanceMonitor getRpcMonitor() {
+    return monitor;
+  }
+
+  @Override
   public GetNewApplicationResponse getNewApplication(
       GetNewApplicationRequest request) throws YarnException, IOException {
-    return clientRMProxy.getNewApplication(request);
+    long startTime = monotonicNow();
+    monitor.proxyOp();
+    GetNewApplicationResponse response = null;
+    try {
+      response = clientRMProxy.getNewApplication(request);
+    } catch (Exception e) {
+      LOG.warn("Unable to create a new ApplicationId", e);
+    }
+
+    if (response != null) {
+      long stopTime = monotonicNow();
+      monitor.getRPCMetrics().succeededAppsCreated(stopTime - startTime);
+      return response;
+    }
+
+    monitor.getRPCMetrics().incrAppsFailedCreated();
+    String errMsg = "Fail to create a new application.";
+    LOG.error(errMsg);
+    throw new YarnException(errMsg);
   }
 
   @Override
   public SubmitApplicationResponse submitApplication(
       SubmitApplicationRequest request) throws YarnException, IOException {
-    return clientRMProxy.submitApplication(request);
+    long startTime = monotonicNow();
+    monitor.proxyOp();
+    ApplicationId applicationId =
+        request.getApplicationSubmissionContext().getApplicationId();
+    SubmitApplicationResponse response = null;
+    try {
+      response = clientRMProxy.submitApplication(request);
+    } catch (Exception e) {
+      LOG.warn("Unable to submit the application " + applicationId, e);
+      monitor.proxyOpFailed();
+    }
+
+    if (response != null) {
+      LOG.info("Application "
+          + request.getApplicationSubmissionContext().getApplicationName()
+          + " with appId " + applicationId);
+      long stopTime = monotonicNow();
+      monitor.getRPCMetrics().succeededAppsSubmitted(stopTime - startTime);
+      monitor.proxyOpComplete();
+      return response;
+    }
+
+    monitor.getRPCMetrics().incrAppsFailedSubmitted();
+    String errMsg = "Application "
+      + request.getApplicationSubmissionContext().getApplicationName()
+      + " with appId " + applicationId + " failed to be submitted.";
+    LOG.error(errMsg);
+    throw new YarnException(errMsg);
   }
 
   @Override
   public KillApplicationResponse forceKillApplication(
       KillApplicationRequest request) throws YarnException, IOException {
-    return clientRMProxy.forceKillApplication(request);
+
+    long startTime = monotonicNow();
+
+    if (request == null || request.getApplicationId() == null) {
+      monitor.getRPCMetrics().incrAppsFailedKilled();
+      RouterServerUtil.logAndThrowException(
+          "Missing forceKillApplication request or ApplicationId.", null);
+    }
+    ApplicationId applicationId = request.getApplicationId();
+
+    KillApplicationResponse response = null;
+    try {
+      LOG.info("forceKillApplication " + applicationId);
+      response = clientRMProxy.forceKillApplication(request);
+    } catch (Exception e) {
+      monitor.getRPCMetrics().incrAppsFailedKilled();
+      LOG.error("Unable to kill the application report for "
+          + request.getApplicationId(), e);
+      throw e;
+    }
+    if (response == null) {
+      LOG.error("No response when attempting to kill the application "
+          + applicationId);
+    }
+    long stopTime = monotonicNow();
+    monitor.getRPCMetrics().succeededAppsKilled(stopTime - startTime);
+    return response;
   }
 
   @Override
@@ -231,13 +323,55 @@ public class DefaultClientRequestInterceptor
   @Override
   public GetApplicationReportResponse getApplicationReport(
       GetApplicationReportRequest request) throws YarnException, IOException {
-    return clientRMProxy.getApplicationReport(request);
+    long startTime = monotonicNow();
+    monitor.proxyOp();
+    if (request == null || request.getApplicationId() == null) {
+      monitor.getRPCMetrics().incrAppsFailedRetrieved();
+      monitor.proxyOpFailed();
+      RouterServerUtil.logAndThrowException(
+          "Missing getApplicationReport request or applicationId information.",
+          null);
+    }
+
+    GetApplicationReportResponse response = null;
+    try {
+      response = clientRMProxy.getApplicationReport(request);
+    } catch (Exception e) {
+      monitor.getRPCMetrics().incrAppsFailedRetrieved();
+      monitor.proxyOpFailed();
+      LOG.error("Unable to get the application report for "
+          + request.getApplicationId(), e);
+      throw e;
+    }
+    long stopTime = monotonicNow();
+    monitor.getRPCMetrics().succeededAppsRetrieved(stopTime - startTime);
+    monitor.proxyOpComplete();
+    if (response == null) {
+      LOG.error("No response when attempting to retrieve the report of "
+          + "the application " + request.getApplicationId());
+    }
+    return response;
   }
 
   @Override
   public GetApplicationsResponse getApplications(GetApplicationsRequest request)
       throws YarnException, IOException {
-    return clientRMProxy.getApplications(request);
+    long startTime = monotonicNow();
+    monitor.proxyOp();
+    GetApplicationsResponse response = null;
+    try {
+      response = clientRMProxy.getApplications(request);
+    } catch (Exception e) {
+      String errorMsg = "Unable to get applications ";
+      LOG.warn(errorMsg, e);
+      monitor.getRPCMetrics().incrMultipleAppsFailedRetrieved();
+      monitor.proxyOpFailed();
+      throw new YarnException(errorMsg);
+    }
+    long stopTime = monotonicNow();
+    monitor.getRPCMetrics().succeededMultipleAppsRetrieved(stopTime - startTime);
+    monitor.proxyOpComplete();
+    return response;
   }
 
   @Override

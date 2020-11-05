@@ -2,6 +2,7 @@ package org.apache.hadoop.store;
 
 import org.apache.hadoop.store.driver.StateStoreDriver;
 import org.apache.hadoop.store.exception.StateStoreUnavailableException;
+import org.apache.hadoop.store.metrics.StateStoreMetrics;
 import org.apache.hadoop.store.record.BaseRecord;
 import org.apache.hadoop.store.record.QueryResult;
 import org.apache.hadoop.util.Time;
@@ -123,6 +124,13 @@ public abstract class CachedRecordStore<R extends BaseRecord>
         this.initialized = true;
       } finally {
         writeLock.unlock();
+      }
+
+      // Update the metrics for the cache State Store size
+      StateStoreMetrics metrics = getDriver().getMetrics();
+      if (metrics != null) {
+        String recordName = getRecordClass().getSimpleName();
+        metrics.setCacheSize(recordName, this.records.size());
       }
 
       lastUpdate = Time.monotonicNow();
