@@ -373,6 +373,13 @@ public class RouterWebHdfsMethods extends NamenodeWebHdfsMethods {
             excludeDatanodes, fsAction, snapshotName, oldSnapshotName,
             tokenKind, tokenService, noredirectParam, startAfter);
       }
+      case GETRESOLVEPATH:
+      {
+        RouterRpcServer server = getRouter().getRpcServer();
+        List<org.apache.hadoop.fs.Path> resolvedPaths = server.getRemoteLocation(fullpath);
+        final String js = resolvedPaths.get(0).toString();
+        return Response.ok(js).type(MediaType.TEXT_PLAIN).build();
+      }
       default:
         throw new UnsupportedOperationException(op + " is not supported");
       }
