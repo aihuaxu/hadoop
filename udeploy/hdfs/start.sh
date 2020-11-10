@@ -89,12 +89,7 @@ function start_zkfc() {
 
 # start balancer process.
 function start_balancer() {
-  if [ -z "${HADOOP_BALANCER_USER}" ]; then
-    echo "ERROR: env BALANCER_USER is empty."
-    exit 1
-  fi
-  # Run balancer with default threshold of 7.
-  exec sudo -u "${HADOOP_BALANCER_USER}" /bin/bash -c "source "${HADOOP_ENV}"; exec "${HDFS_CMD}" balancer -threshold 7 -asService" 2>&1
+  source "${HADOOP_ENV}"; exec "${HDFS_CMD}" balancer -threshold "${BALANCER_THRESHOLD:-3}" 2>&1
 }
 
 # setup system files/dirs.
