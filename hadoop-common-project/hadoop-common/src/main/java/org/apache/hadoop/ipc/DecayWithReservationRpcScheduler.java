@@ -100,14 +100,14 @@ public class DecayWithReservationRpcScheduler extends DecayRpcScheduler {
   }
 
   @Override
-  public void addResponseTime(String name, int priorityLevel, int queueTime,
-      int processingTime) {
-    if (isReservedLevel(priorityLevel)) {
+  public void addResponseTime(String callName, Schedulable schedulable,
+      ProcessingDetails details) {
+    if (isReservedLevel(schedulable.getPriorityLevel())) {
       // Now we don't process response time for reserved users as we don't enable
       // backoff for reserved users yet.
       // TODO (T1165853): we may revisit this later on.
     } else {
-      super.addResponseTime(name, priorityLevel, queueTime, processingTime);
+      super.addResponseTime(callName, schedulable, details);
     }
   }
 
