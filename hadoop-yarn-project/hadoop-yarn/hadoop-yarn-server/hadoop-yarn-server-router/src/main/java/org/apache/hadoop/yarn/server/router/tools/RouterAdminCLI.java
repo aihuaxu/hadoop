@@ -9,15 +9,20 @@ import org.apache.hadoop.util.ToolRunner;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.server.router.RouterAdminClient;
 import org.apache.hadoop.yarn.server.router.RouterConfigKeys;
+import org.apache.hadoop.yarn.server.router.external.peloton.PelotonNodeLabelManager;
 import org.apache.hadoop.yarn.server.router.external.peloton.PelotonZKConfManager;
 import org.apache.hadoop.yarn.server.router.external.peloton.protocol.ClearAllPelotonZKConfsRequest;
 import org.apache.hadoop.yarn.server.router.external.peloton.protocol.ClearAllPelotonZKConfsResponse;
+import org.apache.hadoop.yarn.server.router.external.peloton.protocol.GetPelotonNodeLabelRequest;
+import org.apache.hadoop.yarn.server.router.external.peloton.protocol.GetPelotonNodeLabelResponse;
 import org.apache.hadoop.yarn.server.router.external.peloton.protocol.GetPelotonZKInfoListByClusterRequest;
 import org.apache.hadoop.yarn.server.router.external.peloton.protocol.GetPelotonZKInfoListByClusterResponse;
 import org.apache.hadoop.yarn.server.router.external.peloton.protocol.RemovePelotonZKConfByClusterRequest;
 import org.apache.hadoop.yarn.server.router.external.peloton.protocol.RemovePelotonZKConfByClusterResponse;
 import org.apache.hadoop.yarn.server.router.external.peloton.protocol.RemovePelotonZKInfoFromClusterRequest;
 import org.apache.hadoop.yarn.server.router.external.peloton.protocol.RemovePelotonZKInfoFromClusterResponse;
+import org.apache.hadoop.yarn.server.router.external.peloton.protocol.SavePelotonNodeLabelRequest;
+import org.apache.hadoop.yarn.server.router.external.peloton.protocol.SavePelotonNodeLabelResponse;
 import org.apache.hadoop.yarn.server.router.external.peloton.protocol.SavePelotonZKConfRequest;
 import org.apache.hadoop.yarn.server.router.external.peloton.protocol.SavePelotonZKConfResponse;
 import org.apache.hadoop.yarn.server.router.external.peloton.protocol.SavePelotonZKInfoToClusterRequest;
@@ -60,6 +65,10 @@ public class RouterAdminCLI extends Configured implements Tool {
   public void printUsage() {
     String usage = "Router Admin Tools:\n"
         + "\t Router operation \n"
+        + "\t PelotonZK Usage: yarn routeradmin -pelotonNodeLabel\n"
+        + "\t[-set <node_label>]\n"
+        + "\t[-get]\n"
+        + "\t[-remove]\n"
         + "\t PelotonZK Usage: yarn routeradmin -pelotonZK\n"
         + "\t[-batchCreateJson \"{cluster: <cluster_name>, zkList: [{zone: <zone>, region: <region>, zk: <zk_address>, resPool: <resource_pool_path>}]}\"\n"
         + "\t[-batchUpdateJson \"{cluster: <cluster_name>, zkList: [{zone: <zone>, region: <region>, zk: <zk_address>, resPool: <resource_pool_path>}]}\"\n"
@@ -85,22 +94,29 @@ public class RouterAdminCLI extends Configured implements Tool {
     int i = 0;
     String cmd = argv[i++];
 
-    if ("-pelotonZK".equalsIgnoreCase(cmd)) {
+    if ("-pelotonZK".equalsIgnoreCase(cmd) || "-pelotonNodeLabel".equalsIgnoreCase(cmd)) {
       if (argv.length < 2) {
         System.err.println("Not enough parameters specificed for cmd " + cmd);
         printUsage();
         return exitCode;
       }
     }
+    boolean isPelotonZK = false;
+    boolean isPelotonNodeLabel = false;
+    if ("-pelotonZK".equalsIgnoreCase(cmd)) {
+      isPelotonZK = true;
+    } else if ("-pelotonNodeLabel".equalsIgnoreCase(cmd)) {
+      isPelotonNodeLabel = true;
+    }
     cmd = argv[i++];
-    if ("-batchCreateJson".equalsIgnoreCase(cmd)
+    if (isPelotonZK && ("-batchCreateJson".equalsIgnoreCase(cmd)
         || "-batchUpdateZKConf".equalsIgnoreCase(cmd)
         || "-batchUpdateJson".equalsIgnoreCase(cmd)
         || "-remove".equalsIgnoreCase(cmd)
         || "-addZK".equalsIgnoreCase(cmd)
         || "-updateZK".equalsIgnoreCase(cmd)
         || "-rmZK".equalsIgnoreCase(cmd)
-        || "-listZK".equalsIgnoreCase(cmd)) {
+        || "-listZK".equalsIgnoreCase(cmd))) {
       if (argv.length < 3) {
         System.err.println("Not enough parameters specificed for cmd " + cmd);
         printUsage();
@@ -127,40 +143,62 @@ public class RouterAdminCLI extends Configured implements Tool {
     Exception debugException = null;
     exitCode = 0;
     try {
-      if ("-batchCreateJson".equalsIgnoreCase(cmd)) {
-        if (batchCreatePelotonZKConf(argv, i, true)) {
-          System.out.println("Successfuly create Peloton ZKConf " + argv[i]);
+      if (isPelotonZK) {
+        if ("-batchCreateJson".equalsIgnoreCase(cmd)) {
+          if (batchCreatePelotonZKConf(argv, i, true)) {
+            System.out.println("Successfuly create Peloton ZKConf " + argv[i]);
+          }
+        } else if ("-batchUpdateJson".equalsIgnoreCase(cmd)) {
+          if (batchCreatePelotonZKConf(argv, i, false)) {
+            System.out.println("Successfuly update Peloton ZKConf " + argv[i]);
+          }
+        } else if ("-remove".equalsIgnoreCase(cmd)) {
+          if (removeZKConfByCluster(argv, i)) {
+            System.out.println("Successfuly remove Peloton ZKConf " + argv[i]);
+          }
+        } else if ("-addZK".equalsIgnoreCase(cmd)) {
+          if (saveZKInfoToCluster(argv, i, true)) {
+            System.out.println("Successfuly add Peloton zk info " + argv[i]);
+          }
+        } else if ("-updateZK".equalsIgnoreCase(cmd)) {
+          if (saveZKInfoToCluster(argv, i, false)) {
+            System.out.println("Successfuly update Peloton zk info " + argv[i]);
+          }
+        } else if ("-rmZK".equalsIgnoreCase(cmd)) {
+          if (removeZKInfoFromCluster(argv, i)) {
+            System.out.println("Successfuly remove Peloton zkInfo" + argv[i]);
+          }
+        } else if ("-listZK".equalsIgnoreCase(cmd)) {
+          getZKInfoList(argv, i);
+        } else if ("-clearAll".equalsIgnoreCase(cmd)) {
+          clearAll();
+        } else if ("-list".equalsIgnoreCase(cmd)) {
+          getPelotonZKConfList();
+        } else {
+          printUsage();
+          return exitCode;
         }
-      } else if ("-batchUpdateJson".equalsIgnoreCase(cmd)) {
-        if (batchCreatePelotonZKConf(argv, i, false)) {
-          System.out.println("Successfuly update Peloton ZKConf " + argv[i]);
+      } else if (isPelotonNodeLabel) {
+        if ("-get".equalsIgnoreCase(cmd)) {
+          getPelotonNodeLabel();
+        } else if ("-set".equalsIgnoreCase(cmd)) {
+          if (savePelotonNodeLabel(argv, i)) {
+            System.out.println("Successfuly save Peloton node label" + argv[i]);
+          } else {
+            System.out.println("Failed to save peloton node label");
+          }
+        } else if ("-remove".equalsIgnoreCase(cmd)) {
+          if (removePelotonNodeLabel()) {
+            System.out.println("Successfuly remove Peloton node label");
+          } else {
+            System.out.println("Failed to remove peloton node label");
+          }
+        } else {
+          printUsage();
+          return exitCode;
         }
-      } else if ("-remove".equalsIgnoreCase(cmd)) {
-        if (removeZKConfByCluster(argv, i)) {
-          System.out.println("Successfuly remove Peloton ZKConf " + argv[i]);
-        }
-      } else if ("-addZK".equalsIgnoreCase(cmd)) {
-        if (saveZKInfoToCluster(argv, i, true)) {
-          System.out.println("Successfuly add Peloton zk info " + argv[i]);
-        }
-      } else if ("-updateZK".equalsIgnoreCase(cmd)) {
-        if (saveZKInfoToCluster(argv, i, false)) {
-          System.out.println("Successfuly update Peloton zk info " + argv[i]);
-        }
-      } else if ("-rmZK".equalsIgnoreCase(cmd)) {
-        if (removeZKInfoFromCluster(argv, i)) {
-          System.out.println("Successfuly remove Peloton zkInfo" + argv[i]);
-        }
-      } else if ("-listZK".equalsIgnoreCase(cmd)) {
-        getZKInfoList(argv, i);
-      } else if ("-clearAll".equalsIgnoreCase(cmd)) {
-        clearAll();
-      } else if ("-list".equalsIgnoreCase(cmd)) {
-        getPelotonZKConfList();
-      } else {
-        printUsage();
-        return exitCode;
       }
+
     } catch (IllegalArgumentException arge) {
       debugException = arge;
       exitCode = -1;
@@ -386,6 +424,41 @@ public class RouterAdminCLI extends Configured implements Tool {
             zkInfo.getZKAddress(), zkInfo.getZone(), zkInfo.getRegion()));
       }
     }
+  }
+
+  public void getPelotonNodeLabel() throws IOException {
+    PelotonNodeLabelManager pelotonNodeLabelManager = client.getPelotonNodeLabelManager();
+    GetPelotonNodeLabelResponse response = pelotonNodeLabelManager.getPelotonNodeLabel(
+        GetPelotonNodeLabelRequest.newInstance()
+    );
+    if (response == null) {
+      System.out.println("Peloton hosts node label is DEFAULT");
+      return;
+    }
+    String result =  response.getPelotonNodeLabel();
+    System.out.println("Node label for Peloton hosts is not defined. These hosts will be added in DEFAULT.");
+    System.out.println(result);
+  }
+
+  public boolean savePelotonNodeLabel(String[] params, int i) throws IOException {
+    String label = params[i++];
+    if (label == null) {
+      System.err.println("label cannot be null");
+      return false;
+    }
+    PelotonNodeLabelManager pelotonNodeLabelManager = client.getPelotonNodeLabelManager();
+    SavePelotonNodeLabelResponse response = pelotonNodeLabelManager.savePelotonNodeLabel(
+        SavePelotonNodeLabelRequest.newInstance(label)
+    );
+    return response.getStatus();
+  }
+
+  public boolean removePelotonNodeLabel() throws IOException {
+    PelotonNodeLabelManager pelotonNodeLabelManager = client.getPelotonNodeLabelManager();
+    SavePelotonNodeLabelResponse response = pelotonNodeLabelManager.savePelotonNodeLabel(
+        SavePelotonNodeLabelRequest.newInstance("")
+    );
+    return response.getStatus();
   }
 }
 

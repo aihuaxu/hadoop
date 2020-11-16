@@ -39,4 +39,8 @@ service RouterAdministrationProtocolService {
     rpc getPelotonZKConfListByCluster(GetPelotonZKInfoListByClusterRequestProto) returns (GetPelotonZKInfoListByClusterResponseProto);
 
     rpc clearAllPelotonZKConfs(ClearAllPelotonZKConfsRequestProto) returns (ClearAllPelotonZKConfsResponseProto);
+
+    rpc getPelotonNodeLabel(GetPelotonNodeLabelRequestProto) returns (GetPelotonNodeLabelResponseProto);
+
+    rpc savePelotonNodeLabel(SavePelotonNodeLabelRequestProto) returns (SavePelotonNodeLabelResponseProto);
 }

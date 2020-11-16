@@ -12,16 +12,22 @@ import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.service.AbstractService;
 import org.apache.hadoop.yarn.proto.RouterAdministrationProtocol;
+import org.apache.hadoop.yarn.server.router.external.peloton.PelotonNodeLabelManager;
+import org.apache.hadoop.yarn.server.router.external.peloton.PelotonNodeLabelRecordStore;
 import org.apache.hadoop.yarn.server.router.external.peloton.PelotonZKConfManager;
 import org.apache.hadoop.yarn.server.router.external.peloton.PelotonZKConfRecordStore;
 import org.apache.hadoop.yarn.server.router.external.peloton.protocol.ClearAllPelotonZKConfsRequest;
 import org.apache.hadoop.yarn.server.router.external.peloton.protocol.ClearAllPelotonZKConfsResponse;
+import org.apache.hadoop.yarn.server.router.external.peloton.protocol.GetPelotonNodeLabelRequest;
+import org.apache.hadoop.yarn.server.router.external.peloton.protocol.GetPelotonNodeLabelResponse;
 import org.apache.hadoop.yarn.server.router.external.peloton.protocol.GetPelotonZKInfoListByClusterRequest;
 import org.apache.hadoop.yarn.server.router.external.peloton.protocol.GetPelotonZKInfoListByClusterResponse;
 import org.apache.hadoop.yarn.server.router.external.peloton.protocol.RemovePelotonZKConfByClusterRequest;
 import org.apache.hadoop.yarn.server.router.external.peloton.protocol.RemovePelotonZKConfByClusterResponse;
 import org.apache.hadoop.yarn.server.router.external.peloton.protocol.RemovePelotonZKInfoFromClusterRequest;
 import org.apache.hadoop.yarn.server.router.external.peloton.protocol.RemovePelotonZKInfoFromClusterResponse;
+import org.apache.hadoop.yarn.server.router.external.peloton.protocol.SavePelotonNodeLabelRequest;
+import org.apache.hadoop.yarn.server.router.external.peloton.protocol.SavePelotonNodeLabelResponse;
 import org.apache.hadoop.yarn.server.router.external.peloton.protocol.SavePelotonZKConfRequest;
 import org.apache.hadoop.yarn.server.router.external.peloton.protocol.SavePelotonZKConfResponse;
 import org.apache.hadoop.yarn.server.router.external.peloton.protocol.SavePelotonZKInfoToClusterRequest;
@@ -41,7 +47,7 @@ import java.net.InetSocketAddress;
  * This class is responsible for handling all of the Admin calls to the YARN
  * router. It is created, started, and stopped by {@link Router}.
  */
-public class RouterAdminServer extends AbstractService implements HAServiceProtocol, PelotonZKConfManager {
+public class RouterAdminServer extends AbstractService implements HAServiceProtocol, PelotonZKConfManager, PelotonNodeLabelManager {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(RouterAdminServer.class);
@@ -51,6 +57,7 @@ public class RouterAdminServer extends AbstractService implements HAServiceProto
   private final Router router;
 
   private PelotonZKConfRecordStore pelotonZKConfRecordStore;
+  private PelotonNodeLabelRecordStore pelotonNodeLabelRecordStore;
 
   /** The Admin server that listens to requests from clients. */
   private RPC.Server adminServer;
@@ -178,6 +185,27 @@ public class RouterAdminServer extends AbstractService implements HAServiceProto
   public RemovePelotonZKInfoFromClusterResponse removePelotonZKInfoFromCluster(
       RemovePelotonZKInfoFromClusterRequest request) throws IOException {
     return getPelotonZKConfRecordStore().removePelotonZKInfoFromCluster(request);
+  }
+
+  @Override
+  public GetPelotonNodeLabelResponse getPelotonNodeLabel(GetPelotonNodeLabelRequest request) throws IOException {
+    return getPelotonNodeLabelRecordStore().getPelotonNodeLabel(request);
+  }
+
+  @Override
+  public SavePelotonNodeLabelResponse savePelotonNodeLabel(SavePelotonNodeLabelRequest request) throws IOException {
+    return getPelotonNodeLabelRecordStore().savePelotonNodeLabel(request);
+  }
+
+  private PelotonNodeLabelRecordStore getPelotonNodeLabelRecordStore() throws IOException {
+    if (this.pelotonNodeLabelRecordStore == null) {
+      this.pelotonNodeLabelRecordStore = router.getStateStoreService().getRegisteredRecordStore(
+          PelotonNodeLabelRecordStore.class);
+      if (this.pelotonNodeLabelRecordStore == null) {
+        throw new IOException("pelotonNodeLabelRecordStore is not available.");
+      }
+    }
+    return this.pelotonNodeLabelRecordStore;
   }
 
   private PelotonZKConfRecordStore getPelotonZKConfRecordStore() throws IOException {

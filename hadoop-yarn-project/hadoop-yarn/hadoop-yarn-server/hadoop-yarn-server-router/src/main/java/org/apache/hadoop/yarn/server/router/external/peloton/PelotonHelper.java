@@ -16,13 +16,20 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.api.protocolrecords.GetOrderedHostsRequest;
 import org.apache.hadoop.yarn.api.protocolrecords.GetOrderedHostsResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.IncludeExternalHostsRequest;
+import org.apache.hadoop.yarn.api.records.NodeId;
+import org.apache.hadoop.yarn.api.records.NodeLabel;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
+import org.apache.hadoop.yarn.server.api.ResourceManagerAdministrationProtocol;
+import org.apache.hadoop.yarn.server.api.protocolrecords.ReplaceLabelsOnNodeRequest;
 import org.apache.hadoop.yarn.server.router.clientrm.RouterClientRMService;
+import org.apache.hadoop.yarn.server.router.external.peloton.protocol.GetPelotonNodeLabelRequest;
+import org.apache.hadoop.yarn.server.router.external.peloton.protocol.GetPelotonNodeLabelResponse;
 import org.apache.hadoop.yarn.server.router.external.peloton.protocol.GetPelotonZKInfoListByClusterRequest;
 import org.apache.hadoop.yarn.server.router.external.peloton.protocol.GetPelotonZKInfoListByClusterResponse;
 import org.apache.hadoop.yarn.server.router.external.peloton.records.PelotonZKInfo;
 import org.apache.hadoop.yarn.server.router.metrics.YoPMetrics;
 import org.apache.hadoop.yarn.server.router.store.RouterStateStoreService;
+import org.apache.hadoop.yarn.util.ConverterUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import peloton.api.v0.host.Host.HostInfo;
@@ -38,8 +45,10 @@ import peloton.api.v1alpha.job.stateless.Stateless.UpdateSpec;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static org.apache.hadoop.util.Time.monotonicNow;
@@ -54,7 +63,9 @@ public class PelotonHelper {
 
   private RouterStateStoreService routerStateStore;
   private PelotonZKConfRecordStore pelotonZKConfRecordStore;
+  private PelotonNodeLabelRecordStore pelotonNodeLabelRecordStore;
   private RouterClientRMService clientRMService;
+  private ResourceManagerAdministrationProtocol rmAdminProxy;
   private static String CLIENT_NAME = "Yarn Router";
   private List<PelotonClientWrapper> pelotonClientWrapperList;
   private Configuration conf;
@@ -67,9 +78,11 @@ public class PelotonHelper {
   private Peloton.JobID pelotonJobId;
   private boolean isInitialized = false;
 
-  public PelotonHelper(RouterStateStoreService routerStateStore, RouterClientRMService clientRMService){
+  public PelotonHelper(RouterStateStoreService routerStateStore, RouterClientRMService clientRMService,
+      ResourceManagerAdministrationProtocol rmAdminProxy){
     this.routerStateStore = routerStateStore;
     this.clientRMService = clientRMService;
+    this.rmAdminProxy = rmAdminProxy;
     this.metrics = YoPMetrics.getMetrics();
   }
 
@@ -247,19 +260,40 @@ public class PelotonHelper {
         int instanceNumber = 0;
         QueryHostsResponse queryHostsResponse = queryActiveHostsInSharedPool(clientWrapper.getHostService());
         Set<String> hostSetToInclude = new HashSet<>();
+        Map<NodeId, Set<String>> nodeLabels = new HashMap<>();
+        Set<String> targetLabelSet = new HashSet<>();
+        GetPelotonNodeLabelResponse getPelotonNodeLabelResponse = getPelotonNodeLabelRecordStore().getPelotonNodeLabel(
+            GetPelotonNodeLabelRequest.newInstance()
+        );
+        if (getPelotonNodeLabelResponse == null
+            || getPelotonNodeLabelResponse.getPelotonNodeLabel() == null
+            || getPelotonNodeLabelResponse.getPelotonNodeLabel().isEmpty()) {
+          targetLabelSet.add(YarnConfiguration.DEFAULT_PELOTON_NODE_LABEL_NAME);
+          LOG.info("Node label for Peloton hosts is not defined. These hosts will be added in "
+              + NodeLabel.DEFAULT_NODE_LABEL_PARTITION);
+        } else {
+          String nodeLabel = getPelotonNodeLabelResponse.getPelotonNodeLabel();
+          targetLabelSet.add(nodeLabel);
+          LOG.info("Peloton hosts node label is " + nodeLabel);
+        }
         if (queryHostsResponse.getHostInfosList() != null) {
           instanceNumber = queryHostsResponse.getHostInfosCount();
           for (HostInfo hostInfo : queryHostsResponse.getHostInfosList()) {
+            String hostName = hostInfo.getHostname();
+            NodeId nodeId = ConverterUtils.toNodeIdWithDefaultPort(hostName);
             hostSetToInclude.add(hostInfo.getHostname());
+            nodeLabels.put(nodeId, targetLabelSet);
           }
           LOG.debug("Peloton {} pool has {} active hosts for YARN: {}",
             PelotonJobSpec.Constants.PELOTON_HOST_POOL_SHARED_TO_YARN, instanceNumber, hostSetToInclude);
           try {
             IncludeExternalHostsRequest request = IncludeExternalHostsRequest.newInstance(hostSetToInclude);
             clientRMService.includeExternalHosts(request);
-            LOG.info("includeExternalHosts request succeed.");
+            ReplaceLabelsOnNodeRequest replaceLabelRequest = ReplaceLabelsOnNodeRequest.newInstance(nodeLabels);
+            rmAdminProxy.replaceLabelsOnNode(replaceLabelRequest);
+            LOG.info("includeExternalHosts and replace node label request succeed.");
           } catch (Exception e) {
-            LOG.error("Failed to include hosts");
+            LOG.error("Failed to include hosts or replace the node label");
           }
           createNMJob(
             instanceNumber,
@@ -429,6 +463,17 @@ public class PelotonHelper {
       }
     }
     return this.pelotonZKConfRecordStore;
+  }
+
+  private PelotonNodeLabelRecordStore getPelotonNodeLabelRecordStore() throws IOException {
+    if (this.pelotonNodeLabelRecordStore == null) {
+      this.pelotonNodeLabelRecordStore = routerStateStore.getRegisteredRecordStore(
+          PelotonNodeLabelRecordStore.class);
+      if (this.pelotonNodeLabelRecordStore == null) {
+        throw new IOException("PelotonNodeLabelRecordStore is not available.");
+      }
+    }
+    return this.pelotonNodeLabelRecordStore;
   }
 
   public Configuration getConf() {

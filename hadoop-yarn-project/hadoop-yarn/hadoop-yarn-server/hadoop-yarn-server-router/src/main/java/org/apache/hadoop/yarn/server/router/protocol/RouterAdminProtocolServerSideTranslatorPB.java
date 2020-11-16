@@ -6,6 +6,8 @@ import org.apache.hadoop.yarn.proto.YarnServerRouterProtos;
 import org.apache.hadoop.yarn.server.router.RouterAdminServer;
 import org.apache.hadoop.yarn.server.router.external.peloton.protocol.ClearAllPelotonZKConfsRequest;
 import org.apache.hadoop.yarn.server.router.external.peloton.protocol.ClearAllPelotonZKConfsResponse;
+import org.apache.hadoop.yarn.server.router.external.peloton.protocol.GetPelotonNodeLabelRequest;
+import org.apache.hadoop.yarn.server.router.external.peloton.protocol.GetPelotonNodeLabelResponse;
 import org.apache.hadoop.yarn.server.router.external.peloton.protocol.GetPelotonZKConfListRequest;
 import org.apache.hadoop.yarn.server.router.external.peloton.protocol.GetPelotonZKConfListResponse;
 import org.apache.hadoop.yarn.server.router.external.peloton.protocol.GetPelotonZKInfoListByClusterRequest;
@@ -14,12 +16,16 @@ import org.apache.hadoop.yarn.server.router.external.peloton.protocol.RemovePelo
 import org.apache.hadoop.yarn.server.router.external.peloton.protocol.RemovePelotonZKConfByClusterResponse;
 import org.apache.hadoop.yarn.server.router.external.peloton.protocol.RemovePelotonZKInfoFromClusterRequest;
 import org.apache.hadoop.yarn.server.router.external.peloton.protocol.RemovePelotonZKInfoFromClusterResponse;
+import org.apache.hadoop.yarn.server.router.external.peloton.protocol.SavePelotonNodeLabelRequest;
+import org.apache.hadoop.yarn.server.router.external.peloton.protocol.SavePelotonNodeLabelResponse;
 import org.apache.hadoop.yarn.server.router.external.peloton.protocol.SavePelotonZKConfRequest;
 import org.apache.hadoop.yarn.server.router.external.peloton.protocol.SavePelotonZKConfResponse;
 import org.apache.hadoop.yarn.server.router.external.peloton.protocol.SavePelotonZKInfoToClusterRequest;
 import org.apache.hadoop.yarn.server.router.external.peloton.protocol.SavePelotonZKInfoToClusterResponse;
 import org.apache.hadoop.yarn.server.router.external.peloton.protocol.impl.pb.ClearAllPelotonZKConfsRequestPBImpl;
 import org.apache.hadoop.yarn.server.router.external.peloton.protocol.impl.pb.ClearAllPelotonZKConfsResponsePBImpl;
+import org.apache.hadoop.yarn.server.router.external.peloton.protocol.impl.pb.GetPelotonNodeLabelRequestPBImpl;
+import org.apache.hadoop.yarn.server.router.external.peloton.protocol.impl.pb.GetPelotonNodeLabelResponsePBImpl;
 import org.apache.hadoop.yarn.server.router.external.peloton.protocol.impl.pb.GetPelotonZKConfListRequestPBImpl;
 import org.apache.hadoop.yarn.server.router.external.peloton.protocol.impl.pb.GetPelotonZKConfListResponsePBImpl;
 import org.apache.hadoop.yarn.server.router.external.peloton.protocol.impl.pb.GetPelotonZKInfoListByClusterRequestPBImpl;
@@ -28,6 +34,8 @@ import org.apache.hadoop.yarn.server.router.external.peloton.protocol.impl.pb.Re
 import org.apache.hadoop.yarn.server.router.external.peloton.protocol.impl.pb.RemovePelotonZKConfByClusterResponsePBImpl;
 import org.apache.hadoop.yarn.server.router.external.peloton.protocol.impl.pb.RemovePelotonZKInfoFromClusterRequestPBImpl;
 import org.apache.hadoop.yarn.server.router.external.peloton.protocol.impl.pb.RemovePelotonZKInfoFromClusterResponsePBImpl;
+import org.apache.hadoop.yarn.server.router.external.peloton.protocol.impl.pb.SavePelotonNodeLabelRequestPBImpl;
+import org.apache.hadoop.yarn.server.router.external.peloton.protocol.impl.pb.SavePelotonNodeLabelResponsePBImpl;
 import org.apache.hadoop.yarn.server.router.external.peloton.protocol.impl.pb.SavePelotonZKConfRequestPBImpl;
 import org.apache.hadoop.yarn.server.router.external.peloton.protocol.impl.pb.SavePelotonZKConfResponsePBImpl;
 import org.apache.hadoop.yarn.server.router.external.peloton.protocol.impl.pb.SavePelotonZKInfoToClusterRequestPBImpl;
@@ -131,6 +139,30 @@ public class RouterAdminProtocolServerSideTranslatorPB implements RouterAdminPro
       return responsePB.getProto();
     } catch (IOException e) {
       throw new ServiceException("failed clearAllPelotonZKConfs", e);
+    }
+  }
+
+  @Override
+  public YarnServerRouterProtos.GetPelotonNodeLabelResponseProto getPelotonNodeLabel(RpcController controller, YarnServerRouterProtos.GetPelotonNodeLabelRequestProto request) throws ServiceException {
+    try {
+      GetPelotonNodeLabelRequest req = new GetPelotonNodeLabelRequestPBImpl(request);
+      GetPelotonNodeLabelResponse response = server.getPelotonNodeLabel(req);
+      GetPelotonNodeLabelResponsePBImpl responsePB = (GetPelotonNodeLabelResponsePBImpl) response;
+      return responsePB.getProto();
+    } catch (IOException e) {
+      throw new ServiceException("failed getPelotonNodeLabel", e);
+    }
+  }
+
+  @Override
+  public YarnServerRouterProtos.SavePelotonNodeLabelResponseProto savePelotonNodeLabel(RpcController controller, YarnServerRouterProtos.SavePelotonNodeLabelRequestProto request) throws ServiceException {
+    try {
+      SavePelotonNodeLabelRequest req = new SavePelotonNodeLabelRequestPBImpl(request);
+      SavePelotonNodeLabelResponse response = server.savePelotonNodeLabel(req);
+      SavePelotonNodeLabelResponsePBImpl responsePB = (SavePelotonNodeLabelResponsePBImpl) response;
+      return responsePB.getProto();
+    } catch (IOException e) {
+      throw new ServiceException("failed savePelotonNodeLabel", e);
     }
   }
 }

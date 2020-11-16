@@ -63,6 +63,12 @@ message PelotonZKInfoProto {
     optional uint64 dateModified = 6;
 }
 
+message PelotonNodeLabelProto {
+    optional string nodeLabel = 1;
+    optional uint64 dateCreated = 2;
+    optional uint64 dateModified = 3;
+}
+
 message GetPelotonZKConfListRequestProto {
 }
 
@@ -122,6 +128,22 @@ message ClearAllPelotonZKConfsRequestProto {
 }
 
 message ClearAllPelotonZKConfsResponseProto {
+    optional bool status = 1;
+    optional string errorMsg = 2;
+}
+
+message GetPelotonNodeLabelRequestProto {
+}
+
+message GetPelotonNodeLabelResponseProto {
+    optional string label = 1;
+}
+
+message SavePelotonNodeLabelRequestProto {
+    optional string label = 1;
+}
+
+message SavePelotonNodeLabelResponseProto {
     optional bool status = 1;
     optional string errorMsg = 2;
 }

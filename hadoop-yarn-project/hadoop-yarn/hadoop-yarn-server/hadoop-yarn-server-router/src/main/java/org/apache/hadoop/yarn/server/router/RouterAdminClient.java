@@ -6,6 +6,7 @@ import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.yarn.server.router.external.peloton.PelotonNodeLabelManager;
 import org.apache.hadoop.yarn.server.router.external.peloton.PelotonZKConfManager;
 import org.apache.hadoop.yarn.server.router.protocol.RouterAdminProtocolPB;
 import org.apache.hadoop.yarn.server.router.protocol.RouterAdminProtocolTranslatorPB;
@@ -50,6 +51,10 @@ public class RouterAdminClient implements Closeable {
   }
 
   public PelotonZKConfManager getPelotonZKConfManager() {
+    return proxy;
+  }
+
+  public PelotonNodeLabelManager getPelotonNodeLabelManager() {
     return proxy;
   }
 

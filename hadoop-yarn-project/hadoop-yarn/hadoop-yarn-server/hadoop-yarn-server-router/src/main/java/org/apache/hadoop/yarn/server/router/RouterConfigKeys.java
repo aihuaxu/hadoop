@@ -69,6 +69,10 @@ public class RouterConfigKeys extends CommonConfigurationKeysPublic {
         ROUTER_STORE_PREFIX + "peloton.zkconf.enabled";
     public static final boolean ROUTER_PELOTON_ZK_STORE_ENABLED_DEFAULT = true;
 
+    public static final String ROUTER_PELOTON_NODE_LABEL_STORE_ENABLED =
+        ROUTER_STORE_PREFIX + "peloton.nodelabel.enabled";
+    public static final boolean ROUTER_PELOTON_NODE_LABEL_STORE_ENABLED_DEFAULT = true;
+
     // YARN Router admin
     public static final String ROUTER_ADMIN_HANDLER_COUNT_KEY =
         ROUTER_PREFIX + "admin.handler.count";

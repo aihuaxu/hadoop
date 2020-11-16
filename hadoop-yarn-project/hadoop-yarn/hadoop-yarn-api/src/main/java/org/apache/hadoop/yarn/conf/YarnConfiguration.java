@@ -3008,6 +3008,9 @@ public class YarnConfiguration extends Configuration {
   public static final String PELOTON_DOCKER_IMAGE_TAG = NM_PREFIX + "peloton.image.tag";
   public static final String PELOTON_CLUSTER_ID = NM_PREFIX + "peloton.cluster-id";
 
+  public static final String PELOTON_NODE_LABEL_NAME = NM_PREFIX + "peloton.nodelabel.name";
+  public static final String DEFAULT_PELOTON_NODE_LABEL_NAME = "";
+
   /**
    * Router HA configuration
    */
