@@ -571,6 +571,7 @@ public class AppLogAggregatorImpl implements AppLogAggregator {
       LOG.info("Uploading logs for container " + containerId
           + ". Current good log dirs are "
           + StringUtils.join(",", dirsHandler.getLogDirsForRead()));
+      long startTime = System.currentTimeMillis();
       final LogKey logKey = new LogKey(containerId);
       final LogValue logValue =
           new LogValue(dirsHandler.getLogDirsForRead(), containerId,
@@ -597,11 +598,13 @@ public class AppLogAggregatorImpl implements AppLogAggregator {
           });
 
       this.uploadedFileMeta = Sets.newHashSet(mask);
+      long logUploadTime = System.currentTimeMillis() - startTime;
+      LOG.info("Container " + containerId
+        + " log aggregation is completed in " + logUploadTime + "ms");
 
       // need to return files uploaded or older-than-retention clean up.
       return Sets.union(logValue.getCurrentUpLoadedFilesPath(),
           logValue.getObseleteRetentionLogFiles());
-
     }
   }
 

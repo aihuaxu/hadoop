@@ -1712,6 +1712,13 @@ public class RMAppImpl implements RMApp, Recoverable {
   public void aggregateLogReport(NodeId nodeId, LogAggregationReport report) {
     try {
       this.writeLock.lock();
+      if (this.logAggregationEnabled &&
+        (report.getLogAggregationStatus() == LogAggregationStatus.SUCCEEDED
+          || report.getLogAggregationStatus() == LogAggregationStatus.FAILED)) {
+        LOG.info(String.format("App %s on node %s log aggregration %s in %d ms",
+          this.applicationId, nodeId, report.getLogAggregationStatus(),
+          System.currentTimeMillis() - this.logAggregationStartTime));
+      }
       if (this.logAggregationEnabled && !isLogAggregationFinished()) {
         LogAggregationReport curReport = this.logAggregationStatus.get(nodeId);
         boolean stateChangedToFinal = false;
