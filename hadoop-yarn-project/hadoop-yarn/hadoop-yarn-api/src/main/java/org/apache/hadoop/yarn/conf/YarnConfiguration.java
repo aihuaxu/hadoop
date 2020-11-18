@@ -3024,6 +3024,9 @@ public class YarnConfiguration extends Configuration {
   public static final String ROUTER_DEFAULT_AUTO_FAILOVER_ZK_BASE_PATH =
       "/router-leader-election";
 
+  public static final String PELOTON_SERVICE_ENABLED = ROUTER_PREFIX + "peloton.enabled";
+  public static final boolean PELOTON_SERVICE_ENABLED_DEFAULT = false;
+
   /**
    * The number of retries for GetNewApplication and SubmitApplication in
    * {@code FederationClientInterceptor}.

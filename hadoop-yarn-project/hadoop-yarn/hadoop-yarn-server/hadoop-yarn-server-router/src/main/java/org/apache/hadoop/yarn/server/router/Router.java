@@ -505,9 +505,12 @@ public class Router extends CompositeService {
 
     @Override
     protected void serviceInit(Configuration configuration) throws Exception {
-      yopService = createYoPService(clientRMService);
-      yopService.init(conf);
-      addService(yopService);
+      if (conf.getBoolean(YarnConfiguration.PELOTON_SERVICE_ENABLED, YarnConfiguration.PELOTON_SERVICE_ENABLED_DEFAULT)) {
+        LOG.info("Peloton service enabled.");
+        yopService = createYoPService(clientRMService);
+        yopService.init(conf);
+        addService(yopService);
+      }
     }
   }
 }
