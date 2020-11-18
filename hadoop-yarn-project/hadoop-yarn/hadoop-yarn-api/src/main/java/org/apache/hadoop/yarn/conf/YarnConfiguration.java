@@ -2957,8 +2957,6 @@ public class YarnConfiguration extends Configuration {
 
   public static final String ROUTER_PREFIX = YARN_PREFIX + "router.";
 
-  public static final String ROUTER_MIGRATION_STORE_ENABLED = ROUTER_PREFIX + "migration.store.enabled";
-
   public static final String ROUTER_KEYTAB_FILE_KEY = ROUTER_PREFIX + "keytab.file";
 
   public static final String ROUTER_KERBEROS_PRINCIPAL_KEY = ROUTER_PREFIX + "kerberos.principal";
@@ -3004,11 +3002,11 @@ public class YarnConfiguration extends Configuration {
       "org.apache.hadoop.yarn.server.router.rmadmin."
           + "DefaultRMAdminRequestInterceptor";
 
-  public static final String PELOTON_DOCKER_IMAGE_NAME = NM_PREFIX + "peloton.image.name";
-  public static final String PELOTON_DOCKER_IMAGE_TAG = NM_PREFIX + "peloton.image.tag";
-  public static final String PELOTON_CLUSTER_ID = NM_PREFIX + "peloton.cluster-id";
+  public static final String PELOTON_DOCKER_IMAGE_NAME = ROUTER_PREFIX + "peloton.image.name";
+  public static final String PELOTON_DOCKER_IMAGE_TAG = ROUTER_PREFIX + "peloton.image.tag";
+  public static final String PELOTON_CLUSTER_ID = ROUTER_PREFIX + "peloton.cluster-id";
 
-  public static final String PELOTON_NODE_LABEL_NAME = NM_PREFIX + "peloton.nodelabel.name";
+  public static final String PELOTON_NODE_LABEL_NAME = ROUTER_PREFIX + "peloton.nodelabel.name";
   public static final String DEFAULT_PELOTON_NODE_LABEL_NAME = "";
 
   /**
