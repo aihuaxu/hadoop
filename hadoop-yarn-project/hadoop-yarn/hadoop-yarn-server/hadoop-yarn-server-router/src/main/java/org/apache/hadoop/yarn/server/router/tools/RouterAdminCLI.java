@@ -432,11 +432,11 @@ public class RouterAdminCLI extends Configured implements Tool {
         GetPelotonNodeLabelRequest.newInstance()
     );
     if (response == null) {
-      System.out.println("Peloton hosts node label is DEFAULT");
+      System.out.println("Node label for Peloton hosts is not defined. These hosts will be added in DEFAULT.");
       return;
     }
     String result =  response.getPelotonNodeLabel();
-    System.out.println("Node label for Peloton hosts is not defined. These hosts will be added in DEFAULT.");
+    System.out.println("Node label for Peloton hosts is: ");
     System.out.println(result);
   }
 
