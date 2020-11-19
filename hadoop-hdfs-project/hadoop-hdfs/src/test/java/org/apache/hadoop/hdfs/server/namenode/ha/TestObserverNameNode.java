@@ -26,9 +26,7 @@ import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.ha.ServiceFailedException;
-import org.apache.hadoop.hdfs.DFSConfigKeys;
-import org.apache.hadoop.hdfs.DistributedFileSystem;
-import org.apache.hadoop.hdfs.MiniDFSCluster;
+import org.apache.hadoop.hdfs.*;
 import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
@@ -38,11 +36,14 @@ import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.qjournal.MiniQJMHACluster;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockManager;
+import org.apache.hadoop.hdfs.server.namenode.FSDirectory;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.hdfs.server.namenode.NameNodeAdapter;
 import org.apache.hadoop.io.retry.FailoverProxyProvider;
 import org.apache.hadoop.io.retry.RetryInvocationHandler;
 import org.apache.hadoop.ipc.RetriableException;
+import org.apache.hadoop.security.AccessControlException;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Ignore;
@@ -56,6 +57,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.lang.reflect.Proxy;
 import java.net.URI;
+import java.security.PrivilegedAction;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -157,6 +159,7 @@ public class TestObserverNameNode {
     setObserverRead(true);
 
     dfs.createNewFile(testPath);
+
     try {
       dfs.open(testPath);
       assertSentTo(0);
@@ -187,6 +190,49 @@ public class TestObserverNameNode {
       // Continue
     }
     assertSentTo(0);
+  }
+
+  @Test
+  public void testPermissionDenied() throws Exception {
+    setObserverRead(true);
+
+    // Test read retries on active namenode when permission denies
+    dfs.createNewFile(testPath);
+    dfs.setPermission(testPath, FsPermission.valueOf("r---------"));
+    rollEditLogAndTail(0);
+
+    // Simulate read by a regular user other than superuser
+    UserGroupInformation FAKE_UGI_A =
+            UserGroupInformation.createUserForTesting(
+                    "myuser", new String[]{"group1"});
+
+    String msg = FAKE_UGI_A.doAs(new PrivilegedAction<String>() {
+      public String run() {
+        try {
+          DFSClient client = new DFSClient(DFSUtilClient.getNNAddress(conf), conf);
+          client.open(testPath.toString());
+          fail("Should throw AccessControlException");
+        } catch (AccessControlException e) {
+          // Expect to have this exception
+          return e.getMessage();
+        } catch (IOException e) {
+          fail("Should not through IOException");
+        }
+        return null;
+      }
+    });
+
+    assertTrue(msg.contains("Permission denied"));
+    assertSentTo(0);
+
+    // Test read normally from Observer
+    try {
+      dfs.getFileStatus(testPath);
+    } catch (AccessControlException e) {
+      fail("Should not throw AccessControlException");
+    }
+
+    assertSentTo(2);
   }
 
   @Test
