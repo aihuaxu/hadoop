@@ -1435,22 +1435,29 @@ public class TestDistributedFileSystem {
 
     try {
       cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
-      DistributedFileSystem fs = cluster.getFileSystem();
-      fs.create(new Path("/testpath"));
 
-      // Mock RouterClient as router server is not available.
-      RouterClient rc = Mockito.mock(RouterClient.class);
-      fs.rc = rc;
-      Path routerPath = new Path("hdfs://ns-router-0/testpath");
-      Mockito.when(rc.getRemoteLocation("/testpath")).thenReturn(new Path("hdfs://ns1/testpath"));
+      // The default uri shouldn't in the enabled list, resolvePath shouldn't route to remote NN or router
+      Path nonResolvePath = new Path("/testpath");
+      DistributedFileSystem defaultClientFs = cluster.getFileSystem();
+      assertFalse(defaultClientFs.getResolvePath());
+      defaultClientFs.create(nonResolvePath);
+      Path resolvedPath = defaultClientFs.resolvePath(nonResolvePath);
+      assertEquals(new Path(cluster.getURI() + "/testpath"), resolvedPath);
 
-      Path resolvedPath = fs.resolvePath(routerPath);
+      // Create a new Distributed FileSystem client with cluster.uri().authority() in the resolvePath enabled list.
+      conf.set(HdfsClientConfigKeys.DFS_NAMENODE_RESOLVE_PATH_ENABLED_NAMESERVICES, "ns-toBeResolved1, ns-toBeResolved2, " + cluster.getURI().getAuthority());
+      DistributedFileSystem updatedClientFs = new DistributedFileSystem();
+      updatedClientFs.initialize(cluster.getURI(), conf);
+      assertTrue(updatedClientFs.getResolvePath());
+
+      // Mock a remote server to resolve path.
+      DFSClient mockDFSClient = Mockito.mock(DFSClient.class);
+      updatedClientFs.dfs = mockDFSClient;
+      Mockito.when(mockDFSClient.getRemoteLocation("/testpath")).thenReturn(new Path("hdfs://ns1/testpath"));
+
+      Path toBeResolvedPath = new Path(cluster.getURI() + "/testpath");
+      resolvedPath = updatedClientFs.resolvePath(toBeResolvedPath);
       assertEquals(new Path("hdfs://ns1/testpath"), resolvedPath);
-
-      Path regularPath = new Path("/testpath");
-      resolvedPath = fs.resolvePath(regularPath);
-
-      assertEquals(new Path(fs.getUri() + "/testpath"), resolvedPath);
     } finally {
       if (cluster != null) {
         cluster.shutdown();

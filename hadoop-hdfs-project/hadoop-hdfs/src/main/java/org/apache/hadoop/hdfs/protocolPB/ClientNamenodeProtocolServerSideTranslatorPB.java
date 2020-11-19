@@ -128,6 +128,8 @@ import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetPre
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetPreferredBlockSizeResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetQuotaUsageRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetQuotaUsageResponseProto;
+import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetRemoteLocationRequestProto;
+import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetRemoteLocationResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetServerDefaultsRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetServerDefaultsResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetSnapshotDiffReportRequestProto;
@@ -1597,6 +1599,27 @@ public class ClientNamenodeProtocolServerSideTranslatorPB implements
       BlackListUserResponseProto.Builder builder = BlackListUserResponseProto
           .newBuilder();
       builder.addAllUser(users);
+      return builder.build();
+    } catch (IOException e) {
+      throw new ServiceException(e);
+    }
+  }
+
+  /**
+   * This function is intended for router, Namenode RPC server doesn't have mplementation and should return exception.
+   *
+   * @param controller
+   * @param req
+   * @return
+   * @throws ServiceException
+   */
+  @Override
+  public GetRemoteLocationResponseProto getRemoteLocation(RpcController controller,
+                                                          GetRemoteLocationRequestProto req) throws ServiceException {
+    try {
+      List<String> resolvedPathStrs = PBHelperClient.convertResolvedPaths(server.getRemoteLocation(req.getSrcPath()));
+      GetRemoteLocationResponseProto.Builder builder = GetRemoteLocationResponseProto.newBuilder();
+      builder.addAllResolvedPaths(resolvedPathStrs);
       return builder.build();
     } catch (IOException e) {
       throw new ServiceException(e);

@@ -30,6 +30,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.crypto.CryptoProtocolVersion;
+import org.apache.hadoop.fs.*;
 import org.apache.hadoop.fs.BatchedRemoteIterator.BatchedEntries;
 import org.apache.hadoop.fs.BatchedRemoteIterator.BatchedListEntries;
 import org.apache.hadoop.fs.CacheFlag;
@@ -121,6 +122,8 @@ import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetLis
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetListingResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetPreferredBlockSizeRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetQuotaUsageRequestProto;
+import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetRemoteLocationRequestProto;
+import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetRemoteLocationResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetServerDefaultsRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetSnapshotDiffReportRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.GetSnapshotDiffReportResponseProto;
@@ -1623,4 +1626,25 @@ public class ClientNamenodeProtocolTranslatorPB implements
     }
   }
 
+  /**
+   * getRemoteLocation sends request in proto format and extract parsed path from proto response.
+   *
+   * @param src the router path to be resolved
+   * @return the resolved path
+   * @throws IOException exception happens during the rpc call
+   */
+  @Override
+  public List<Path> getRemoteLocation(String src) throws IOException {
+    GetRemoteLocationRequestProto req = GetRemoteLocationRequestProto
+            .newBuilder()
+            .setSrcPath(src)
+            .build();
+    try {
+      GetRemoteLocationResponseProto resp = rpcProxy.getRemoteLocation(null, req);
+      if (resp.getResolvedPathsCount() == 0) throw new RuntimeException("No result path found");
+      return PBHelperClient.convertResolvedPathStrs(resp.getResolvedPathsList());
+    } catch (ServiceException e) {
+      throw ProtobufHelper.getRemoteException(e);
+    }
+  }
 }
