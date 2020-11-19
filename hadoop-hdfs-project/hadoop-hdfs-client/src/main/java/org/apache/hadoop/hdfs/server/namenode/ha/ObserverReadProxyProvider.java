@@ -43,6 +43,7 @@ import org.apache.hadoop.ipc.Client;
 import org.apache.hadoop.ipc.RemoteException;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.security.AccessControlException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -188,13 +189,20 @@ public class ObserverReadProxyProvider<T> extends ConfiguredFailoverProxyProvide
     return new ProxyInfo<>(wrappedProxy, combinedInfo.toString());
   }
 
-  // Check if the exception 'ex' wraps a FileNotFoundException.
-  private boolean isFNFException(Exception ex) {
+  // Check if the exception 'ex' wraps a FileNotFoundException or AccessControlException
+  // with which, retrying the same action on active NameNode.
+  private boolean isRetryActiveException(Exception ex, Class<? extends Exception>... exceptionTypes) {
     Throwable e = ex.getCause();
     if (e instanceof RemoteException) {
       RemoteException re = (RemoteException) e;
-      return re.unwrapRemoteException() instanceof FileNotFoundException;
+
+      for (Class<? extends Exception> exceptionType : exceptionTypes) {
+        if (re.unwrapRemoteException().getClass() == exceptionType) {
+          return true;
+        }
+      }
     }
+
     return false;
   }
 
@@ -253,7 +261,7 @@ public class ObserverReadProxyProvider<T> extends ConfiguredFailoverProxyProvide
     public Object invoke(Object proxy, final Method method, final Object[] args)
         throws Throwable {
       lastProxy = null;
-      boolean isFNFError = false;
+      boolean retryActiveOnException = false; // retry active namenode on certain exceptions
       Object retVal;
 
       if (useObserver(method)) {
@@ -274,7 +282,7 @@ public class ObserverReadProxyProvider<T> extends ConfiguredFailoverProxyProvide
             // Check if return value is null (meaning FNF for getListing &
             // getFileInfo). If so, we break from the loop and try active.
             if (retVal == null && isGetListingOrFileInfo(method)) {
-              isFNFError = true;
+              retryActiveOnException = true;
               break;
             }
             return retVal;
@@ -282,10 +290,13 @@ public class ObserverReadProxyProvider<T> extends ConfiguredFailoverProxyProvide
             if (!(ite.getCause() instanceof Exception)) {
               throw ite.getCause();
             }
-            // If received remote FNF exception from server side (e.g., open),
+            // If received remote FNF exception from server side (e.g., open)
+            // or permission denied issue,
             // also break from the loop and try active.
-            if (isFNFException(ite)) {
-              isFNFError = true;
+            if (isRetryActiveException(ite,
+                    FileNotFoundException.class,
+                    AccessControlException.class)) {
+              retryActiveOnException = true;
               break;
             }
 
@@ -308,7 +319,7 @@ public class ObserverReadProxyProvider<T> extends ConfiguredFailoverProxyProvide
       // If we get here, it means all observer NNs have failed, or that it is a
       // write request. At this point we'll try to fail over to the active NN.
       try {
-        if (!isFNFError && useObserver(method)) {
+        if (!retryActiveOnException && useObserver(method)) {
           LOG.warn("All observers have failed for read request {}. Fall back "
               + "to active at: {}", method.getName(), activeProxy);
         }
