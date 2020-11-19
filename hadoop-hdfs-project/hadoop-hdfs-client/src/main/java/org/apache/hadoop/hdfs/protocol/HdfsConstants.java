@@ -116,9 +116,6 @@ public class HdfsConstants {
    */
   public static final long LEASE_HARDLIMIT_PERIOD = 60 * LEASE_SOFTLIMIT_PERIOD;
 
-  // ROUTER_AUTHORITY_KEYWORD is used to check if an authority is router.
-  public static final String ROUTER_AUTHORITY_KEYWORD = "ns-router";
-
   // SafeMode actions
   public enum SafeModeAction {
     SAFEMODE_LEAVE, SAFEMODE_ENTER, SAFEMODE_GET, SAFEMODE_FORCE_EXIT

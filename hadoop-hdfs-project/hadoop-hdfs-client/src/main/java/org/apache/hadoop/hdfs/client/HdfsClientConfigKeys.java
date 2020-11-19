@@ -194,6 +194,9 @@ public interface HdfsClientConfigKeys {
       "dfs.data.transfer.client.tcpnodelay";
   boolean DFS_DATA_TRANSFER_CLIENT_TCPNODELAY_DEFAULT = true;
 
+  String DFS_NAMENODE_RESOLVE_PATH_ENABLED_NAMESERVICES = "dfs.namenode.resolve-path.enabled.nameservices";
+  String DFS_NAMENODE_RESOLVE_PATH_ENABLED_NAMESERVICES_DEFAULT = "ns-router";
+
   /**
    * These are deprecated config keys to client code.
    */

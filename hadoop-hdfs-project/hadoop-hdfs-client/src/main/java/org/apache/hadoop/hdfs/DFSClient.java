@@ -2966,4 +2966,15 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
     checkOpen();
     return namenode.blackListUser(action, user);
   }
+
+  /**
+   * getRemoteLocation wraps implementation from ClientRouterProtocol.
+   *
+   * @param src the router path to be resolved
+   * @return a resolved path. Return the first in resolved path list if multiple available
+   * @throws IOException exception during remove RPC call
+   */
+  public Path getRemoteLocation(String src) throws IOException{
+    return namenode.getRemoteLocation(src).get(0);
+  }
 }

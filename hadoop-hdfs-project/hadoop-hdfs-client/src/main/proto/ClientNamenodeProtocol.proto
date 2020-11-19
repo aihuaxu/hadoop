@@ -774,6 +774,14 @@ message ListOpenFilesResponseProto {
   required bool hasMore = 2;
 }
 
+message GetRemoteLocationRequestProto {
+  optional string srcPath = 1;
+}
+
+message GetRemoteLocationResponseProto {
+  repeated string resolvedPaths = 1;
+}
+
 service ClientNamenodeProtocol {
   rpc getBlockLocations(GetBlockLocationsRequestProto)
       returns(GetBlockLocationsResponseProto);
@@ -930,4 +938,6 @@ service ClientNamenodeProtocol {
       returns(ListOpenFilesResponseProto);
   rpc blackListUser(BlackListUserRequestProto)
       returns(BlackListUserResponseProto);
+  rpc getRemoteLocation(GetRemoteLocationRequestProto)
+      returns(GetRemoteLocationResponseProto);
 }

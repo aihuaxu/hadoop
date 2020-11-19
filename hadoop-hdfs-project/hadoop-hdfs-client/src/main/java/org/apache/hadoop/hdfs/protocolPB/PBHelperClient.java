@@ -118,7 +118,6 @@ import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.OpenFi
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.RollingUpgradeActionProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.RollingUpgradeInfoProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.SafeModeActionProto;
-import org.apache.hadoop.hdfs.protocol.proto.ClientRouterProtocolProtos.RemoteLocationProto;
 import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.ShortCircuitShmIdProto;
 import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.ShortCircuitShmSlotProto;
 import org.apache.hadoop.hdfs.protocol.proto.EncryptionZonesProtos.EncryptionZoneProto;
@@ -2539,17 +2538,26 @@ public class PBHelperClient {
   }
 
   /**
-   * Convert a list of protobuf to a List of Path.
+   * Convert a list of string to a list of Path objects.
    */
-  public static List<Path> convertRemoteLocationProto(
-          List<RemoteLocationProto> remoteLocationProtoList) {
+  public static List<Path> convertResolvedPathStrs(
+          List<String> resolvedPathStrs) {
     List<Path> pathList = new ArrayList<>();
-    for (RemoteLocationProto remoteLocationProto : remoteLocationProtoList) {
-      String fullQualifiedPath = HDFS_URI_SCHEME + "://" +
-              remoteLocationProto.getNameserviceId() + "/" +
-              remoteLocationProto.getPath();
-      pathList.add(new Path(fullQualifiedPath));
+    for (String resolvedPathStr : resolvedPathStrs) {
+      pathList.add(new Path(resolvedPathStr));
     }
     return pathList;
+  }
+
+  /**
+   * Convert a list of Path objects to a list of strings.
+   */
+  public static List<String> convertResolvedPaths(
+          List<Path> resolvedPaths) {
+    List<String> strList = new ArrayList<>();
+    for (Path resolvedPath : resolvedPaths) {
+      strList.add(resolvedPath.toString());
+    }
+    return strList;
   }
 }
