@@ -1421,13 +1421,21 @@ public class ZKRMStateStore extends RMStateStore {
   @Override
   public synchronized List<String> getExternalIncludedNodes() throws Exception {
     List<String> nodes = zkManager.getChildren(externalNodesIncludePath);
-    return nodes;
+    if (nodes == null) {
+      return new ArrayList<>();
+    } else {
+      return nodes;
+    }
   }
 
   @Override
   public synchronized List<String> getExternalExcludedNodes() throws Exception {
     List<String> nodes = zkManager.getChildren(externalNodesExcludePath);
-    return nodes;
+    if (nodes == null) {
+      return new ArrayList<>();
+    } else {
+      return nodes;
+    }
   }
 
   @VisibleForTesting
