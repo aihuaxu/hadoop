@@ -1,0 +1,9 @@
+schema:
+  version: 1
+---
+owner:
+  name: Data Infra - Hadoop Ecosystem
+  managerEmail: jeffreyz@uber.com
+reviewers:
+  groups:
+    - hadoop_admin
