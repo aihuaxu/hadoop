@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
+import java.security.PrivilegedExceptionAction;
 import java.security.SecureRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -92,6 +93,7 @@ public class Router extends CompositeService {
   private static final Logger LOG = LoggerFactory.getLogger(Router.class);
   private static CompositeServiceShutdownHook routerShutdownHook;
   private Configuration conf;
+  private UserGroupInformation routerLoginUGI;
   private AtomicBoolean isStopping = new AtomicBoolean(false);
   private RouterClientRMService clientRMProxyService;
   private RouterRMAdminService rmAdminProxyService;
@@ -136,7 +138,14 @@ public class Router extends CompositeService {
     // since the JIRA is not fully merged into upstream, we copy the patch here
     UserGroupInformation.setConfiguration(conf);
     SecurityUtil.login(conf, ROUTER_KEYTAB_FILE_KEY,
-    ROUTER_KERBEROS_PRINCIPAL_KEY);
+    ROUTER_KERBEROS_PRINCIPAL_KEY, getHostName(conf));
+
+    // if security is enable, set routerLoginUGI as UGI of loginUser
+    // getLoginUser function will call spawnAutoRenewalThreadForUserCreds which
+    // handles the auto renew token.
+    if (UserGroupInformation.isSecurityEnabled()) {
+      this.routerLoginUGI = UserGroupInformation.getLoginUser();
+    }
   }
 
   @Override
@@ -147,6 +156,11 @@ public class Router extends CompositeService {
     updateRouterState(RouterServiceState.INITIALIZING);
     String hostName = getHostName(conf);
     setRouterId(hostName + ":" + DEFAULT_ROUTER_CLIENTRM_PORT);
+    try {
+      doSecureLogin();
+    } catch (IOException e) {
+      throw new YarnRuntimeException("Failed Router login", e);
+    }
     // RouterStateStore Service
     if (conf.getBoolean(
         ROUTER_STORE_ENABLE,
@@ -202,11 +216,6 @@ public class Router extends CompositeService {
 
   @Override
   protected void serviceStart() throws Exception {
-    try {
-      doSecureLogin();
-    } catch (IOException e) {
-      throw new YarnRuntimeException("Failed Router login", e);
-    }
     startWepApp();
     super.serviceStart();
     // Router is running now
@@ -431,7 +440,18 @@ public class Router extends CompositeService {
       return;
     }
     LOG.info("Transitioning to active state");
-    startActiveServices();
+    this.routerLoginUGI.doAs(new PrivilegedExceptionAction<Void>() {
+      @Override
+      public Void run() throws Exception {
+        try {
+          startActiveServices();
+          return null;
+        } catch (Exception e) {
+          createAndInitActiveServices(conf, clientRMProxyService);
+          throw e;
+        }
+      }
+    });
     routerHAContext.setHAServiceState(HAServiceProtocol.HAServiceState.ACTIVE);
     LOG.info("Transitioned to active state");
   }
