@@ -97,6 +97,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerNode;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.SchedulerEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.SchedulerEventType;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.placement.MultiNodeSortingManager;
+import org.apache.hadoop.yarn.server.resourcemanager.scorer.RMScorerInfo;
 import org.apache.hadoop.yarn.server.resourcemanager.scorer.ScorerEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.scorer.ScorerEventDispatcherMetrics;
 import org.apache.hadoop.yarn.server.resourcemanager.scorer.ScorerEventType;
@@ -711,6 +712,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
       scorerDispatcher = createScorerEventDispatcher();
       addIfService(scorerDispatcher);
       rmDispatcher.register(ScorerEventType.class, scorerDispatcher);
+      new RMScorerInfo(scorerService);
 
       nmLivelinessMonitor = createNMLivelinessMonitor();
       addService(nmLivelinessMonitor);

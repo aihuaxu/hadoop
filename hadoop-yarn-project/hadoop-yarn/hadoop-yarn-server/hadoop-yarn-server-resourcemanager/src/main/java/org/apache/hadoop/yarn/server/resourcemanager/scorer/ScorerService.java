@@ -18,13 +18,14 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.scorer;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.Timer;
@@ -45,6 +46,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeImpl;
+import org.mortbay.util.ajax.JSON;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -115,6 +117,15 @@ public class ScorerService extends AbstractService implements EventHandler<Score
       this.numContainers = numContainers;
     }
 
+    protected HostScoreInfo(String hostName, int numNonPreemptible,
+      int numAMs, int numContainers, int containerRunningTime) {
+      this.hostName = hostName;
+      this.numNonPreemptible = numNonPreemptible;
+      this.numAMs = numAMs;
+      this.numContainers = numContainers;
+      this.containerRunningTime = containerRunningTime;
+    }
+
     @Override
     public String toString() {
       return "HostScoreInfo{" +
@@ -124,6 +135,42 @@ public class ScorerService extends AbstractService implements EventHandler<Score
         ", numContainers=" + numContainers +
         ", containerRunningTime=" + containerRunningTime +
         '}';
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (o == null || getClass() != o.getClass()) {
+        return false;
+      }
+
+      HostScoreInfo that = (HostScoreInfo) o;
+
+      if (numNonPreemptible != that.numNonPreemptible) {
+        return false;
+      }
+      if (numAMs != that.numAMs) {
+        return false;
+      }
+      if (numContainers != that.numContainers) {
+        return false;
+      }
+      if (containerRunningTime != that.containerRunningTime) {
+        return false;
+      }
+      return hostName != null ? hostName.equals(that.hostName) : that.hostName == null;
+    }
+
+    @Override
+    public int hashCode() {
+      int result = hostName != null ? hostName.hashCode() : 0;
+      result = 31 * result + numNonPreemptible;
+      result = 31 * result + numAMs;
+      result = 31 * result + numContainers;
+      result = 31 * result + containerRunningTime;
+      return result;
     }
   }
 
@@ -263,7 +310,7 @@ public class ScorerService extends AbstractService implements EventHandler<Score
     }
     long processTimeUs = (System.nanoTime() - startTime) / 1000;
     scorerMetrics.setGetOrderedHostsListTimeUs(processTimeUs);
-    LOG.info("getOrderedHostList took {} us", processTimeUs);
+    LOG.info("getOrderedHostList returned {} hosts in {} us", hostsList.size(), processTimeUs);
 
     return hostsList;
   }
@@ -449,11 +496,41 @@ public class ScorerService extends AbstractService implements EventHandler<Score
     this.scorerMetrics = metrics;
   }
 
+  protected ConcurrentMap<String, HostScoreInfo> getHostsScoreMap() {
+    return hostsScoreMap;
+  }
+
+  /**
+   * Return host score info with JSON string
+   *
+   * @return JSON formatted string containing scores of all node managers in Scorer service
+   */
+  public String getHostScores() {
+    List<InfoMap> nmScoreInfo = new ArrayList<InfoMap>();
+    readLock.lock();
+    for (Map.Entry<String, HostScoreInfo> entry : hostsScoreMap.entrySet()) {
+      HostScoreInfo score = entry.getValue();
+      InfoMap info = new InfoMap();
+      info.put("HostName", entry.getKey());
+      info.put("numNonPreemptible", score.numNonPreemptible);
+      info.put("numAMs", score.numAMs);
+      info.put("numContainers", score.numContainers);
+      info.put("containerRunningTime", score.containerRunningTime);
+      nmScoreInfo.add(info);
+    }
+    readLock.unlock();
+
+    return JSON.toString(nmScoreInfo);
+  }
+
+  static class InfoMap extends LinkedHashMap<String, Object> {
+    private static final long serialVersionUID = 1L;
+  }
+
   /**
    * TimerTask to update container running time in host score
    */
   private class ScoreUpdateTimerTask extends TimerTask {
-
     @Override
     public void run() {
       LOG.debug("ScoreUpdateTimerTask: Start updating host score...");
@@ -463,10 +540,5 @@ public class ScorerService extends AbstractService implements EventHandler<Score
       scorerMetrics.setUpdateRunningContainerTimeUs(processTimeUs);
       LOG.info("ScoreUpdateTimerTask took {} us", processTimeUs);
     }
-  }
-
-  @VisibleForTesting
-  ConcurrentMap<String, HostScoreInfo> getHostsScoreMap() {
-    return hostsScoreMap;
   }
 }

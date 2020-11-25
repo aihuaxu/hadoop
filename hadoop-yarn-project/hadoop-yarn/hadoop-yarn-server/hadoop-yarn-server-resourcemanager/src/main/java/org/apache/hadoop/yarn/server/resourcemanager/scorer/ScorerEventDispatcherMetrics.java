@@ -67,8 +67,8 @@ public class ScorerEventDispatcherMetrics extends DispatcherMetrics {
   @Metric("Container finished event count from Peloton") MutableCounterLong containerFinishedCountFromPeloton;
   @Metric("AM Container finished event count from Peloton") MutableCounterLong amContainerFinishedCountFromPeloton;
 
-  @Metric("getOrderedHostsList processing time") MutableGaugeLong getOrderedHostsListTimeUs;
-  @Metric("updateRunningContainerTask processing time") MutableGaugeLong updateRunningContainerTimeUs;
+  @Metric("getOrderedHostsList processing time") MutableCounterLong getOrderedHostsListTimeUs;
+  @Metric("updateRunningContainerTask processing time") MutableCounterLong updateRunningContainerTimeUs;
 
   protected ScorerEventDispatcherMetrics(MetricsSystem ms) {
     super(ms, RECORD_INFO);
@@ -153,10 +153,10 @@ public class ScorerEventDispatcherMetrics extends DispatcherMetrics {
   }
 
   public void setGetOrderedHostsListTimeUs(long processTimeUs) {
-    getOrderedHostsListTimeUs.set(processTimeUs);
+    getOrderedHostsListTimeUs.incr(processTimeUs);
   }
 
   public void setUpdateRunningContainerTimeUs(long processTimeUs) {
-    updateRunningContainerTimeUs.set(processTimeUs);
+    updateRunningContainerTimeUs.incr(processTimeUs);
   }
 }
