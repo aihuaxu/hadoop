@@ -19,12 +19,6 @@
 package org.apache.hadoop.yarn.server.resourcemanager.scorer;
 
 public enum ScorerEventType {
-  CONTAINER_ADDED,
-  CONTAINER_RECOVERED,
-  AM_CONTAINER_ADDED,
-  CONTAINER_FINISHED,
-  AM_CONTAINER_FINISHED,
-
   INCLUDE_HOSTS_UPDATE,
   EXCLUDE_HOSTS_UPDATE
 }

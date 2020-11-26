@@ -10,9 +10,10 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import org.apache.hadoop.yarn.event.Event;
 import org.apache.hadoop.yarn.api.protocolrecords.GetExternalIncludedHostsResponse;
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.GetExternalIncludedHostsRequestPBImpl;
@@ -27,6 +28,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
 import org.apache.hadoop.yarn.server.resourcemanager.RMContextImpl;
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer;
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerImpl;
+import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeImpl;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ResourceScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.scorer.ScorerService.HostScoreInfo;
@@ -52,8 +54,6 @@ public class TestScorerService {
   QueueInfo mockNonPreemptibleQueueInfo;
   RMContext mockRMContext;
   GetExternalIncludedHostsResponse getExternalIncludedHostsResponse;
-  RMContainer mockRMContainer;
-  NodeId nodeId;
   ScorerEventDispatcherMetrics metrics = ScorerEventDispatcherMetrics.registerMetrics();
 
   @Before
@@ -87,10 +87,6 @@ public class TestScorerService {
     mockEventHandler = mock(EventHandler.class);
     when(mockDispatcher.getEventHandler()).thenReturn(mockEventHandler);
     doNothing().when(mockEventHandler).handle(any(Event.class));
-
-    nodeId = NodeId.newInstance(HOST1, HOST_PORT);
-    mockRMContainer = mock(RMContainer.class);
-    when(mockRMContainer.getNodeId()).thenReturn(nodeId);
   }
 
   @Test
@@ -135,192 +131,14 @@ public class TestScorerService {
   }
 
   @Test
-  public void testContainersInPreemptibleQueue() {
-    initHosts();
-
-    //add a non-AM container
-    when(mockRMContainer.isAMContainer()).thenReturn(false);
-    when(mockRMContainer.getQueueName()).thenReturn(PREEMPTIBLE_QUEUE);
-    ScorerEvent event = new ScorerContainerEvent(mockRMContainer, ScorerEventType.CONTAINER_ADDED);
-    scorerService.handle(event);
-
-    Map<String, HostScoreInfo> scoreInfoMap = scorerService.getHostsScoreMap();
-    HostScoreInfo host1Score = scoreInfoMap.get(HOST1);
-    assertEquals(0, host1Score.numAMs);
-    assertEquals(1, host1Score.numContainers);
-    assertEquals(0, host1Score.numNonPreemptible);
-    HostScoreInfo host2Score = scoreInfoMap.get(HOST2);
-    assertEquals(0, host2Score.numAMs);
-    assertEquals(0, host2Score.numContainers);
-    assertEquals(0, host2Score.numNonPreemptible);
-
-    // another container is added
-    when(mockRMContainer.isAMContainer()).thenReturn(true);
-    when(mockRMContainer.getQueueName()).thenReturn(PREEMPTIBLE_QUEUE);
-    event = new ScorerContainerEvent(mockRMContainer, ScorerEventType.CONTAINER_ADDED);
-    scorerService.handle(event);
-
-    scoreInfoMap = scorerService.getHostsScoreMap();
-    host1Score = scoreInfoMap.get(HOST1);
-    assertEquals(0, host1Score.numAMs);
-    assertEquals(2, host1Score.numContainers);
-    assertEquals(0, host1Score.numNonPreemptible);
-    host2Score = scoreInfoMap.get(HOST2);
-    assertEquals(0, host2Score.numAMs);
-    assertEquals(0, host2Score.numContainers);
-    assertEquals(0, host2Score.numNonPreemptible);
-
-    // one of the containers is set as AM container
-    when(mockRMContainer.isAMContainer()).thenReturn(true);
-    when(mockRMContainer.getQueueName()).thenReturn(PREEMPTIBLE_QUEUE);
-    event = new ScorerContainerEvent(mockRMContainer, ScorerEventType.AM_CONTAINER_ADDED);
-    scorerService.handle(event);
-
-    scoreInfoMap = scorerService.getHostsScoreMap();
-    host1Score = scoreInfoMap.get(HOST1);
-    assertEquals(1, host1Score.numAMs);
-    assertEquals(2, host1Score.numContainers);
-    assertEquals(0, host1Score.numNonPreemptible);
-    host2Score = scoreInfoMap.get(HOST2);
-    assertEquals(0, host2Score.numAMs);
-    assertEquals(0, host2Score.numContainers);
-    assertEquals(0, host2Score.numNonPreemptible);
-
-    //the first container is finished
-    when(mockRMContainer.isAMContainer()).thenReturn(false);
-    when(mockRMContainer.getQueueName()).thenReturn(PREEMPTIBLE_QUEUE);
-    event = new ScorerContainerEvent(mockRMContainer, ScorerEventType.CONTAINER_FINISHED);
-    scorerService.handle(event);
-
-    scoreInfoMap = scorerService.getHostsScoreMap();
-    host1Score = scoreInfoMap.get(HOST1);
-    assertEquals(1, host1Score.numAMs);
-    assertEquals(1, host1Score.numContainers);
-    assertEquals(0, host1Score.numNonPreemptible);
-    host2Score = scoreInfoMap.get(HOST2);
-    assertEquals(0, host2Score.numAMs);
-    assertEquals(0, host2Score.numContainers);
-    assertEquals(0, host2Score.numNonPreemptible);
-
-    //the second container is finished
-    when(mockRMContainer.isAMContainer()).thenReturn(true);
-    when(mockRMContainer.getQueueName()).thenReturn(PREEMPTIBLE_QUEUE);
-    event = new ScorerContainerEvent(mockRMContainer, ScorerEventType.CONTAINER_FINISHED);
-    scorerService.handle(event);
-
-    scoreInfoMap = scorerService.getHostsScoreMap();
-    host1Score = scoreInfoMap.get(HOST1);
-    assertEquals(1, host1Score.numAMs);
-    assertEquals(0, host1Score.numContainers);
-    assertEquals(0, host1Score.numNonPreemptible);
-    host2Score = scoreInfoMap.get(HOST2);
-    assertEquals(0, host2Score.numAMs);
-    assertEquals(0, host2Score.numContainers);
-    assertEquals(0, host2Score.numNonPreemptible);
-
-    //the AM container is finished
-    when(mockRMContainer.isAMContainer()).thenReturn(true);
-    when(mockRMContainer.getQueueName()).thenReturn(PREEMPTIBLE_QUEUE);
-    event = new ScorerContainerEvent(mockRMContainer, ScorerEventType.AM_CONTAINER_FINISHED);
-    scorerService.handle(event);
-
-    scoreInfoMap = scorerService.getHostsScoreMap();
-    host1Score = scoreInfoMap.get(HOST1);
-    assertEquals(0, host1Score.numAMs);
-    assertEquals(0, host1Score.numContainers);
-    assertEquals(0, host1Score.numNonPreemptible);
-    host2Score = scoreInfoMap.get(HOST2);
-    assertEquals(0, host2Score.numAMs);
-    assertEquals(0, host2Score.numContainers);
-    assertEquals(0, host2Score.numNonPreemptible);
-  }
-
-  @Test
-  public void testContainersInNonPreemptibleQueue() {
-    initHosts();
-
-    //add a non-AM container
-    when(mockRMContainer.isAMContainer()).thenReturn(false);
-    when(mockRMContainer.getQueueName()).thenReturn(NON_PREEMPTIBLE_QUEUE);
-    ScorerEvent event = new ScorerContainerEvent(mockRMContainer, ScorerEventType.CONTAINER_ADDED);
-    scorerService.handle(event);
-
-    Map<String, HostScoreInfo> scoreInfoMap = scorerService.getHostsScoreMap();
-    HostScoreInfo host1Score = scoreInfoMap.get(HOST1);
-    assertEquals(0, host1Score.numAMs);
-    assertEquals(1, host1Score.numContainers);
-    assertEquals(1, host1Score.numNonPreemptible);
-    HostScoreInfo host2Score = scoreInfoMap.get(HOST2);
-    assertEquals(0, host2Score.numAMs);
-    assertEquals(0, host2Score.numContainers);
-    assertEquals(0, host2Score.numNonPreemptible);
-
-    //the non-AM container is finished
-    when(mockRMContainer.isAMContainer()).thenReturn(false);
-    when(mockRMContainer.getQueueName()).thenReturn(NON_PREEMPTIBLE_QUEUE);
-    event = new ScorerContainerEvent(mockRMContainer, ScorerEventType.CONTAINER_FINISHED);
-    scorerService.handle(event);
-
-    scoreInfoMap = scorerService.getHostsScoreMap();
-    host1Score = scoreInfoMap.get(HOST1);
-    assertEquals(0, host1Score.numAMs);
-    assertEquals(0, host1Score.numContainers);
-    assertEquals(0, host1Score.numNonPreemptible);
-    host2Score = scoreInfoMap.get(HOST2);
-    assertEquals(0, host2Score.numAMs);
-    assertEquals(0, host2Score.numContainers);
-    assertEquals(0, host2Score.numNonPreemptible);
-  }
-
-  @Test
-  public void testContainerRecoverEvent() {
-    initHosts();
-
-    //recover a non-AM container
-    when(mockRMContainer.isAMContainer()).thenReturn(false);
-    when(mockRMContainer.getQueueName()).thenReturn(NON_PREEMPTIBLE_QUEUE);
-    ScorerEvent event = new ScorerContainerEvent(mockRMContainer, ScorerEventType.CONTAINER_RECOVERED);
-    scorerService.handle(event);
-
-    Map<String, HostScoreInfo> scoreInfoMap = scorerService.getHostsScoreMap();
-    HostScoreInfo host1Score = scoreInfoMap.get(HOST1);
-    assertEquals(0, host1Score.numAMs);
-    assertEquals(1, host1Score.numContainers);
-    assertEquals(1, host1Score.numNonPreemptible);
-    HostScoreInfo host2Score = scoreInfoMap.get(HOST2);
-    assertEquals(0, host2Score.numAMs);
-    assertEquals(0, host2Score.numContainers);
-    assertEquals(0, host2Score.numNonPreemptible);
-
-    //the recovered container is finished
-    when(mockRMContainer.isAMContainer()).thenReturn(false);
-    when(mockRMContainer.getQueueName()).thenReturn(NON_PREEMPTIBLE_QUEUE);
-    event = new ScorerContainerEvent(mockRMContainer, ScorerEventType.CONTAINER_FINISHED);
-    scorerService.handle(event);
-
-    scoreInfoMap = scorerService.getHostsScoreMap();
-    host1Score = scoreInfoMap.get(HOST1);
-    assertEquals(0, host1Score.numAMs);
-    assertEquals(0, host1Score.numContainers);
-    assertEquals(0, host1Score.numNonPreemptible);
-    host2Score = scoreInfoMap.get(HOST2);
-    assertEquals(0, host2Score.numAMs);
-    assertEquals(0, host2Score.numContainers);
-    assertEquals(0, host2Score.numNonPreemptible);
-  }
-
-  @Test
   public void testScorerHostEvent() {
-    initHosts();
-
     //add a non-AM container to HOST1
-    when(mockRMContainer.isAMContainer()).thenReturn(false);
-    when(mockRMContainer.getQueueName()).thenReturn(NON_PREEMPTIBLE_QUEUE);
-    ScorerEvent event = new ScorerContainerEvent(mockRMContainer, ScorerEventType.CONTAINER_ADDED);
-    scorerService.handle(event);
+    ConcurrentMap<String, HostScoreInfo> hostsScoreMap = scorerService.getHostsScoreMap();
+    hostsScoreMap.clear();
+    hostsScoreMap.put(HOST1, new HostScoreInfo(HOST1, 1, 0 ,1));
 
-    //update include hosts with new host3, and host2 has been evicted
-    event = new ScorerHostEvent(new HashSet<String>(Arrays.asList(HOST1, "host3")),
+    //update include hosts with new host3
+    ScorerHostEvent event = new ScorerHostEvent(new HashSet<String>(Arrays.asList(HOST1, "host3")),
       ScorerEventType.INCLUDE_HOSTS_UPDATE);
     scorerService.handle(event);
     assertEquals(2, scorerService.getHostsScoreMap().size());
@@ -372,32 +190,69 @@ public class TestScorerService {
   }
 
   @Test
-  public void testUpdateContainerRunningTime() {
+  public void testUpdateHostScore() {
     initHosts();
-    List<RMNodeImpl> rmNodes = new ArrayList<>();
+
+    ConcurrentMap<NodeId, RMNode> rmNodes = new ConcurrentHashMap<NodeId, RMNode>();
+    when(mockRMContext.getRMNodes()).thenReturn(rmNodes);
+    when(mockRMContext.getScheduler()).thenReturn(mockScheduler);
+
     RMNodeImpl rmNode1 = mock(RMNodeImpl.class);
     ContainerId containerId1 = mock(ContainerId.class);
+    when(containerId1.toString()).thenReturn("containerId1");
     ContainerId containerId2 = mock(ContainerId.class);
+    when(containerId2.toString()).thenReturn("containerId2");
     when(rmNode1.getLaunchedContainers()).thenReturn(
       new HashSet<ContainerId>(Arrays.asList(containerId1, containerId2)));
     when(rmNode1.getHostName()).thenReturn(HOST1);
-    rmNodes.add(rmNode1);
+    NodeId nodeId1 = NodeId.newInstance(HOST1, HOST_PORT);
+    rmNodes.put(nodeId1, rmNode1);
+
     RMNodeImpl rmNode2 = mock(RMNodeImpl.class);
     ContainerId containerId3 = mock(ContainerId.class);
+    when(containerId3.toString()).thenReturn("containerId3");
     ContainerId containerId4 = mock(ContainerId.class);
+    when(containerId4.toString()).thenReturn("containerId4");
     when(rmNode2.getLaunchedContainers()).thenReturn(
       new HashSet<ContainerId>(Arrays.asList(containerId3, containerId4)));
-    when(rmNode1.getHostName()).thenReturn(HOST2);
-    rmNodes.add(rmNode2);
+    when(rmNode2.getHostName()).thenReturn(HOST2);
+    NodeId nodeId2 = NodeId.newInstance(HOST2, HOST_PORT);
+    rmNodes.put(nodeId2, rmNode2);
 
-    RMContainerImpl rmContainer = mock(RMContainerImpl.class);
-    when(rmContainer.getCreationTime()).thenReturn(System.currentTimeMillis());
+    RMContainerImpl rmContainer1 = mock(RMContainerImpl.class);
+    when(rmContainer1.getCreationTime()).thenReturn(System.currentTimeMillis());
+    when(rmContainer1.isAMContainer()).thenReturn(true);
+    when(rmContainer1.getQueueName()).thenReturn(NON_PREEMPTIBLE_QUEUE);
+    when(mockScheduler.getRMContainer(containerId1)).thenReturn(rmContainer1);
 
-    when(mockRMContext.getScheduler()).thenReturn(mockScheduler);
-    when(mockScheduler.getRMContainer(any(ContainerId.class))).thenReturn(rmContainer);
+    RMContainerImpl rmContainer2 = mock(RMContainerImpl.class);
+    when(rmContainer2.getCreationTime()).thenReturn(System.currentTimeMillis());
+    when(rmContainer2.isAMContainer()).thenReturn(false);
+    when(rmContainer2.getQueueName()).thenReturn(NON_PREEMPTIBLE_QUEUE);
+    when(mockScheduler.getRMContainer(containerId2)).thenReturn(rmContainer2);
 
-    scorerService.updateContainerRunningTime();
+    RMContainerImpl rmContainer3 = mock(RMContainerImpl.class);
+    when(rmContainer3.getCreationTime()).thenReturn(System.currentTimeMillis());
+    when(rmContainer3.isAMContainer()).thenReturn(false);
+    when(rmContainer3.getQueueName()).thenReturn(PREEMPTIBLE_QUEUE);
+    when(mockScheduler.getRMContainer(containerId3)).thenReturn(rmContainer3);
+
+    RMContainerImpl rmContainer4 = mock(RMContainerImpl.class);
+    when(rmContainer4.getCreationTime()).thenReturn(System.currentTimeMillis());
+    when(rmContainer4.isAMContainer()).thenReturn(false);
+    when(rmContainer4.getQueueName()).thenReturn(NON_PREEMPTIBLE_QUEUE);
+    when(mockScheduler.getRMContainer(containerId4)).thenReturn(rmContainer4);
+
+    scorerService.updateHostScore();
+    assertEquals(2, scorerService.getHostsScoreMap().size());
+    assertEquals(2, scorerService.getHostsScoreMap().get(HOST1).numNonPreemptible);
+    assertEquals(1, scorerService.getHostsScoreMap().get(HOST1).numAMs);
+    assertEquals(2, scorerService.getHostsScoreMap().get(HOST1).numContainers);
     assertEquals(0, scorerService.getHostsScoreMap().get(HOST1).containerRunningTime, 60);
+
+    assertEquals(1, scorerService.getHostsScoreMap().get(HOST2).numNonPreemptible);
+    assertEquals(0, scorerService.getHostsScoreMap().get(HOST2).numAMs);
+    assertEquals(2, scorerService.getHostsScoreMap().get(HOST2).numContainers);
     assertEquals(0, scorerService.getHostsScoreMap().get(HOST2).containerRunningTime, 60);
   }
 }

@@ -53,9 +53,6 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptE
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.event.RMAppAttemptContainerFinishedEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeCleanContainerEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeUpdateContainerEvent;
-import org.apache.hadoop.yarn.server.resourcemanager.scorer.ScorerContainerEvent;
-import org.apache.hadoop.yarn.server.resourcemanager.scorer.ScorerEvent;
-import org.apache.hadoop.yarn.server.resourcemanager.scorer.ScorerEventType;
 import org.apache.hadoop.yarn.server.scheduler.SchedulerRequestKey;
 import org.apache.hadoop.yarn.state.InvalidStateTransitionException;
 import org.apache.hadoop.yarn.state.MultipleArcTransition;
@@ -455,10 +452,6 @@ public class RMContainerImpl implements RMContainer {
     try {
       writeLock.lock();
       this.isAMContainer = isAMContainer;
-
-      //Notify Scorer service that this container is AM
-      rmContext.getDispatcher().getEventHandler().handle(
-        new ScorerContainerEvent(this, ScorerEventType.AM_CONTAINER_ADDED));
     } finally {
       writeLock.unlock();
     }
@@ -524,10 +517,6 @@ public class RMContainerImpl implements RMContainer {
     @Override
     public RMContainerState transition(RMContainerImpl container,
         RMContainerEvent event) {
-      //Notify Scorer service for this recovered container
-      container.rmContext.getDispatcher().getEventHandler().handle(
-        new ScorerContainerEvent(container, ScorerEventType.CONTAINER_RECOVERED));
-
       NMContainerStatus report =
           ((RMContainerRecoverEvent) event).getContainerReport();
       if (report.getContainerState().equals(ContainerState.COMPLETE)) {
@@ -715,10 +704,6 @@ public class RMContainerImpl implements RMContainer {
         container.rmContext.getSystemMetricsPublisher().containerFinished(
             container, container.finishTime);
       }
-
-      //Notify Scorer service that this container finished
-      container.rmContext.getDispatcher().getEventHandler().handle(
-        new ScorerContainerEvent(container, ScorerEventType.CONTAINER_FINISHED));
     }
 
     private static void updateAttemptMetrics(RMContainerImpl container) {
@@ -890,9 +875,5 @@ public class RMContainerImpl implements RMContainer {
       rmContext.getSystemMetricsPublisher().containerCreated(
           this, this.creationTime);
     }
-
-    //Notify Scorer service for this new container
-    rmContext.getDispatcher().getEventHandler().handle(
-      new ScorerContainerEvent(this, ScorerEventType.CONTAINER_ADDED));
   }
 }

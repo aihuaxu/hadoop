@@ -46,29 +46,19 @@ public class ScorerEventDispatcherMetrics extends DispatcherMetrics {
   static boolean initialized;
   static ScorerEventDispatcherMetrics metrics = null;
 
-  @Metric("Container added event count") MutableCounterLong containerAddedCount;
-  @Metric("Container added processing time") MutableCounterLong containerAddedTimeUs;
-  @Metric("Container recovered event count") MutableCounterLong containerRecoveredCount;
-  @Metric("Container recovered processing time") MutableCounterLong containerRecoveredTimeUs;
-  @Metric("AM Container added event count") MutableCounterLong amContainerAddedCount;
-  @Metric("AM Container added processing time") MutableCounterLong amContainerAddedTimeUs;
-  @Metric("Container finished event count") MutableCounterLong containerFinishedCount;
-  @Metric("Container finished processing time") MutableCounterLong containerFinishedTimeUs;
-  @Metric("AM Container finished event count") MutableCounterLong amContainerFinishedCount;
-  @Metric("AM Container finished processing time") MutableCounterLong amContainerFinishedTimeUs;
+  @Metric("Number of containers") MutableGaugeLong containers;
+  @Metric("Number of AM containers") MutableGaugeLong amContainers;
+  @Metric("Number of non-preemptible containers") MutableGaugeLong nonPreemptibleContainers;
 
   @Metric("Number of include hosts") MutableGaugeLong numberOfIncludeHosts;
   @Metric("Include hosts event processing time") MutableCounterLong includeHostsTimeUs;
   @Metric("Number of exclude hosts") MutableCounterLong numberOfExcludeHosts;
   @Metric("Exclude hosts event processing time") MutableCounterLong excludeHostsTimeUs;
 
-  @Metric("Container added event count from Peloton") MutableCounterLong containerAddedCountFromPeloton;
-  @Metric("AM Container added event count from Peloton") MutableCounterLong amContainerAddedCountFromPeloton;
-  @Metric("Container finished event count from Peloton") MutableCounterLong containerFinishedCountFromPeloton;
-  @Metric("AM Container finished event count from Peloton") MutableCounterLong amContainerFinishedCountFromPeloton;
-
   @Metric("getOrderedHostsList processing time") MutableCounterLong getOrderedHostsListTimeUs;
-  @Metric("updateRunningContainerTask processing time") MutableCounterLong updateRunningContainerTimeUs;
+  @Metric("updateRunningContainerTask processing time") MutableCounterLong updateHostScoreTimeUs;
+
+  @Metric("Host score update succeeded") MutableGaugeLong updateHostScoreSucceeded;
 
   protected ScorerEventDispatcherMetrics(MetricsSystem ms) {
     super(ms, RECORD_INFO);
@@ -101,26 +91,6 @@ public class ScorerEventDispatcherMetrics extends DispatcherMetrics {
   public void incrementEventType(Event event, long processingTimeUs) {
     LOG.debug("Got scorer event of type " + event.getType());
     switch ((ScorerEventType) (event.getType())) {
-      case CONTAINER_ADDED:
-        containerAddedCount.incr();
-        containerAddedTimeUs.incr(processingTimeUs);
-        break;
-      case CONTAINER_RECOVERED:
-        containerRecoveredCount.incr();
-        containerRecoveredTimeUs.incr(processingTimeUs);
-        break;
-      case AM_CONTAINER_ADDED:
-        amContainerAddedCount.incr();
-        amContainerAddedTimeUs.incr(processingTimeUs);
-        break;
-      case CONTAINER_FINISHED:
-        containerFinishedCount.incr();
-        containerFinishedTimeUs.incr(processingTimeUs);
-        break;
-      case AM_CONTAINER_FINISHED:
-        amContainerFinishedCount.incr();
-        amContainerFinishedTimeUs.incr(processingTimeUs);
-        break;
       case INCLUDE_HOSTS_UPDATE:
         Set<String> includeHosts = ((ScorerHostEvent) event).getHosts();
         numberOfIncludeHosts.set(includeHosts == null ? 0 : includeHosts.size());
@@ -136,27 +106,28 @@ public class ScorerEventDispatcherMetrics extends DispatcherMetrics {
     }
   }
 
-  public void incrContainerAddedCountFromPeloton() {
-    containerAddedCountFromPeloton.incr();
+  public void setContainers(long numberOfContainers) {
+    containers.set(numberOfContainers);
   }
 
-  public void incrAmContainerAddedCountFromPeloton() {
-    amContainerAddedCountFromPeloton.incr();
+  public void setAMContainers(long numberOfAMContainers) {
+    amContainers.set(numberOfAMContainers);
   }
 
-  public void incrContainerFinishedCountFromPeloton() {
-    containerFinishedCountFromPeloton.incr();
+  public void setNonPreemptibleContainers(long numberOfNonPreemptibleContainers) {
+    nonPreemptibleContainers.set(numberOfNonPreemptibleContainers);
   }
 
-  public void incrAmContainerFinishedCountFromPeloton() {
-    amContainerFinishedCountFromPeloton.incr();
-  }
-
-  public void setGetOrderedHostsListTimeUs(long processTimeUs) {
+  public void incrGetOrderedHostsListTimeUs(long processTimeUs) {
     getOrderedHostsListTimeUs.incr(processTimeUs);
   }
 
-  public void setUpdateRunningContainerTimeUs(long processTimeUs) {
-    updateRunningContainerTimeUs.incr(processTimeUs);
+  public void incrUpdateHostScoreTimeUs(long processTimeUs) {
+    updateHostScoreTimeUs.incr(processTimeUs);
   }
+
+  public void setUpdateHostScoreSucceeded(long updateHostScoreSucceeded) {
+    this.updateHostScoreSucceeded.set(updateHostScoreSucceeded);
+  }
+
 }

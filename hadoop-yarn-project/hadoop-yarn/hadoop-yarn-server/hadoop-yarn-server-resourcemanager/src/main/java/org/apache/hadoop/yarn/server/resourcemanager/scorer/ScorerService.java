@@ -60,10 +60,9 @@ import org.slf4j.LoggerFactory;
  *
  * This is how ScorerService works:
  * - Registers itself to RM's active services so only it will be only running on active RM instance
- * - Registers ScorerEventDispatcher in RM to receive ScorerEvent from NodeListManager and RMContainerImpl
+ * - Registers ScorerEventDispatcher in RM to receive ScorerEvent from NodeListManager
  * - Receives latest include and exclude hosts from NodeListManager
- * - Receives container add / recover / finish / set AM events from RMContainerImpl
- * - Includes a timer task to periodically calculate container running time on these hosts
+ * - Includes a timer task to periodically update host score
  * - Uses ScorerEventDispatcherMetrics to emit JMX metrics
  */
 @Private
@@ -124,6 +123,13 @@ public class ScorerService extends AbstractService implements EventHandler<Score
       this.numAMs = numAMs;
       this.numContainers = numContainers;
       this.containerRunningTime = containerRunningTime;
+    }
+
+    protected void clearScore() {
+      this.numNonPreemptible = 0;
+      this.numAMs = 0;
+      this.numContainers = 0;
+      this.containerRunningTime = 0;
     }
 
     @Override
@@ -309,7 +315,7 @@ public class ScorerService extends AbstractService implements EventHandler<Score
       readLock.unlock();
     }
     long processTimeUs = (System.nanoTime() - startTime) / 1000;
-    scorerMetrics.setGetOrderedHostsListTimeUs(processTimeUs);
+    scorerMetrics.incrGetOrderedHostsListTimeUs(processTimeUs);
     LOG.info("getOrderedHostList returned {} hosts in {} us", hostsList.size(), processTimeUs);
 
     return hostsList;
@@ -321,44 +327,17 @@ public class ScorerService extends AbstractService implements EventHandler<Score
    */
   @Override
   public void handle(ScorerEvent event) {
-    RMContainer container;
     switch (event.getType()) {
-      case CONTAINER_ADDED:
-      case CONTAINER_RECOVERED:
-      case AM_CONTAINER_ADDED:
-      case CONTAINER_FINISHED:
-        container = ((ScorerContainerEvent) event).getContainer();
-        LOG.info("Received Event {} from container {} on host {}", event.getType(),
-          container.getContainerId(),
-          container.getNodeId().getHost());
-        break;
       case INCLUDE_HOSTS_UPDATE:
-      case EXCLUDE_HOSTS_UPDATE:
         Set<String> hosts = ((ScorerHostEvent) event).getHosts();
-        LOG.info("Received Event {} with {} hosts", event.getType(), hosts.size());
-        break;
-      default:
-        break;
-    }
-
-    switch (event.getType()) {
-      case CONTAINER_ADDED:
-      case CONTAINER_RECOVERED:
-        addContainerToHost(((ScorerContainerEvent) event).getContainer(), false);
-        break;
-      case AM_CONTAINER_ADDED:
-        addContainerToHost(((ScorerContainerEvent) event).getContainer(), true);
-        break;
-      case CONTAINER_FINISHED:
-        removeContainerFromHost(((ScorerContainerEvent) event).getContainer());
-        break;
-      case AM_CONTAINER_FINISHED:
-        removeAMContainerFromHost(((ScorerContainerEvent) event).getContainer());
-        break;
-      case INCLUDE_HOSTS_UPDATE:
+        LOG.info("Received Event INCLUDE_HOSTS_UPDATE with {} hosts",
+          hosts == null ? 0 : hosts.size());
         updateIncludeHosts(((ScorerHostEvent) event).getHosts());
         break;
       case EXCLUDE_HOSTS_UPDATE:
+        hosts = ((ScorerHostEvent) event).getHosts();
+        LOG.info("Received Event EXCLUDE_HOSTS_UPDATE with {} hosts",
+          hosts == null ? 0 : hosts.size());
         updateExcludeHosts(((ScorerHostEvent) event).getHosts());
         break;
       default:
@@ -367,103 +346,14 @@ public class ScorerService extends AbstractService implements EventHandler<Score
   }
 
   /**
-   * When a container is allocated or set as AM container on a host, increase this host score
-   * @param container the allocated container
-   * @param isAMContainer whether this container is an AM or not
+   * Update host score for all external hosts
    */
-  private void addContainerToHost(RMContainer container, boolean isAMContainer) {
-    //Add this container to HostScoreInfo
-    String hostName = container.getNodeId().getHost();
-    HostScoreInfo hostScoreInfo = hostsScoreMap.get(hostName);
-    if (hostScoreInfo == null) {
-      //This container is not from a Peloton host
-      return;
-    }
-
-    //lock this object in case more than one containers added/finished on this host from different threads
-    synchronized (hostScoreInfo) {
-      if (isAMContainer) {
-        hostScoreInfo.numAMs++;
-        scorerMetrics.incrAmContainerAddedCountFromPeloton();
-      } else {
-        hostScoreInfo.numContainers++;
-        scorerMetrics.incrContainerAddedCountFromPeloton();
-        try {
-          if (rmContext.getScheduler().getQueueInfo(container.getQueueName(), false, false)
-            .getPreemptionDisabled()) {
-            hostScoreInfo.numNonPreemptible++;
-          }
-        } catch (IOException e) {
-          LOG.warn("Failed to check if container's queue is preemptible, container: {}, queue: {}",
-            container.getContainerId(), container.getQueueName(), e);
-        }
-      }
-    }
-    LOG.debug("addContainerToHost completed, hostScoreInfo: {}", hostScoreInfo);
-  }
-
-  /**
-   * After an AM container is finished on a host, decrease this host's score
-   * @param container
-   */
-  private void removeAMContainerFromHost(RMContainer container) {
-    HostScoreInfo hostScoreInfo = hostsScoreMap.get(container.getNodeId().getHost());
-    if (hostScoreInfo == null) {
-      return;
-    }
-
-    scorerMetrics.incrAmContainerFinishedCountFromPeloton();
-    //lock this object in case more than one containers added to this host from different threads
-    synchronized (hostScoreInfo) {
-      hostScoreInfo.numAMs--;
-    }
-    LOG.debug("removeAMContainerFromHost completed, hostScoreInfo: {}", hostScoreInfo);
-  }
-
-  /**
-   * After a container finishes on a host, decrease this host's score
-   */
-  private void removeContainerFromHost(RMContainer container) {
-    //Remove this container from HostScoreInfo
-    HostScoreInfo hostScoreInfo = hostsScoreMap.get(container.getNodeId().getHost());
-    if (hostScoreInfo == null) {
-      return;
-    }
-
-    scorerMetrics.incrContainerFinishedCountFromPeloton();
-    //lock this object in case more than one containers added to this host from different threads
-    synchronized (hostScoreInfo) {
-      if (container.isAMContainer()) {
-        rmContext.getDispatcher().getEventHandler().handle(
-          new ScorerContainerEvent(container, ScorerEventType.AM_CONTAINER_FINISHED));
-      }
-      hostScoreInfo.numContainers--;
-      try {
-        if (rmContext.getScheduler().getQueueInfo(container.getQueueName(), false, false)
-          .getPreemptionDisabled()) {
-          hostScoreInfo.numNonPreemptible--;
-        }
-      } catch (IOException e) {
-        LOG.warn("Failed to check if container's queue is preemptible, container: {}, queue: {}",
-          container.getContainerId(), container.getQueueName(), e);
-      }
-      //in case container count become negative because of any racing condition
-      if ((hostScoreInfo.numAMs < 0) || (hostScoreInfo.numContainers < 0)
-        || (hostScoreInfo.numNonPreemptible < 0)) {
-        //This should not happen, log this error in case there are any corner cases neglected
-        LOG.error("Scorer service container count became negative, hostScoreInfo: {}", hostScoreInfo);
-      }
-    }
-    LOG.debug("removeContainerFromHost completed, hostScoreInfo: {}", hostScoreInfo);
-  }
-
-  /**
-   * Update container running time in host score
-   */
-  protected void updateContainerRunningTime() {
+  protected void updateHostScore() {
     writeLock.lock();
     try {
-      //update host container running time
+      int totalAMs = 0;
+      int totalContainers = 0;
+      int totalNonPreemptibleContainers = 0;
       for (RMNode rmNode : rmContext.getRMNodes().values()) {
         String nodeHostName = rmNode.getHostName();
         HostScoreInfo hostScoreInfo = hostsScoreMap.get(nodeHostName);
@@ -471,18 +361,39 @@ public class ScorerService extends AbstractService implements EventHandler<Score
           //this is not a peloton host
           continue;
         }
-        hostScoreInfo.containerRunningTime = 0;
+        hostScoreInfo.clearScore();
         RMNodeImpl rmNodeImpl = (RMNodeImpl) rmNode;
         for (ContainerId containerId : rmNodeImpl.getLaunchedContainers()) {
           RMContainer rmContainer = rmContext.getScheduler().getRMContainer(containerId);
           if (rmContainer == null) {
             continue;
           }
+          hostScoreInfo.numContainers++;
+          if (rmContainer.isAMContainer()) {
+            hostScoreInfo.numAMs++;
+          }
+          try {
+            if (rmContext.getScheduler().getQueueInfo(rmContainer.getQueueName(), false, false)
+              .getPreemptionDisabled()) {
+              hostScoreInfo.numNonPreemptible++;
+            }
+          } catch (IOException e) {
+            LOG.warn("Failed to check if container's queue is preemptible, container: "
+              + containerId, e);
+          }
           hostScoreInfo.containerRunningTime +=
             System.currentTimeMillis() - rmContainer.getCreationTime();
         }
+        totalContainers += hostScoreInfo.numContainers;
+        totalAMs += hostScoreInfo.numAMs;
+        totalNonPreemptibleContainers += hostScoreInfo.numNonPreemptible;
       }
+      scorerMetrics.setNonPreemptibleContainers(totalNonPreemptibleContainers);
+      scorerMetrics.setAMContainers(totalAMs);
+      scorerMetrics.setContainers(totalContainers);
+      scorerMetrics.setUpdateHostScoreSucceeded(1);
     } catch (Exception e) {
+      scorerMetrics.setUpdateHostScoreSucceeded(0);
       LOG.error("ScoreUpdateTimerTask: host score update failed, exception", e);
     } finally {
       writeLock.unlock();
@@ -528,16 +439,16 @@ public class ScorerService extends AbstractService implements EventHandler<Score
   }
 
   /**
-   * TimerTask to update container running time in host score
+   * TimerTask to update host score
    */
   private class ScoreUpdateTimerTask extends TimerTask {
     @Override
     public void run() {
       LOG.debug("ScoreUpdateTimerTask: Start updating host score...");
       long startTime = System.nanoTime();
-      updateContainerRunningTime();
+      updateHostScore();
       long processTimeUs = (System.nanoTime() - startTime) / 1000;
-      scorerMetrics.setUpdateRunningContainerTimeUs(processTimeUs);
+      scorerMetrics.incrUpdateHostScoreTimeUs(processTimeUs);
       LOG.info("ScoreUpdateTimerTask took {} us", processTimeUs);
     }
   }
