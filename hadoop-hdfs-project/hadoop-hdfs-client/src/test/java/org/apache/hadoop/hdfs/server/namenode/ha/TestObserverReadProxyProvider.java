@@ -35,6 +35,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
 import org.apache.hadoop.hdfs.protocol.ClientProtocol;
+import org.apache.hadoop.io.retry.RetryPolicy;
+import org.apache.hadoop.ipc.StandbyException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.util.StringUtils;
@@ -240,6 +242,31 @@ public class TestObserverReadProxyProvider {
     assertTrue(nn3Count.get() < NUM_ITERATIONS && nn3Count.get() > 0);
     assertEquals(NUM_ITERATIONS,
         nn1Count.get() + nn2Count.get() + nn3Count.get());
+  }
+
+  /**
+   * Tests getProxy with proper delays between failovers.
+   */
+  @Test
+  public void testDelayBetweenFailover() throws Exception {
+    Map<InetSocketAddress, ClientProtocol> proxyMap = new HashMap<>();
+
+    for (int i = 1; i <= NUM_ITERATIONS; i++) {
+      ObserverReadProxyProvider<ClientProtocol> provider =
+          new ObserverReadProxyProvider<>(conf, ns2Uri,
+              ClientProtocol.class, createFactory(proxyMap));
+      RetryPolicy.RetryAction action =
+          provider.getObserverRetryPolicy()
+              .shouldRetry(new StandbyException("test"), 0, i,true);
+      if (i < 15) { // 15 is the failover max limit
+        assertTrue(action.action
+            == RetryPolicy.RetryAction.RetryDecision.FAILOVER_AND_RETRY);
+        assertTrue(action.delayMillis > 0);
+      } else {
+        assertTrue(action.action
+            == RetryPolicy.RetryAction.RetryDecision.FAIL);
+      }
+    }
   }
 
   /**

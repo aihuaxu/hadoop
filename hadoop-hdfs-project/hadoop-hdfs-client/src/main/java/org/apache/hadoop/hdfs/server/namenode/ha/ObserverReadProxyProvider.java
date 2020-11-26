@@ -35,6 +35,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.DFSUtilClient;
 import org.apache.hadoop.hdfs.HAUtilClient;
 import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
+import org.apache.hadoop.hdfs.client.impl.DfsClientConf;
 import org.apache.hadoop.io.retry.AtMostOnce;
 import org.apache.hadoop.io.retry.Idempotent;
 import org.apache.hadoop.io.retry.RetryPolicies;
@@ -111,11 +112,14 @@ public class ObserverReadProxyProvider<T> extends ConfiguredFailoverProxyProvide
       observerProxies.add(new AddressRpcProxyPair<T>(address));
     }
 
-    // Don't bother configuring the number of retries and such on the retry
-    // policy since it is mainly only used for determining whether or not an
-    // exception is retriable or fatal
+    // Max retry is not actually used when deciding retry
+    // action as the number of retries are not counted.
+    // The sleep base and max are used to make the client retry slower.
+    DfsClientConf config = new DfsClientConf(conf);
     observerRetryPolicy = RetryPolicies.failoverOnNetworkException(
-        RetryPolicies.TRY_ONCE_THEN_FAIL, 1);
+        RetryPolicies.TRY_ONCE_THEN_FAIL, config.getMaxFailoverAttempts(),
+        config.getMaxRetryAttempts(), config.getFailoverSleepBaseMillis(),
+        config.getFailoverSleepMaxMillis());
 
     observerReadEnabled = conf.getBoolean(
         HdfsClientConfigKeys.DFS_CLIENT_OBSERVER_READS_ENABLED,
@@ -237,6 +241,11 @@ public class ObserverReadProxyProvider<T> extends ConfiguredFailoverProxyProvide
     return lastProxy;
   }
 
+  @VisibleForTesting
+  public RetryPolicy getObserverRetryPolicy() {
+    return observerRetryPolicy;
+  }
+
   class ObserverReadInvocationHandler implements InvocationHandler {
     final List<ProxyInfo<T>> observerProxies;
     final ProxyInfo<T> activeProxy;
@@ -301,7 +310,8 @@ public class ObserverReadProxyProvider<T> extends ConfiguredFailoverProxyProvide
             }
 
             Exception e = (Exception) ite.getCause();
-            RetryAction retryInfo = observerRetryPolicy.shouldRetry(e, 0, 0,
+            RetryAction retryInfo = observerRetryPolicy.shouldRetry(e, 0,
+                failedObserverCount,
                 method.isAnnotationPresent(Idempotent.class)
                     || method.isAnnotationPresent(AtMostOnce.class));
             if (retryInfo.action == RetryAction.RetryDecision.FAIL) {
@@ -311,6 +321,8 @@ public class ObserverReadProxyProvider<T> extends ConfiguredFailoverProxyProvide
               LOG.warn(
                   "Invocation returned exception on [{}]; {} failure(s) so far",
                   current.proxyInfo, failedObserverCount, e);
+              // add delay to make clients failover slower between observers
+              Thread.sleep(retryInfo.delayMillis);
             }
           }
         }
