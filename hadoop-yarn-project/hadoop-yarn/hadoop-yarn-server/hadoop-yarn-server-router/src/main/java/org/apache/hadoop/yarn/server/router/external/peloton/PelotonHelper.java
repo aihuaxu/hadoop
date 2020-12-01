@@ -268,7 +268,6 @@ public class PelotonHelper {
         if (getPelotonNodeLabelResponse == null
             || getPelotonNodeLabelResponse.getPelotonNodeLabel() == null
             || getPelotonNodeLabelResponse.getPelotonNodeLabel().isEmpty()) {
-          targetLabelSet.add(YarnConfiguration.DEFAULT_PELOTON_NODE_LABEL_NAME);
           LOG.info("Node label for Peloton hosts is not defined. These hosts will be added in "
               + NodeLabel.DEFAULT_NODE_LABEL_PARTITION);
         } else {
