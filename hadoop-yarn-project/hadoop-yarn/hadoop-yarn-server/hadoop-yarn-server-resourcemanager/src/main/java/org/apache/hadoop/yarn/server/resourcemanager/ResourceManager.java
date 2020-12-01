@@ -104,6 +104,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.scorer.ScorerEventType;
 import org.apache.hadoop.yarn.server.resourcemanager.scorer.ScorerService;
 import org.apache.hadoop.yarn.server.resourcemanager.security.DelegationTokenRenewer;
 import org.apache.hadoop.yarn.server.resourcemanager.security.QueueACLsManager;
+import org.apache.hadoop.yarn.server.resourcemanager.security.SecurityInfoMetrics;
 import org.apache.hadoop.yarn.server.resourcemanager.timelineservice.RMTimelineCollectorManager;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.RMWebApp;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.RMWebAppUtil;
@@ -499,7 +500,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
   }
   
   protected DelegationTokenRenewer createDelegationTokenRenewer() {
-    return new DelegationTokenRenewer();
+    return new DelegationTokenRenewer(SecurityInfoMetrics.getMetrics());
   }
 
   protected RMAppManager createRMAppManager() {

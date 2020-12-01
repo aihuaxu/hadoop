@@ -75,6 +75,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppEventType;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+
 /**
  * Service to renew application delegation tokens.
  */
@@ -95,7 +96,7 @@ public class DelegationTokenRenewer extends AbstractService {
   
   // delegation token canceler thread
   private DelegationTokenCancelThread dtCancelThread =
-    new DelegationTokenCancelThread();
+          new DelegationTokenCancelThread();
   private ThreadPoolExecutor renewerService;
 
   private ConcurrentMap<ApplicationId, Set<DelegationTokenToRenew>> appTokens =
@@ -123,6 +124,7 @@ public class DelegationTokenRenewer extends AbstractService {
   private final Map<DelegationTokenRenewerEvent, Future<?>> futures =
       new HashMap<>();
   private boolean delegationTokenRenewerPoolTrackerFlag = true;
+  private SecurityInfoMetrics securityInfoMetrics;
 
   // this config is supposedly not used by end-users.
   public static final String RM_SYSTEM_CREDENTIALS_VALID_TIME_REMAINING =
@@ -132,6 +134,11 @@ public class DelegationTokenRenewer extends AbstractService {
 
   public DelegationTokenRenewer() {
     super(DelegationTokenRenewer.class.getName());
+  }
+
+  public DelegationTokenRenewer(SecurityInfoMetrics securityInfoMetrics) {
+    this();
+    this.securityInfoMetrics = securityInfoMetrics;
   }
 
   @Override
@@ -191,6 +198,9 @@ public class DelegationTokenRenewer extends AbstractService {
 
   @Override
   protected void serviceStart() throws Exception {
+    if(securityInfoMetrics != null) {
+      dtCancelThread.setSecurityInfoMetrics(securityInfoMetrics);
+    }
     dtCancelThread.start();
     if (tokenKeepAliveEnabled) {
       delayedRemovalThread =
@@ -327,6 +337,8 @@ public class DelegationTokenRenewer extends AbstractService {
   
   
   private static class DelegationTokenCancelThread extends Thread {
+    private SecurityInfoMetrics securityInfoMetrics;
+
     private static class TokenWithConf {
       Token<?> token;
       Configuration conf;
@@ -342,7 +354,13 @@ public class DelegationTokenRenewer extends AbstractService {
       super("Delegation Token Canceler");
       setDaemon(true);
     }
-    public void cancelToken(Token<?> token,  
+
+    public DelegationTokenCancelThread(SecurityInfoMetrics securityInfoMetrics) {
+      this();
+      this.securityInfoMetrics = securityInfoMetrics;
+    }
+
+    public void cancelToken(Token<?> token,
         Configuration conf) {
       TokenWithConf tokenWithConf = new TokenWithConf(token, conf);
       while (!queue.offer(tokenWithConf)) {
@@ -356,10 +374,21 @@ public class DelegationTokenRenewer extends AbstractService {
       }
     }
 
+    public void setSecurityInfoMetrics(SecurityInfoMetrics securityInfoMetrics){
+      this.securityInfoMetrics = securityInfoMetrics;
+    }
+
     public void run() {
       TokenWithConf tokenWithConf = null;
       while (true) {
         try {
+          if(securityInfoMetrics == null) {
+            securityInfoMetrics = SecurityInfoMetrics.getMetrics();
+          }
+          securityInfoMetrics.setSizeDelegationTokenCancel(queue.size());
+          LOG.info(String.format("Added DT queue size: %d into SizeDelegationTokenCancel Metric in SecurityInfoMetrics",
+                  securityInfoMetrics.getSizeDelegationTokenCancel()));
+
           tokenWithConf = queue.take();
           final TokenWithConf current = tokenWithConf;
           if (LOG.isDebugEnabled()) {
@@ -368,7 +397,6 @@ public class DelegationTokenRenewer extends AbstractService {
           // need to use doAs so that http can find the kerberos tgt
           UserGroupInformation.getLoginUser()
             .doAs(new PrivilegedExceptionAction<Void>(){
-
               @Override
               public Void run() throws Exception {
                 current.token.cancel(current.conf);
