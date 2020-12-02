@@ -27,11 +27,14 @@ import java.text.DateFormat;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
@@ -198,7 +201,10 @@ public class Balancer {
       + "\tWhether to run the balancer during an ongoing HDFS upgrade."
       + "This is usually not desired since it will not affect used space "
       + "on over-utilized machines."
-      + "\n\t[-asService]\tRun as a long running service.";
+      + "\n\t[-asService]\tRun as a long running service."
+      + "\n\t[-sortTopNodes]"
+      + "\tSort datanodes based on the utilization so "
+      + "that highly utilized datanodes get scheduled first.";
 
   @VisibleForTesting
   private static volatile boolean serviceRunning = false;
@@ -215,6 +221,7 @@ public class Balancer {
   private final long maxSizeToMove;
   private final long defaultBlockSize;
   private final BalancerMetrics metrics;
+  private final boolean sortTopNodes;
 
   // all data node lists
   private final Collection<Source> overUtilized = new LinkedList<Source>();
@@ -316,6 +323,7 @@ public class Balancer {
     this.policy = p.getBalancingPolicy();
     this.sourceNodes = p.getSourceNodes();
     this.runDuringUpgrade = p.getRunDuringUpgrade();
+    this.sortTopNodes = p.getSortTopNodes();
 
     this.maxSizeToMove = getLongBytes(conf,
         DFSConfigKeys.DFS_BALANCER_MAX_SIZE_TO_MOVE_KEY,
@@ -363,6 +371,8 @@ public class Balancer {
       policy.accumulateSpaces(r);
     }
     policy.initAvgUtilization();
+    // Store the capacity % of over utilized nodes for sorting, if needed.
+    Map<Source, Double> overUtilizedPercentage = new HashMap<>();
 
     // create network topology and classify utilization collections: 
     //   over-utilized, above-average, below-average and under-utilized.
@@ -372,7 +382,7 @@ public class Balancer {
       final boolean isSource = Util.isIncluded(sourceNodes, dn.getDatanodeInfo());
       for(StorageType t : StorageType.getMovableTypes()) {
         final Double utilization = policy.getUtilization(r, t);
-        if (utilization == null) { // datanode does not have such storage type 
+        if (utilization == null) { // datanode does not have such storage type
           continue;
         }
         
@@ -398,6 +408,7 @@ public class Balancer {
           } else {
             overLoadedBytes += percentage2bytes(thresholdDiff, capacity);
             overUtilized.add(s);
+            overUtilizedPercentage.put(s, utilization);
           }
           g = s;
         } else {
@@ -413,6 +424,10 @@ public class Balancer {
       }
     }
 
+    if (sortTopNodes) {
+      sortOverUtilized(overUtilizedPercentage);
+    }
+
     logUtilizationCollections();
     metrics.setNumOfOverUtilizedNodes(overUtilized.size());
     metrics.setNumOfUnderUtilizedNodes(underUtilized.size());
@@ -424,6 +439,23 @@ public class Balancer {
     
     // return number of bytes to be moved in order to make the cluster balanced
     return Math.max(overLoadedBytes, underLoadedBytes);
+  }
+
+  private void sortOverUtilized(final Map<Source, Double> overUtilizedPercentage) {
+    Preconditions.checkState(overUtilized instanceof List,
+        "Collection overUtilized is not a List.");
+
+    LOG.info("Sorting over-utilized nodes by capacity" +
+        " to bring down top used datanode capacity faster");
+
+    List<Source> list = (List<Source>) overUtilized;
+    Collections.sort(list, new Comparator<Source>() {
+      @Override
+      public int compare(Source o1, Source o2) {
+        return Double.compare(overUtilizedPercentage.get(o2),
+            overUtilizedPercentage.get(o1));
+      }
+    });
   }
 
   private static long computeMaxSize2Move(final long capacity, final long remaining,
@@ -946,6 +978,10 @@ public class Balancer {
             } else if ("-asService".equalsIgnoreCase(args[i])) {
               b.setRunAsService(true);
               LOG.info("Balancer will run as a long running service");
+            } else if ("-sortTopNodes".equalsIgnoreCase(args[i])) {
+              b.setSortTopNodes(true);
+              LOG.info("Balancer will sort nodes by" +
+                  " capacity usage percentage to prioritize top used nodes");
             } else {
               throw new IllegalArgumentException("args = "
                   + Arrays.toString(args));
