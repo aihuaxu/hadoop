@@ -41,6 +41,7 @@ import org.junit.Test;
 public class TestScorerService {
   static String HOST1 = "agent1-phx2";
   static String HOST2 = "agent2-phx2";
+  static String HOST3 = "agent3-phx2";
   static int HOST_PORT = 123;
   static String PREEMPTIBLE_QUEUE = "preemptible-queue";
   static String NON_PREEMPTIBLE_QUEUE = "non-preemptible-queue";
@@ -125,7 +126,7 @@ public class TestScorerService {
   }
 
   private void initHosts() {
-    Set<String> hosts = new HashSet<>(Arrays.asList(HOST1, HOST2));
+    Set<String> hosts = new HashSet<>(Arrays.asList(HOST1, HOST2, HOST3));
     getExternalIncludedHostsResponse.setIncludedHosts(hosts);
     scorerService.initHostScoreMap();
   }
@@ -208,17 +209,6 @@ public class TestScorerService {
     NodeId nodeId1 = NodeId.newInstance(HOST1, HOST_PORT);
     rmNodes.put(nodeId1, rmNode1);
 
-    RMNodeImpl rmNode2 = mock(RMNodeImpl.class);
-    ContainerId containerId3 = mock(ContainerId.class);
-    when(containerId3.toString()).thenReturn("containerId3");
-    ContainerId containerId4 = mock(ContainerId.class);
-    when(containerId4.toString()).thenReturn("containerId4");
-    when(rmNode2.getLaunchedContainers()).thenReturn(
-      new HashSet<ContainerId>(Arrays.asList(containerId3, containerId4)));
-    when(rmNode2.getHostName()).thenReturn(HOST2);
-    NodeId nodeId2 = NodeId.newInstance(HOST2, HOST_PORT);
-    rmNodes.put(nodeId2, rmNode2);
-
     RMContainerImpl rmContainer1 = mock(RMContainerImpl.class);
     when(rmContainer1.getCreationTime()).thenReturn(System.currentTimeMillis());
     when(rmContainer1.isAMContainer()).thenReturn(true);
@@ -230,6 +220,17 @@ public class TestScorerService {
     when(rmContainer2.isAMContainer()).thenReturn(false);
     when(rmContainer2.getQueueName()).thenReturn(NON_PREEMPTIBLE_QUEUE);
     when(mockScheduler.getRMContainer(containerId2)).thenReturn(rmContainer2);
+
+    RMNodeImpl rmNode2 = mock(RMNodeImpl.class);
+    ContainerId containerId3 = mock(ContainerId.class);
+    when(containerId3.toString()).thenReturn("containerId3");
+    ContainerId containerId4 = mock(ContainerId.class);
+    when(containerId4.toString()).thenReturn("containerId4");
+    when(rmNode2.getLaunchedContainers()).thenReturn(
+      new HashSet<ContainerId>(Arrays.asList(containerId3, containerId4)));
+    when(rmNode2.getHostName()).thenReturn(HOST2);
+    NodeId nodeId2 = NodeId.newInstance(HOST2, HOST_PORT);
+    rmNodes.put(nodeId2, rmNode2);
 
     RMContainerImpl rmContainer3 = mock(RMContainerImpl.class);
     when(rmContainer3.getCreationTime()).thenReturn(System.currentTimeMillis());
@@ -243,8 +244,26 @@ public class TestScorerService {
     when(rmContainer4.getQueueName()).thenReturn(NON_PREEMPTIBLE_QUEUE);
     when(mockScheduler.getRMContainer(containerId4)).thenReturn(rmContainer4);
 
+    RMNodeImpl nonPelotonNode = mock(RMNodeImpl.class);
+    ContainerId containerId5 = mock(ContainerId.class);
+    when(containerId5.toString()).thenReturn("containerId5");
+    when(nonPelotonNode.getLaunchedContainers()).thenReturn(
+      new HashSet<ContainerId>(Arrays.asList(containerId5)));
+    when(nonPelotonNode.getHostName()).thenReturn("NonPelotonHost");
+    NodeId nonPelotonNodeId = NodeId.newInstance("NonPelotonHost", HOST_PORT);
+    rmNodes.put(nonPelotonNodeId, nonPelotonNode);
+
+    // host3 is a peloton host but has no container running
+    RMNodeImpl rmNode3 = mock(RMNodeImpl.class);
+    when(rmNode3.getLaunchedContainers()).thenReturn(
+      new HashSet<ContainerId>());
+    when(rmNode3.getHostName()).thenReturn(HOST3);
+    NodeId nodeId3 = NodeId.newInstance(HOST3, HOST_PORT);
+    rmNodes.put(nodeId3, rmNode3);
+
     scorerService.updateHostScore();
-    assertEquals(2, scorerService.getHostsScoreMap().size());
+    assertEquals(3, scorerService.getHostsScoreMap().size());
+
     assertEquals(2, scorerService.getHostsScoreMap().get(HOST1).numNonPreemptible);
     assertEquals(1, scorerService.getHostsScoreMap().get(HOST1).numAMs);
     assertEquals(2, scorerService.getHostsScoreMap().get(HOST1).numContainers);
@@ -254,5 +273,10 @@ public class TestScorerService {
     assertEquals(0, scorerService.getHostsScoreMap().get(HOST2).numAMs);
     assertEquals(2, scorerService.getHostsScoreMap().get(HOST2).numContainers);
     assertEquals(0, scorerService.getHostsScoreMap().get(HOST2).containerRunningTime, 60);
+
+    assertEquals(0, scorerService.getHostsScoreMap().get(HOST3).numNonPreemptible);
+    assertEquals(0, scorerService.getHostsScoreMap().get(HOST3).numAMs);
+    assertEquals(0, scorerService.getHostsScoreMap().get(HOST3).numContainers);
+    assertEquals(0, scorerService.getHostsScoreMap().get(HOST3).containerRunningTime);
   }
 }
