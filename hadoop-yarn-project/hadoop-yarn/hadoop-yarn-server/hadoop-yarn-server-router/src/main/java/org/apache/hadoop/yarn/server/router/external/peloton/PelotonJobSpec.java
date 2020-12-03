@@ -39,7 +39,7 @@ public class PelotonJobSpec {
     // Set of labels required for CLH to fetch pool secrets and keytab.
     POD_LABEL_MAP.put("org.apache.aurora.metadata.udeploy", "{\"svc_pconfig_dict\":{\"tier\":2}}");
     POD_LABEL_MAP.put("org.apache.aurora.metadata.udeploy_task", "{\"application_id\":\"yarn\",\"service_id\":\"yarn\"}");
-    POD_LABEL_MAP.put("org.apache.aurora.metadata.usecrets.mount", "{\"container_path\":\"/secrets\",\"host_path\":\"/secrets-tmpfs/yarn\"\"use_tmpfs\":true}");
+    POD_LABEL_MAP.put("org.apache.aurora.metadata.usecrets.mount", "{\"container_path\":\"/secrets\",\"host_path\":\"/secrets-tmpfs/yarn\",\"use_tmpfs\":true}");
     POD_LABEL_MAP.put("com.uber.peloton.metadata.usecrets.pool", "{\"pool\": \"hadoop_main\"}");
     POD_LABEL_MAP.put("com.uber.peloton.metadata.kerberos.keytab", "{\"principals\": [\"yarn/{HOST_NAME}.prod.uber.internal\"]}");
     POD_LABEL_MAP.put("org.apache.aurora.metadata.usecrets.regional", "true");
