@@ -15,5 +15,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+### Copied from start-build-env.sh, with minor changes
+
 set -e               # exit on error
-mvn clean package -DskipTests
+
+mvn clean install -DskipTests -T 32
+cd hadoop-hdfs-project
+mvn clean test -fn -Pparallel-tests

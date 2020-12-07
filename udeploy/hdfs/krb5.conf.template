@@ -1,0 +1,28 @@
+[libdefaults]
+    default_realm = $KRB_KDC_REALM
+    renew_lifetime = 7d
+    forwardable = true
+
+[realms]
+    $KRB_KDC_REALM = {
+        kdc = $KRB_KDC_HOST_ADDR
+        admin_server = $KRB_ADMIN_SERVER_HOST_ADDR
+        default_domain = $KRB_DOMAIN_REALM
+        auth_to_local = DEFAULT
+        }
+
+[domain_realm]
+    .$KRB_DOMAIN_REALM = $KRB_KDC_REALM
+    $KRB_DOMAIN_REALM = $KRB_KDC_REALM
+    localhost.localdomain = $KRB_KDC_REALM
+    localhost = $KRB_KDC_REALM
+
+[logging]
+    default = SYSLOG
+
+[appdefaults]
+    kinit = {
+        encrypt = true
+        forwardable = true
+        renewable = true
+    }
