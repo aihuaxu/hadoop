@@ -89,7 +89,7 @@ function start_zkfc() {
 
 # start balancer process.
 function start_balancer() {
-  source "${HADOOP_ENV}"; exec "${HDFS_CMD}" balancer -threshold "${BALANCER_THRESHOLD:-3}" 2>&1
+  source "${HADOOP_ENV}"; exec "${HDFS_CMD}" balancer -sortTopNodes -threshold "${BALANCER_THRESHOLD:-3}" 2>&1
 }
 
 # setup system files/dirs.
