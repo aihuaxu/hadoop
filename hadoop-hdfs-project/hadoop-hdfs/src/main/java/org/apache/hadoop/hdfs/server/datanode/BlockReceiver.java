@@ -519,7 +519,6 @@ class BlockReceiver implements Closeable {
   private int receivePacket() throws IOException {
     // read the next packet
     packetReceiver.receiveNextPacket(in);
-
     PacketHeader header = packetReceiver.getHeader();
     if (LOG.isDebugEnabled()){
       LOG.debug("Receiving one packet for block " + block +
@@ -572,6 +571,7 @@ class BlockReceiver implements Closeable {
       return 0;
     }
 
+    datanode.metrics.incrPacketsReceived();
     //First write the packet to the mirror:
     if (mirrorOut != null && !mirrorError) {
       try {
@@ -584,8 +584,11 @@ class BlockReceiver implements Closeable {
         setLastSentTime(now);
         long duration = now - begin;
         if (duration > datanodeSlowLogThresholdMs) {
-          LOG.warn("Slow BlockReceiver write packet to mirror took " + duration
-              + "ms (threshold=" + datanodeSlowLogThresholdMs + "ms)");
+          datanode.metrics.incrPacketsSlowWriteToMirror();
+          if (LOG.isWarnEnabled()) {
+            LOG.warn("Slow BlockReceiver write packet to mirror took " + duration
+                + "ms (threshold=" + datanodeSlowLogThresholdMs + "ms)");
+          }
         }
       } catch (IOException e) {
         handleMirrorOutError(e);
@@ -714,10 +717,15 @@ class BlockReceiver implements Closeable {
           // Write data to disk.
           long begin = Time.monotonicNow();
           out.write(dataBuf.array(), startByteToDisk, numBytesToDisk);
+          // no-op in prod
+          DataNodeFaultInjector.get().delayWriteToDisk();
           long duration = Time.monotonicNow() - begin;
           if (duration > datanodeSlowLogThresholdMs) {
-            LOG.warn("Slow BlockReceiver write data to disk cost:" + duration
-                + "ms (threshold=" + datanodeSlowLogThresholdMs + "ms)");
+            datanode.metrics.incrPacketsSlowWriteToDisk();
+            if (LOG.isWarnEnabled()) {
+              LOG.warn("Slow BlockReceiver write data to disk cost:" + duration
+                  + "ms (threshold=" + datanodeSlowLogThresholdMs + "ms)");
+            }
           }
 
           final byte[] lastCrc;
@@ -878,10 +886,15 @@ class BlockReceiver implements Closeable {
               block.getBlockName(), outFd, 0, dropPos, POSIX_FADV_DONTNEED);
         }
         lastCacheManagementOffset = offsetInBlock;
+        // For testing. Normally no-op.
+        DataNodeFaultInjector.get().delayWriteToOsCache();
         long duration = Time.monotonicNow() - begin;
         if (duration > datanodeSlowLogThresholdMs) {
-          LOG.warn("Slow manageWriterOsCache took " + duration
+          datanode.metrics.incrPacketsSlowWriteToOsCache();
+          if (LOG.isWarnEnabled()) {
+            LOG.warn("Slow manageWriterOsCache took " + duration
               + "ms (threshold=" + datanodeSlowLogThresholdMs + "ms)");
+          }
         }
       }
     } catch (Throwable t) {
@@ -1133,7 +1146,7 @@ class BlockReceiver implements Closeable {
    */
   class PacketResponder implements Runnable, Closeable {   
     /** queue for packets waiting for ack - synchronization using monitor lock */
-    private final LinkedList<Packet> ackQueue = new LinkedList<Packet>(); 
+    private final LinkedList<Packet> ackQueue = new LinkedList<Packet>();
     /** the thread that spawns this responder */
     private final Thread receiverThread = Thread.currentThread();
     /** is this responder running? - synchronization using monitor lock */
