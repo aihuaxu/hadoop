@@ -62,4 +62,14 @@ public class DataNodeFaultInjector {
 
   public void throwTooManyOpenFiles() throws FileNotFoundException {
   }
+
+  /**
+   * Used as a hook to delay writing a packet to disk.
+   */
+  public void delayWriteToDisk() {}
+
+  /**
+   * Used as a hook to delay writing a packet to os cache.
+   */
+  public void delayWriteToOsCache() {}
 }

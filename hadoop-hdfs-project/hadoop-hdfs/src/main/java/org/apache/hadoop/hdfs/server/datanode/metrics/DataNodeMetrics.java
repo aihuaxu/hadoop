@@ -126,6 +126,11 @@ public class DataNodeMetrics {
   @Metric MutableRate sendDataPacketTransferNanos;
   final MutableQuantiles[] sendDataPacketTransferNanosQuantiles;
 
+  @Metric MutableCounterLong packetsReceived;
+  @Metric MutableCounterLong packetsSlowWriteToMirror;
+  @Metric MutableCounterLong packetsSlowWriteToDisk;
+  @Metric MutableCounterLong packetsSlowWriteToOsCache;
+
   final MetricsRegistry registry = new MetricsRegistry("datanode");
   final String name;
   JvmMetrics jvmMetrics = null;
@@ -414,5 +419,21 @@ public class DataNodeMetrics {
     for (MutableQuantiles q : ramDiskBlocksLazyPersistWindowMsQuantiles) {
       q.add(latencyMs);
     }
+  }
+
+  public void incrPacketsReceived() {
+    packetsReceived.incr();
+  }
+
+  public void incrPacketsSlowWriteToMirror() {
+    packetsSlowWriteToMirror.incr();
+  }
+
+  public void incrPacketsSlowWriteToDisk() {
+    packetsSlowWriteToDisk.incr();
+  }
+
+  public void incrPacketsSlowWriteToOsCache() {
+    packetsSlowWriteToOsCache.incr();
   }
 }
