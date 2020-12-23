@@ -104,8 +104,8 @@ public class YoPService extends AbstractService {
         try {
           LOG.info("YARN on Peloton monitoring thread is running");
           pelotonHelper.connectPelotonServices();
-          LOG.info("Get ordered list of hosts....");
-          pelotonHelper.getOrderedHosts();
+          LOG.info("set reclaimer hosts....");
+          pelotonHelper.setReclaimerHosts();
           LOG.info("Start NMs on Peloton....");
           pelotonHelper.startNMsOnPeloton();
         } catch (Exception e) {

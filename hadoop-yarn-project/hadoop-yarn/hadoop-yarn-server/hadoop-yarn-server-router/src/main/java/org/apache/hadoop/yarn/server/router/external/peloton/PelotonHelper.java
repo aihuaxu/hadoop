@@ -1,5 +1,6 @@
 package org.apache.hadoop.yarn.server.router.external.peloton;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.peloton.api.v0.host.svc.pb.HostSvc.QueryHostsRequest;
 import com.peloton.api.v0.host.svc.pb.HostSvc.QueryHostsResponse;
 import com.peloton.api.v0.host.svc.pb.HostSvc.SetReclaimHostOrderRequest;
@@ -70,6 +71,7 @@ public class PelotonHelper {
   private List<PelotonClientWrapper> pelotonClientWrapperList;
   private Configuration conf;
   private YoPMetrics metrics;
+  private boolean isTest = false;
 
   //username and password for Peloton gRPC connection
   private String yarnUser = "";
@@ -86,11 +88,7 @@ public class PelotonHelper {
     this.metrics = YoPMetrics.getMetrics();
   }
 
-  protected void getOrderedHosts() {
-    if (!isInitialized) {
-      LOG.warn("not initialized.");
-      return;
-    }
+  protected List<String> getOrderedHostsListFromRM() {
     long getHostOrderStartTime = monotonicNow();
     GetOrderedHostsRequest request = GetOrderedHostsRequest.newInstance();
     List<String> orderedList = null;
@@ -103,6 +101,14 @@ public class PelotonHelper {
       LOG.error("Error getting OrderedHosts", e);
       metrics.incrGetOrderedHostsFromRMFailure();
     }
+    return orderedList;
+  }
+  protected void setReclaimerHosts() {
+    if (!isInitialized) {
+      LOG.warn("not initialized.");
+      return;
+    }
+    List<String> orderedList = getOrderedHostsListFromRM();
     if (orderedList != null && !orderedList.isEmpty()) {
       for (PelotonClientWrapper clientWrapper : pelotonClientWrapperList) {
         try {
@@ -183,7 +189,13 @@ public class PelotonHelper {
         clientWrapper.setHostManagerClient(new HostManager(CLIENT_NAME, pelotonZK));
         clientWrapper.getHostManagerClient().setAuth(yarnUser, yarnPassword);
         clientWrapper.setResourceManagerClient(new ResourceManager(CLIENT_NAME, pelotonZK));
-        clientWrapper.getResourceManagerClient().setAuth(yarnUser, yarnPassword);
+        // disable this logical when running unit tests due to
+        // ResourceManager(Peloton) class is extended from Peloton class and setAuth does not override in ResouceManager class,
+        // also, Peloton abstract class is not public so cannot Mock on parent Peloton class.
+        // Thus, the unit test will fail.
+        if (!isTest) {
+          clientWrapper.getResourceManagerClient().setAuth(yarnUser, yarnPassword);
+        }
         clientWrapper.setStatelessSvcClient(new StatelessJobService(CLIENT_NAME, pelotonZK));
         clientWrapper.getStatelessSvcClient().setAuth(yarnUser, yarnPassword);
         pelotonClientWrapperList.add(clientWrapper);
@@ -479,4 +491,23 @@ public class PelotonHelper {
     return this.conf;
   }
 
+  @VisibleForTesting
+  protected boolean isInitialized() {
+    return isInitialized;
+  }
+
+  @VisibleForTesting
+  protected List<PelotonClientWrapper> getClientWrapper() {
+    return this.pelotonClientWrapperList;
+  }
+
+  @VisibleForTesting
+  protected void enableTest() {
+    this.isTest = true;
+  }
+
+  @VisibleForTesting
+  protected boolean isTest() {
+    return this.isTest;
+  }
 }
