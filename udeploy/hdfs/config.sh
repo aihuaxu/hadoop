@@ -73,7 +73,12 @@ config_secrets() {
     for dir in $(ls / | grep data[0-9][0-9]); do
       target_dir="/${dir}/dfs"
       if [ -d "${target_dir}" ]; then
-        sudo chmod 700 ${target_dir}
+        {
+          sudo chmod 700 ${target_dir}
+        } || {
+          # by pass error, see https://t3.uberinternal.com/browse/HDFS-619
+          echo "bad data dir ${target_dir}"
+        }
       fi
     done
   fi
