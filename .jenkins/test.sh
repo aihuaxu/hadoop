@@ -19,6 +19,6 @@
 
 set -e               # exit on error
 
-mvn clean install -DskipTests -T 32
+MAVEN_OPTS="-Xms256m -Xmx1536m" mvn clean install -DskipTests -T 32
 cd hadoop-hdfs-project
-mvn clean test -fn -Pparallel-tests
+MAVEN_OPTS="-Xms256m -Xmx1536m" mvn clean test -fn -Pparallel-tests

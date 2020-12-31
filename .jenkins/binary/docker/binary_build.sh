@@ -33,7 +33,7 @@ mkdir -p /build_dir
 rsync -a /hadoop /build_dir
 
 pushd /build_dir/hadoop
-mvn -X -B clean package \
+MAVEN_OPTS="-Xms256m -Xmx1536m" mvn -X -B clean package \
     -Pdist,native \
     -Drequire.snappy \
     -Dbundle.snappy \
