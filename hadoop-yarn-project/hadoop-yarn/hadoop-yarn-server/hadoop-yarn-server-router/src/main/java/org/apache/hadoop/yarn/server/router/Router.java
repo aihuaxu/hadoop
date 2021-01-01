@@ -128,6 +128,8 @@ public class Router extends CompositeService {
 
   private static final String METRICS_NAME = "Router";
 
+  private boolean isTest = false;
+
   public Router() {
     super(Router.class.getName());
   }
@@ -143,7 +145,7 @@ public class Router extends CompositeService {
     // if security is enable, set routerLoginUGI as UGI of loginUser
     // getLoginUser function will call spawnAutoRenewalThreadForUserCreds which
     // handles the auto renew token.
-    if (UserGroupInformation.isSecurityEnabled()) {
+    if (UserGroupInformation.isSecurityEnabled() || isTest) {
       this.routerLoginUGI = UserGroupInformation.getLoginUser();
     }
   }
@@ -216,7 +218,9 @@ public class Router extends CompositeService {
 
   @Override
   protected void serviceStart() throws Exception {
-    startWepApp();
+    if (!isTest) {
+      startWepApp();
+    }
     super.serviceStart();
     // Router is running now
     updateRouterState(RouterServiceState.RUNNING);
@@ -532,5 +536,10 @@ public class Router extends CompositeService {
         addService(yopService);
       }
     }
+  }
+
+  @VisibleForTesting
+  public void enableTest() {
+    isTest = true;
   }
 }
