@@ -52,6 +52,16 @@ function start_namenode() {
   # INIT not set -> standby NN in initialization,
   # INIT == false -> maybe a replacement standby NN in running cluster.
   else
+    # Delete the existing fsimage before bootstrap
+    if [ "${container_type}" == "ob" ]; then
+      sudo rm -rf /data/dfs/name-data/
+      if [ $? -ne 0 ]; then
+        echo 'ERROR: Failed to delete fsimage directory.'
+        # Not exit on error as it is expected if fsimage does not exist.
+      else
+        echo 'INFO: Successfully deleted fsimage directory.'
+      fi
+    fi
     source "${HADOOP_ENV}"; "${HDFS_START_SCRIPT}" namenode -bootstrapStandby ${init_option}
     if [ $? -ne 0 ]; then
       echo 'ERROR: Failed to bootstrap standby namenode.'
