@@ -1345,7 +1345,7 @@ public class CapacityScheduler extends
     // Check if node is stressed and scheduling on stressed node is not allowed
     if (!schedulingOnStressedNodesAllowed &&
         rmContext.getStressedRMNodes().containsKey(node.getNodeID())) {
-      LOG.error("Trying to schedule on a stressed node, when it is not allowed." +
+      LOG.warn("Trying to schedule on a stressed node, when it is not allowed." +
           " Stressed node : " + node.getNodeName());
       return null;
     }
