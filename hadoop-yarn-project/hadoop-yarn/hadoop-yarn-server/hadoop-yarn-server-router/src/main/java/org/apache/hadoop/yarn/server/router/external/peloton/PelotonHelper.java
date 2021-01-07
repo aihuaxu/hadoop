@@ -266,54 +266,66 @@ public class PelotonHelper {
       LOG.warn("not initialized.");
       return;
     }
+    Set<String> hostSetToInclude = new HashSet<>();
+    Map<NodeId, Set<String>> nodeLabels = new HashMap<>();
+    Set<String> targetLabelSet = new HashSet<>();
     for (PelotonClientWrapper clientWrapper: pelotonClientWrapperList) {
       LOG.info("startNMsOnPeloton in Peloton cluster " + clientWrapper.getPelotonZKInfo());
+      Set<String> hostSetToIncludePerPelotonCluster = new HashSet<>();
       try {
         int instanceNumber = 0;
         QueryHostsResponse queryHostsResponse = queryActiveHostsInSharedPool(clientWrapper.getHostService());
-        Set<String> hostSetToInclude = new HashSet<>();
-        Map<NodeId, Set<String>> nodeLabels = new HashMap<>();
-        Set<String> targetLabelSet = new HashSet<>();
-        GetPelotonNodeLabelResponse getPelotonNodeLabelResponse = getPelotonNodeLabelRecordStore().getPelotonNodeLabel(
-            GetPelotonNodeLabelRequest.newInstance()
-        );
-        if (getPelotonNodeLabelResponse == null
-            || getPelotonNodeLabelResponse.getPelotonNodeLabel() == null
-            || getPelotonNodeLabelResponse.getPelotonNodeLabel().isEmpty()) {
-          LOG.info("Node label for Peloton hosts is not defined. These hosts will be added in "
-              + NodeLabel.DEFAULT_NODE_LABEL_PARTITION);
-        } else {
-          String nodeLabel = getPelotonNodeLabelResponse.getPelotonNodeLabel();
-          targetLabelSet.add(nodeLabel);
-          LOG.info("Peloton hosts node label is " + nodeLabel);
-        }
         if (queryHostsResponse.getHostInfosList() != null) {
           instanceNumber = queryHostsResponse.getHostInfosCount();
           for (HostInfo hostInfo : queryHostsResponse.getHostInfosList()) {
             String hostName = hostInfo.getHostname();
             NodeId nodeId = ConverterUtils.toNodeIdWithDefaultPort(hostName);
-            hostSetToInclude.add(hostInfo.getHostname());
+            hostSetToIncludePerPelotonCluster.add(hostInfo.getHostname());
             nodeLabels.put(nodeId, targetLabelSet);
           }
           LOG.debug("Peloton {} pool has {} active hosts for YARN: {}",
-            PelotonJobSpec.Constants.PELOTON_HOST_POOL_SHARED_TO_YARN, instanceNumber, hostSetToInclude);
-          try {
-            IncludeExternalHostsRequest request = IncludeExternalHostsRequest.newInstance(hostSetToInclude);
-            clientRMService.includeExternalHosts(request);
-            ReplaceLabelsOnNodeRequest replaceLabelRequest = ReplaceLabelsOnNodeRequest.newInstance(nodeLabels);
-            rmAdminProxy.replaceLabelsOnNode(replaceLabelRequest);
-            LOG.info("includeExternalHosts and replace node label request succeed.");
-          } catch (Exception e) {
-            LOG.error("Failed to include hosts or replace the node label");
-          }
-          createNMJob(
-            instanceNumber,
+            PelotonJobSpec.Constants.PELOTON_HOST_POOL_SHARED_TO_YARN, instanceNumber, hostSetToIncludePerPelotonCluster);
+          clientWrapper.setInstanceNumber(instanceNumber);
+          hostSetToInclude.addAll(hostSetToIncludePerPelotonCluster);
+        }
+      } catch (Exception e) {
+        LOG.error("Exception occurred when get peloton hosts info with ZK info {}", clientWrapper.getPelotonZKInfo(), e);
+      }
+    }
+
+    LOG.info("calling RM to include hosts and set up node label for peloton hosts, number of hosts: " + hostSetToInclude.size());
+    try {
+      IncludeExternalHostsRequest request = IncludeExternalHostsRequest.newInstance(hostSetToInclude);
+      clientRMService.includeExternalHosts(request);
+      GetPelotonNodeLabelResponse getPelotonNodeLabelResponse = getPelotonNodeLabelRecordStore().getPelotonNodeLabel(
+          GetPelotonNodeLabelRequest.newInstance()
+      );
+      if (getPelotonNodeLabelResponse == null
+          || getPelotonNodeLabelResponse.getPelotonNodeLabel() == null
+          || getPelotonNodeLabelResponse.getPelotonNodeLabel().isEmpty()) {
+        LOG.info("Node label for Peloton hosts is not defined. These hosts will be added in "
+            + NodeLabel.DEFAULT_NODE_LABEL_PARTITION);
+      } else {
+        String nodeLabel = getPelotonNodeLabelResponse.getPelotonNodeLabel();
+        targetLabelSet.add(nodeLabel);
+        LOG.info("Peloton hosts node label is " + nodeLabel);
+      }
+      ReplaceLabelsOnNodeRequest replaceLabelRequest = ReplaceLabelsOnNodeRequest.newInstance(nodeLabels);
+      rmAdminProxy.replaceLabelsOnNode(replaceLabelRequest);
+      LOG.info("includeExternalHosts and replace node label request succeed.");
+    } catch (Exception e) {
+      LOG.error("Failed to include hosts or replace the node label");
+    }
+
+    for (PelotonClientWrapper clientWrapper: pelotonClientWrapperList) {
+      try {
+        createNMJob(
+            clientWrapper.getInstanceNumber(),
             clientWrapper.getResourceManager(),
             clientWrapper.getJobSvc(),
             clientWrapper.getPelotonZKInfo());
-        }
       } catch (Exception e) {
-        LOG.error("Exception occurred", e);
+        LOG.error("Exception occurred when create NM Job", e);
       }
     }
   }

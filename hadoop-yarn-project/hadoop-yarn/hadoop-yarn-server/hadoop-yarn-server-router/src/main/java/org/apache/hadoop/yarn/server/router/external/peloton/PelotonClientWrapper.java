@@ -12,6 +12,7 @@ import peloton.api.v1alpha.peloton.Peloton.JobID;
 public class PelotonClientWrapper {
 
   private PelotonZKInfo zkInfo;
+  private int instanceNumber = 0;
 
   private HostManager hostManagerClient;
   private ResourceManager resourceManagerClient;
@@ -60,6 +61,10 @@ public class PelotonClientWrapper {
     this.pelotonJobId = jobId;
   }
 
+  public void setInstanceNumber(int instanceNumber) {
+    this.instanceNumber = instanceNumber;
+  }
+
   public PelotonZKInfo getPelotonZKInfo() {
     return zkInfo;
   }
@@ -89,5 +94,9 @@ public class PelotonClientWrapper {
   }
   public JobID getPelotonJobId () {
     return pelotonJobId;
+  }
+
+  public int getInstanceNumber() {
+    return instanceNumber;
   }
 }
