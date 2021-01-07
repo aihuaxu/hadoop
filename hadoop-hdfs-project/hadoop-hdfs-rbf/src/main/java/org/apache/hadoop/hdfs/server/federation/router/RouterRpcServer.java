@@ -55,6 +55,7 @@ import org.apache.hadoop.fs.permission.AclEntry;
 import org.apache.hadoop.fs.permission.AclStatus;
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.ha.HAServiceProtocol;
 import org.apache.hadoop.hdfs.AddBlockFlag;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSUtil;
@@ -2551,5 +2552,23 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol {
   @VisibleForTesting
   public Configuration getConf() {
     return conf;
+  }
+
+
+  @Override
+  public HAServiceProtocol.HAServiceState getHAServiceState() throws IOException {
+    return null;
+  }
+
+  @Override
+  public void msync() throws IOException {
+    checkOperation(OperationCategory.WRITE);
+
+    String ns = subclusterResolver.getDefaultNamespace();
+    RemoteMethod remoteMethod = new RemoteMethod("msync",
+            new Class<?>[] {String.class, long.class, long.class},
+            new RemoteParam(), offset, length);
+
+    rpcClient.invokeSingle(ns, remoteMethod);
   }
 }

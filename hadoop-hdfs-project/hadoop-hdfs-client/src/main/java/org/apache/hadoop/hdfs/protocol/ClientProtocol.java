@@ -27,6 +27,7 @@ import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.crypto.CryptoProtocolVersion;
 import org.apache.hadoop.fs.*;
 import org.apache.hadoop.fs.BatchedRemoteIterator.BatchedEntries;
+import org.apache.hadoop.ha.HAServiceProtocol;
 import org.apache.hadoop.hdfs.AddBlockFlag;
 import org.apache.hadoop.fs.permission.AclEntry;
 import org.apache.hadoop.fs.permission.AclStatus;
@@ -1735,4 +1736,23 @@ public interface ClientProtocol {
    */
   @Idempotent
   List<Path> getRemoteLocation(String src) throws IOException;
+
+  /**
+   * Get HA service state of the server.
+   *
+   * @return server HA state
+   * @throws IOException
+   */
+  @Idempotent
+  HAServiceProtocol.HAServiceState getHAServiceState() throws IOException;
+
+  /**
+   * Called by client to wait until the server has reached the state id of the
+   * client. The client and server state id are given by client side and server
+   * side alignment context respectively. This can be a blocking call.
+   *
+   * @throws IOException
+   */
+  @Idempotent
+  void msync() throws IOException;
 }
