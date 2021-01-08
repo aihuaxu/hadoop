@@ -644,6 +644,9 @@ public class Client implements AutoCloseable {
         LOG.warn("Address change detected. Old: " + server.toString() +
                                  " New: " + currentAddr.toString());
         server = currentAddr;
+        // Update remoteId so next connection gets updated address as well
+        remoteId.address = currentAddr;
+
         return true;
       }
       return false;
