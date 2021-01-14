@@ -472,6 +472,14 @@ public class NameNode implements NameNodeStatusMXBean {
   }
 
   /**
+   * Get the namenode configuration.
+   * NOTE: this should be no longer needed with HDFS-1477.
+   */
+  public Configuration getConf() {
+    return conf;
+  }
+
+  /**
    * Set the configuration property for the service rpc address
    * to address
    */
