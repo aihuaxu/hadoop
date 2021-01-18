@@ -56,7 +56,6 @@ public class ConnectionManager {
    */
   protected static final float MIN_ACTIVE_RATIO = 0.5f;
 
-
   /**
    * Configuration for the connection manager, pool and sockets.
    */
@@ -308,6 +307,43 @@ public class ConnectionManager {
   }
 
   /**
+   * Get number of idle connections.
+   *
+   * @return Number of active connections.
+   */
+  public int getNumIdleConnections() {
+    int total = 0;
+    readLock.lock();
+    try {
+      for (ConnectionPool pool : this.pools.values()) {
+        total += pool.getNumIdleConnections();
+      }
+    } finally {
+      readLock.unlock();
+    }
+    return total;
+  }
+
+  /**
+   * Get number of recently active connections.
+   *
+   * @return Number of recently active connections.
+   */
+  public int getNumActiveConnectionsRecently() {
+    int total = 0;
+    readLock.lock();
+    try {
+      for (ConnectionPool pool : this.pools.values()) {
+        total += pool.getNumActiveConnectionsRecently();
+      }
+    } finally {
+      readLock.unlock();
+    }
+    return total;
+  }
+
+
+  /**
    * Get the number of connections to be created.
    *
    * @return Number of connections to be created.
@@ -353,11 +389,14 @@ public class ConnectionManager {
       // Check if the pool hasn't been active in a while or not 50% are used
       long timeSinceLastActive = Time.now() - pool.getLastActiveTime();
       int total = pool.getNumConnections();
-      int active = pool.getNumActiveConnections();
+      int activeRecently = pool.getNumActiveConnectionsRecently();
       if (timeSinceLastActive > connectionCleanupPeriodMs ||
-              active < MIN_ACTIVE_RATIO * total) {
-        // Remove and close 1 connection
-        List<ConnectionContext> conns = pool.removeConnections(1);
+          activeRecently < MIN_ACTIVE_RATIO * total) {
+        // Be greedy here to close as many connections as possible in one shot
+        int targetConnectionsCount =
+            (int)(MIN_ACTIVE_RATIO * total) - activeRecently;
+        List<ConnectionContext> conns =
+            pool.removeConnections(targetConnectionsCount);
         for (ConnectionContext conn : conns) {
           conn.close();
         }
@@ -391,16 +430,16 @@ public class ConnectionManager {
                   currentTime > (lastTimeActive + poolCleanupPeriodMs);
           if (lastTimeActive > 0 && isStale) {
             // Remove this pool
-            LOG.debug("Closing and removing stale pool {}", pool);
             pool.close();
             ConnectionPoolId poolId = entry.getKey();
             toRemove.add(poolId);
           } else {
             // Keep this pool but clean connections inside
-            LOG.debug("Cleaning up {}", pool);
             cleanup(pool);
           }
         }
+      } catch (Exception e) {
+        LOG.error("clean up task run into exception", e);
       } finally {
         readLock.unlock();
       }
@@ -412,6 +451,8 @@ public class ConnectionManager {
           for (ConnectionPoolId poolId : toRemove) {
             pools.remove(poolId);
           }
+        } catch (Exception e) {
+          LOG.error("clean up task run into exception when removing", e);
         } finally {
           writeLock.unlock();
         }
@@ -449,7 +490,7 @@ public class ConnectionManager {
           ConnectionPool pool = this.queue.take();
           try {
             int total = pool.getNumConnections();
-            int active = pool.getNumActiveConnections();
+            int active = pool.getNumActiveConnectionsRecently();
             if (pool.getNumConnections() < pool.getMaxSize() &&
                     active >= MIN_ACTIVE_RATIO * total) {
               long startTime = Time.now();
