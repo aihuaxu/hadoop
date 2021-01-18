@@ -150,8 +150,10 @@ public class TestConnectionManager {
       if (e.getKey().getUgi() == ugi) {
         assertEquals(numOfConns, e.getValue().getNumConnections());
         assertEquals(numOfActiveConns, e.getValue().getNumActiveConnections());
+        // idle + active = total connections
+        assertEquals(numOfConns - numOfActiveConns,
+            e.getValue().getNumIdleConnections());
       }
     }
   }
-
 }
