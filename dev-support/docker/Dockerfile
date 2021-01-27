@@ -118,6 +118,8 @@ RUN apt-get -q install --no-install-recommends -y bats
 # Install pylint
 ####
 RUN pip install -U pip setuptools wheel
+
+RUN pip2 install --upgrade pip==20.3.4
 RUN pip install pylint
 
 ####
