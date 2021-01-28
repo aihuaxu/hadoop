@@ -91,7 +91,6 @@ public class SaslRpcClient {
   private SaslClient saslClient;
   private SaslPropertiesResolver saslPropsResolver;
   private AuthMethod authMethod;
-  
   private static final RpcRequestHeaderProto saslHeader = ProtoUtil
       .makeRpcRequestHeader(RpcKind.RPC_PROTOCOL_BUFFER,
           OperationProto.RPC_FINAL_PACKET, AuthProtocol.SASL.callId,

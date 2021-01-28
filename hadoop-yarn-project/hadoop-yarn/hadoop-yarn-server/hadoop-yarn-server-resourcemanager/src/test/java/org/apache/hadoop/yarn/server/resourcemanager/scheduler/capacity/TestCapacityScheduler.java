@@ -2645,7 +2645,7 @@ public class TestCapacityScheduler {
     queueA1M.incrPendingResources(rmContainer.getNodeLabelExpression(),
         "user1", 1, resource);
     queueA1M.allocateResources(rmContainer.getNodeLabelExpression(),
-        "user1", resource);
+        "user1", 1, resource, true);
     // remove attempt
     sch.handle(new AppAttemptRemovedSchedulerEvent(appAttemptId,
         RMAppAttemptState.KILLED, true));

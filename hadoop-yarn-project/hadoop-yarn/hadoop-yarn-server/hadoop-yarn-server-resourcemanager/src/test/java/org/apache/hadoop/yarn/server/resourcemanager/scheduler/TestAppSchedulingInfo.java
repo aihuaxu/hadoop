@@ -45,9 +45,10 @@ public class TestAppSchedulingInfo {
 
     FSLeafQueue queue = mock(FSLeafQueue.class);
     doReturn("test").when(queue).getQueueName();
+    RMContext rmContext = mock(RMContext.class);
     AppSchedulingInfo appSchedulingInfo = new AppSchedulingInfo(appAttemptId,
         "test", queue, null, 0, new ResourceUsage(),
-        new HashMap<String, String>(), null);
+        new HashMap<String, String>(), rmContext);
 
     appSchedulingInfo.updatePlacesBlacklistedByApp(new ArrayList<String>(),
         new ArrayList<String>());
@@ -117,9 +118,10 @@ public class TestAppSchedulingInfo {
 
     Queue queue = mock(Queue.class);
     doReturn(mock(QueueMetrics.class)).when(queue).getMetrics();
+    RMContext rmContext = mock(RMContext.class);
     AppSchedulingInfo  info = new AppSchedulingInfo(
         appAttemptId, "test", queue, mock(ActiveUsersManager.class), 0,
-        new ResourceUsage(), new HashMap<String, String>(), mock(RMContext.class));
+        new ResourceUsage(), new HashMap<String, String>(), rmContext);
     Assert.assertEquals(0, info.getSchedulerKeys().size());
 
     Priority pri1 = Priority.newInstance(1);

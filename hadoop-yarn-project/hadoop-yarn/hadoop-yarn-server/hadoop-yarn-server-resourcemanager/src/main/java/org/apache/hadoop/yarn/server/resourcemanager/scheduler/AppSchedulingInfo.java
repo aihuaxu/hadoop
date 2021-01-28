@@ -93,7 +93,6 @@ public class AppSchedulingInfo {
   private final Map<String, String> applicationSchedulingEnvs = new HashMap<>();
   private final RMContext rmContext;
 
-
   public AppSchedulingInfo(ApplicationAttemptId appAttemptId, String user,
       Queue queue, AbstractUsersManager abstractUsersManager, long epoch,
       ResourceUsage appResourceUsage,
@@ -452,7 +451,7 @@ public class AppSchedulingInfo {
 
   public List<ResourceRequest> allocate(NodeType type,
       SchedulerNode node, SchedulerRequestKey schedulerKey,
-      Container containerAllocated) {
+      RMContainer containerAllocated) {
     try {
       writeLock.lock();
 
@@ -611,7 +610,7 @@ public class AppSchedulingInfo {
   }
 
   private void updateMetricsForAllocatedContainer(NodeType type,
-      SchedulerNode node, Container containerAllocated) {
+      SchedulerNode node, RMContainer containerAllocated) {
     QueueMetrics metrics = queue.getMetrics();
     if (pending) {
       // once an allocation is done we assume the application is
@@ -622,14 +621,17 @@ public class AppSchedulingInfo {
 
     if (LOG.isDebugEnabled()) {
       LOG.debug("allocate: applicationId=" + applicationId + " container="
-          + containerAllocated.getId() + " host=" + containerAllocated
+          + containerAllocated.getContainer().getId() + " host=" + containerAllocated
           .getNodeId().toString() + " user=" + user + " resource="
-          + containerAllocated.getResource() + " type="
+          + containerAllocated.getContainer().getResource() + " type="
           + type);
     }
+
     if(node != null) {
       metrics.allocateResources(node.getPartition(), user, 1,
-          containerAllocated.getResource(), true);
+          containerAllocated.getContainer().getResource(), false);
+      metrics.decrPendingResources(containerAllocated.getNodeLabelExpression(),
+          user, 1, containerAllocated.getContainer().getResource());
     }
     metrics.incrNodeTypeAggregations(user, type);
   }
@@ -673,6 +675,10 @@ public class AppSchedulingInfo {
     } finally {
       this.readLock.unlock();
     }
+  }
+
+  public RMContext getRMContext() {
+    return this.rmContext;
   }
 
   /**
