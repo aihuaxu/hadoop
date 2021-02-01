@@ -7,7 +7,8 @@ java_standard:
   build_cmds:
     - RUN echo 'This is hdfs build'
   post_build_cmds:
-    - RUN echo hdfs hadoop supergroup | xargs -n 1 groupadd -r && useradd -r -m -s /bin/bash -g hadoop -g hdfs hdfs && usermod -a -G sudo,supergroup udocker && sed -i -e 's/%sudo\s\+ALL=(ALL:ALL)\s\+ALL/%sudo ALL=(ALL) NOPASSWD:ALL/g' /etc/sudoers
+    - RUN usermod -a -G sudo udocker && sed -i -e 's/%sudo\s\+ALL=(ALL:ALL)\s\+ALL/%sudo ALL=(ALL) NOPASSWD:ALL/g' /etc/sudoers
+    - RUN mkdir -p /etc/ubernss && chown udocker:udocker /etc/ubernss && sed -Ei '/^passwd|^group/{/uber/!s/$/ uber/}' /etc/nsswitch.conf
     - RUN mkdir -p /opt/hdfs/binary /opt/hdfs/conf /opt/hdfs/scripts /opt/hadoop/keytabs /var/log/hadoop /opt/hdfs/hosts
     - RUN chmod 777 /var/log/hadoop && chown -R udocker:udocker /opt/hdfs && chown -R udocker:udocker /opt/hadoop && chown -R udocker:udocker /run
     - RUN wget -O /tmp/hadoop.tar.gz http://artifactory.uber.internal:4587/artifactory/pub/hadoop/binary/${GIT_REF}/hadoop.tar.gz && tar -zxf /tmp/hadoop.tar.gz -C /opt/hdfs/binary --strip 1 && rm -f /tmp/hadoop.tar.gz
@@ -32,10 +33,12 @@ debian_packages_for_build:
 
 debian_packages_for_runtime:
   - name: rsync
+  - name: uber-usergroups
+  - name: ubernss
 
 applications:
   - udeploy_app_id: hdfs
     app_type: command_line
     command_line:
-      run_cmd: '/bin/bash ./udeploy/hdfs/start.sh'
+      run_cmd: '/usr/bin/usergroups-exec -t 5m -d data -- /bin/bash ./udeploy/hdfs/start.sh'
     health_check: none
