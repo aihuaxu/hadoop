@@ -119,13 +119,14 @@ RUN apt-get -q install --no-install-recommends -y bats
 ####
 # Install pylint
 ####
-RUN pip install -U pip setuptools==44 wheel
-RUN pip install pylint
+RUN pip2 install --upgrade pip==20.3.4
+RUN pip2 install -U pip setuptools wheel
+RUN pip2 install pylint
 
 ####
 # Install dateutil.parser
 ####
-RUN pip install python-dateutil
+RUN pip2 install python-dateutil
 
 ###
 # Avoid out of memory errors in builds
