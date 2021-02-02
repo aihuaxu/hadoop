@@ -40,7 +40,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.*;
 import java.util.concurrent.Executor;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.TimeUnit;
@@ -76,7 +75,6 @@ import org.apache.hadoop.hdfs.protocol.RecoveryInProgressException;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.ReplicaState;
 import org.apache.hadoop.hdfs.server.common.Storage;
 import org.apache.hadoop.hdfs.server.datanode.BlockMetadataHeader;
-import org.apache.hadoop.hdfs.server.datanode.BlockScanner;
 import org.apache.hadoop.hdfs.server.datanode.DataNode;
 import org.apache.hadoop.hdfs.server.datanode.metrics.DataNodeMetricHelper;
 import org.apache.hadoop.hdfs.server.datanode.DataStorage;
@@ -171,7 +169,9 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
               volume.getDfsUsed(),
               volume.getAvailable(),
               volume.getBlockPoolUsed(bpid),
-              volume.getNonDfsUsed());
+              volume.getNonDfsUsed(),
+              volume.getMount()
+          );
           reports.add(sr);
         } catch (ClosedChannelException e) {
           continue;
@@ -189,6 +189,10 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
           volumeMap.get(b.getBlockPoolId(), b.getLocalBlock());
       return r != null ? (FsVolumeImpl) r.getVolume() : null;
     }
+  }
+
+  MountVolumeMap getMountVolumeMap() {
+    return volumes.getMountVolumeMap();
   }
 
   @Override // FsDatasetSpi
@@ -326,7 +330,7 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
             RoundRobinVolumeChoosingPolicy.class,
             VolumeChoosingPolicy.class), conf);
     volumes = new FsVolumeList(volumeFailureInfos, datanode.getBlockScanner(),
-        blockChooserImpl);
+        blockChooserImpl, conf);
     asyncDiskService = new FsDatasetAsyncDiskService(datanode, this);
     asyncLazyPersistService = new RamDiskAsyncLazyPersistService(datanode, conf);
     deletingBlock = new HashMap<String, Set<Long>>();
@@ -412,6 +416,21 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
         final String errorMsg = String.format(
             "Found duplicated storage UUID: %s in %s.",
             sd.getStorageUuid(), sd.getVersionFile());
+        LOG.error(errorMsg);
+        throw new IOException(errorMsg);
+      }
+      // Check if there is same storage type on the mount.
+      // Only useful when same disk tiering is turned on.
+      FsVolumeImpl volumeImpl = (FsVolumeImpl) ref.getVolume();
+      FsVolumeReference checkRef = volumes
+          .getMountVolumeMap()
+          .getVolumeRefByMountAndStorageType(
+              volumeImpl.getMount(), volumeImpl.getStorageType());
+      if (checkRef != null) {
+        final String errorMsg = String.format(
+            "Storage type %s already exists on same mount: %s.",
+            volumeImpl.getStorageType(), volumeImpl.getMount());
+        checkRef.close();
         LOG.error(errorMsg);
         throw new IOException(errorMsg);
       }

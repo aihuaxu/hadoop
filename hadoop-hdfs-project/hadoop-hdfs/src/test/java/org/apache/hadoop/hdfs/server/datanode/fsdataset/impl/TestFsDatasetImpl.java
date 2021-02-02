@@ -82,6 +82,7 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.fail;
 import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.anyList;
 import static org.mockito.Matchers.anyListOf;
 import static org.mockito.Matchers.anyString;
 import static org.mockito.Matchers.eq;
@@ -142,6 +143,25 @@ public class TestFsDatasetImpl {
     when(storage.getNumStorageDirs()).thenReturn(numDirs);
   }
 
+  private static StorageLocation createStorageWithStorageType(String subDir,
+      StorageType storageType, Configuration conf, DataStorage storage,
+      DataNode dataNode) throws IOException {
+    String archiveStorageType = "[" + storageType + "]";
+    String path = BASE_DIR + subDir;
+    new File(path).mkdirs();
+    String pathUri = new Path(path).toUri().toString();
+    StorageLocation loc = StorageLocation.parse(archiveStorageType + pathUri);
+    Storage.StorageDirectory sd = new Storage.StorageDirectory(loc.getFile());
+    DataStorage.createStorageID(sd, false);
+
+    DataStorage.VolumeBuilder builder =
+        new DataStorage.VolumeBuilder(storage, sd);
+    when(storage.prepareVolume(eq(dataNode), eq(loc.getFile()),
+        anyList()))
+        .thenReturn(builder);
+    return loc;
+  }
+
   private int getNumVolumes() {
     try (FsDatasetSpi.FsVolumeReferences volumes =
         dataset.getFsVolumeReferences()) {
@@ -176,6 +196,56 @@ public class TestFsDatasetImpl {
     assertEquals(NUM_INIT_VOLUMES, getNumVolumes());
     assertEquals(0, dataset.getNumFailedVolumes());
   }
+
+  // When turning on same disk tiering,
+  // we should prevent misconfig that
+  // volumes with same storage type created on same mount.
+  @Test
+  public void testAddVolumeWithSameDiskTiering() throws IOException {
+    datanode = mock(DataNode.class);
+    storage = mock(DataStorage.class);
+    this.conf = new Configuration();
+    this.conf.setLong(DFS_DATANODE_SCAN_PERIOD_HOURS_KEY, 0);
+    conf.setBoolean(DFSConfigKeys.DFS_DATANODE_ALLOW_SAME_DISK_TIERING,
+        true);
+    conf.setDouble(DFSConfigKeys
+            .DFS_DATANODE_RESERVE_FOR_ARCHIVE_DEFAULT_PERCENTAGE,
+        0.5);
+
+    when(datanode.getConf()).thenReturn(conf);
+    final DNConf dnConf = new DNConf(conf);
+    when(datanode.getDnConf()).thenReturn(dnConf);
+    final BlockScanner disabledBlockScanner = new BlockScanner(datanode, conf);
+    when(datanode.getBlockScanner()).thenReturn(disabledBlockScanner);
+    final ShortCircuitRegistry shortCircuitRegistry =
+        new ShortCircuitRegistry(conf);
+    when(datanode.getShortCircuitRegistry()).thenReturn(shortCircuitRegistry);
+
+    createStorageDirs(storage, conf, 1);
+    dataset = new FsDatasetImpl(datanode, storage, conf);
+
+    List<NamespaceInfo> nsInfos = Lists.newArrayList();
+    for (String bpid : BLOCK_POOL_IDS) {
+      nsInfos.add(new NamespaceInfo(0, CLUSTER_ID, bpid, 1));
+    }
+    dataset.addVolume(
+        createStorageWithStorageType("archive1",
+            StorageType.ARCHIVE, conf, storage, datanode), nsInfos);
+    assertEquals(2, getNumVolumes());
+
+    // Add second ARCHIVAL volume should fail fsDataSetImpl.
+    try {
+      dataset.addVolume(
+          createStorageWithStorageType("archive2",
+              StorageType.ARCHIVE, conf, storage, datanode), nsInfos);
+      fail("Should throw exception for" +
+          " same storage type already exists on same mount.");
+    } catch (IOException e) {
+      assertTrue(e.getMessage()
+          .startsWith("Storage type ARCHIVE already exists on same mount:"));
+    }
+  }
+
 
   @Test
   public void testAddVolumes() throws IOException {
@@ -322,7 +392,7 @@ public class TestFsDatasetImpl {
     conf.setLong(DFSConfigKeys.DFS_DATANODE_SCAN_PERIOD_HOURS_KEY, -1);
     final BlockScanner blockScanner = new BlockScanner(datanode, conf);
     final FsVolumeList volumeList = new FsVolumeList(
-        Collections.<VolumeFailureInfo>emptyList(), blockScanner, blockChooser);
+        Collections.<VolumeFailureInfo>emptyList(), blockScanner, blockChooser, conf);
     final List<FsVolumeImpl> oldVolumes = new ArrayList<>();
 
     // Initialize FsVolumeList with 5 mock volumes.
