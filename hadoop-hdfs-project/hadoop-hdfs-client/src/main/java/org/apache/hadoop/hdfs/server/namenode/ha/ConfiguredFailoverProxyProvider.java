@@ -52,16 +52,19 @@ public class ConfiguredFailoverProxyProvider<T> extends
       LoggerFactory.getLogger(ConfiguredFailoverProxyProvider.class);
 
   protected final Configuration conf;
-  protected final List<AddressRpcProxyPair<T>> proxies =
-      new ArrayList<AddressRpcProxyPair<T>>();
+  protected final List<AddressRpcProxyPair<T>> proxies;
   protected final UserGroupInformation ugi;
   protected final Class<T> xface;
 
   private int currentProxyIndex = 0;
   protected final HAProxyFactory<T> factory;
 
-  public ConfiguredFailoverProxyProvider(Configuration conf, URI uri,
-      Class<T> xface, HAProxyFactory<T> factory) {
+  public ConfiguredFailoverProxyProvider(
+          Configuration conf,
+          URI uri,
+          Class<T> xface,
+          HAProxyFactory<T> factory) {
+    this.factory = factory;
     this.xface = xface;
     this.conf = new Configuration(conf);
     int maxRetries = this.conf.getInt(
@@ -78,42 +81,57 @@ public class ConfiguredFailoverProxyProvider<T> extends
             CommonConfigurationKeysPublic
                     .IPC_CLIENT_CONNECT_MAX_RETRIES_ON_SOCKET_TIMEOUTS_KEY,
             maxRetriesOnSocketTimeouts);
-
     try {
       ugi = UserGroupInformation.getCurrentUser();
-
-      Map<String, Map<String, InetSocketAddress>> map =
-          DFSUtilClient.getHaNnRpcAddresses(conf);
-      Map<String, InetSocketAddress> addressesInNN = map.get(uri.getHost());
-
-      if (addressesInNN == null || addressesInNN.size() == 0) {
-        throw new RuntimeException("Could not find any configured addresses " +
-            "for URI " + uri);
-      }
-
-      Collection<InetSocketAddress> addressesOfNns = addressesInNN.values();
-      try {
-        addressesOfNns = getResolvedHostsIfNecessary(addressesOfNns, uri);
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
-      for (InetSocketAddress address : addressesOfNns) {
-        proxies.add(new AddressRpcProxyPair<T>(address));
-      }
-      // Randomize the list to prevent all clients pointing to the same one
-      boolean randomized = getRandomOrder(conf, uri);
-      if (randomized) {
-        Collections.shuffle(proxies);
-      }
-
-      // The client may have a delegation token set for the logical
-      // URI of the cluster. Clone this token to apply to each of the
-      // underlying IPC addresses so that the IPC code can find it.
-      HAUtilClient.cloneDelegationTokenForLogicalUri(ugi, uri, addressesOfNns);
-      this.factory = factory;
+      this.proxies = resolveNameNodes(uri,
+              DFSUtilClient.getHaNnRpcAddresses(conf).get(uri.getHost()),
+              HdfsClientConfigKeys.Failover.RESOLVE_ADDRESS_NEEDED_KEY,
+              HdfsClientConfigKeys.Failover.RANDOM_ORDER);
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
+  }
+
+  /**
+   * Given name service uri and namenode addresses (single DNS or real addresses),
+   * resolve to real NameNode addresses.
+   * Randomize the list if requested.
+   * @param uri name service
+   */
+  protected List<AddressRpcProxyPair<T>> resolveNameNodes(
+          URI uri,
+          Map<String, InetSocketAddress> namenodeAddresses,
+          String resolveAddressNeededKey,
+          String randomOrderKey) {
+    final List<AddressRpcProxyPair<T>> proxies = new ArrayList<>();
+
+    if (namenodeAddresses == null || namenodeAddresses.size() == 0) {
+      throw new RuntimeException("Could not find any configured addresses " +
+              "for URI " + uri);
+    }
+
+    Collection<InetSocketAddress> addressesOfNns = namenodeAddresses.values();
+    try {
+      addressesOfNns = getResolvedHostsIfNecessary(addressesOfNns, uri, resolveAddressNeededKey);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+    for (InetSocketAddress address : addressesOfNns) {
+      proxies.add(new AddressRpcProxyPair<T>(address));
+    }
+    // Randomize the list to prevent all clients pointing to the same one
+    boolean randomized = getRandomOrder(conf,
+            uri,
+            randomOrderKey);
+    if (randomized) {
+      Collections.shuffle(proxies);
+    }
+
+    // The client may have a delegation token set for the logical
+    // URI of the cluster. Clone this token to apply to each of the
+    // underlying IPC addresses so that the IPC code can find it.
+    HAUtilClient.cloneDelegationTokenForLogicalUri(ugi, uri, addressesOfNns);
+    return proxies;
   }
 
   /**
@@ -122,17 +140,19 @@ public class ConfiguredFailoverProxyProvider<T> extends
    *
    * @param addressesOfNns The domain name list from config.
    * @param nameNodeUri The URI of namenode/nameservice.
+   * @
    * @return The collection of resolved IP addresses.
    * @throws IOException If there are issues resolving the addresses.
    */
   Collection<InetSocketAddress> getResolvedHostsIfNecessary(
-      Collection<InetSocketAddress> addressesOfNns, URI nameNodeUri)
+          Collection<InetSocketAddress> addressesOfNns,
+          URI nameNodeUri,
+          String resolveAddressNeededKey)
       throws IOException {
     // 'host' here is usually the ID of the nameservice when address
     // resolving is needed.
     String host = nameNodeUri.getHost();
-    String configKeyWithHost =
-        HdfsClientConfigKeys.Failover.RESOLVE_ADDRESS_NEEDED_KEY  + "." + host;
+    String configKeyWithHost = resolveAddressNeededKey + "." + host;
     boolean resolveNeeded = conf.getBoolean(configKeyWithHost,
         HdfsClientConfigKeys.Failover.RESOLVE_ADDRESS_NEEDED_DEFAULT);
     if (!resolveNeeded) {
@@ -172,13 +192,13 @@ public class ConfiguredFailoverProxyProvider<T> extends
    *
    * @param conf Configuration
    * @param nameNodeUri The URI of namenode/nameservice
+   * @param randomOrderKey  the key to Configuration for random order
    * @return random order configuration
    */
   private static boolean getRandomOrder(
-      Configuration conf, URI nameNodeUri) {
+      Configuration conf, URI nameNodeUri, String randomOrderKey) {
     String host = nameNodeUri.getHost();
-    String configKeyWithHost = HdfsClientConfigKeys.Failover.RANDOM_ORDER
-        + "." + host;
+    String configKeyWithHost = randomOrderKey + "." + host;
 
     if (conf.get(configKeyWithHost) != null) {
       return conf.getBoolean(
@@ -187,7 +207,7 @@ public class ConfiguredFailoverProxyProvider<T> extends
     }
 
     return conf.getBoolean(
-        HdfsClientConfigKeys.Failover.RANDOM_ORDER,
+        randomOrderKey,
         HdfsClientConfigKeys.Failover.RANDOM_ORDER_DEFAULT);
   }
 

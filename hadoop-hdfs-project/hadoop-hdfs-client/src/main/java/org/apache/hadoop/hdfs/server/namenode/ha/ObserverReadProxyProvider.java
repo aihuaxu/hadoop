@@ -22,18 +22,13 @@ import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
-import java.net.InetSocketAddress;
 import java.net.URI;
 import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.DFSUtilClient;
-import org.apache.hadoop.hdfs.HAUtilClient;
 import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
 import org.apache.hadoop.hdfs.client.impl.DfsClientConf;
 import org.apache.hadoop.io.retry.AtMostOnce;
@@ -85,33 +80,14 @@ public class ObserverReadProxyProvider<T> extends ConfiguredFailoverProxyProvide
   /** The last proxy that has been used. Only used for testing */
   private volatile ProxyInfo<T> lastProxy = null;
 
-  /**
-   * If this is true, this observer proxy will try observers in random
-   * order instead of config order. Each nameservice has different
-   * settings with nameservice name as the suffix in config
-   */
-  private final boolean observerReadRandomOrder;
-
   public ObserverReadProxyProvider(
       Configuration conf, URI uri, Class<T> xface, HAProxyFactory<T> factory) {
     super(conf, uri, xface, factory);
 
-    // Initialize observer namenode list
-    Map<String, Map<String, InetSocketAddress>> addressMap =
-        DFSUtilClient.getObserverRpcAddresses(conf);
-    Map<String, InetSocketAddress> addressesInNN = addressMap.get(uri.getHost());
-
-    if (addressesInNN == null || addressesInNN.isEmpty()) {
-      throw new RuntimeException("Could not find any configured observer " +
-          "namenode address for URI " + uri);
-    }
-
-    observerProxies = new ArrayList<>();
-    Collection<InetSocketAddress> addressesOfNns = addressesInNN.values();
-    for (InetSocketAddress address : addressesOfNns) {
-      observerProxies.add(new AddressRpcProxyPair<T>(address));
-    }
-
+    observerProxies = resolveNameNodes(uri,
+            DFSUtilClient.getObserverRpcAddresses(conf).get(uri.getHost()),
+            HdfsClientConfigKeys.Failover.RESOLVE_ADDRESS_NEEDED_OBSERVER_KEY,
+            HdfsClientConfigKeys.DFS_CLIENT_OBSERVER_READS_RANDOM_ORDER);
     // Max retry is not actually used when deciding retry
     // action as the number of retries are not counted.
     // The sleep base and max are used to make the client retry slower.
@@ -128,44 +104,6 @@ public class ObserverReadProxyProvider<T> extends ConfiguredFailoverProxyProvide
     if (observerReadEnabled) {
       LOG.debug("Reading from observer namenode is enabled");
     }
-
-    observerReadRandomOrder = getRandomOrder(conf, uri);
-    if (observerReadRandomOrder) {
-      LOG.debug("Reading from observer namenode in random order");
-      Collections.shuffle(observerProxies);
-    }
-
-    // The client may have a delegation token set for the logical
-    // URI of the cluster. Clone this token to apply to each of the
-    // underlying IPC addresses so that the IPC code can find it.
-    // Copied from the parent class.
-    HAUtilClient.cloneDelegationTokenForLogicalUri(ugi, uri, addressesOfNns);
-  }
-
-  /**
-   * Check whether random order is configured for observer read proxy
-   * provider for the namenode/nameservice.
-   *
-   * @param conf Configuration
-   * @param nameNodeUri The URI of namenode/nameservice
-   * @return random order configuration
-   */
-  private static boolean getRandomOrder(
-      Configuration conf, URI nameNodeUri) {
-    String host = nameNodeUri.getHost();
-    String configKeyWithHost =
-        HdfsClientConfigKeys.DFS_CLIENT_OBSERVER_READS_RANDOM_ORDER
-            + "." + host;
-
-    if (conf.get(configKeyWithHost) != null) {
-      return conf.getBoolean(
-          configKeyWithHost,
-          HdfsClientConfigKeys.DFS_CLIENT_OBSERVER_READS_RANDOM_ORDER_DEFAULT);
-    }
-
-    return conf.getBoolean(
-        HdfsClientConfigKeys.DFS_CLIENT_OBSERVER_READS_RANDOM_ORDER,
-        HdfsClientConfigKeys.DFS_CLIENT_OBSERVER_READS_RANDOM_ORDER_DEFAULT);
   }
 
   @SuppressWarnings("unchecked")

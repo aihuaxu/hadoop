@@ -18,20 +18,22 @@
 package org.apache.hadoop.hdfs.server.namenode.ha;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
 import org.apache.hadoop.hdfs.protocol.ClientProtocol;
@@ -267,6 +269,36 @@ public class TestObserverReadProxyProvider {
             == RetryPolicy.RetryAction.RetryDecision.FAIL);
       }
     }
+  }
+
+  /**
+   * Tests getProxy with random.order configuration set to false.
+   * This expects the proxy order to be consistent every time a new
+   * ConfiguredFailoverProxyProvider is created.
+   */
+  @Test
+  public void testResolveDNSObservers() throws Exception {
+
+    Map<InetSocketAddress, ClientProtocol> proxyMap = new HashMap<>();
+
+    Configuration confCopy = new Configuration(conf);
+    confCopy.set("dfs.ha.namenodes." + ns1, "nn,nn1");
+    confCopy.set("dfs.ha.observer.namenodes." + ns1, "nn");
+    confCopy.set("dfs.client.failover.resolve-needed.observer." + ns1, "true");
+    confCopy.set("dfs.client.failover.resolver.impl." + ns1, "org.apache.hadoop.net.MockDomainNameResolver");
+    confCopy.set("dfs.namenode.rpc-address." + ns1 + ".nn", "test1.foo.bar:8020");
+    confCopy.set("dfs.namenode.rpc-address." + ns1 + ".nn1", "test2.foo.bar:8020");
+
+    ObserverReadProxyProvider<ClientProtocol> observerProvider =
+            new ObserverReadProxyProvider<>(confCopy, ns1Uri,
+                    ClientProtocol.class, createFactory(proxyMap));
+
+    Field field = FieldUtils
+            .getField(ObserverReadProxyProvider.class, "observerProxies", true);
+    List<ConfiguredFailoverProxyProvider.AddressRpcProxyPair> proxies =
+    (List<ConfiguredFailoverProxyProvider.AddressRpcProxyPair>) field.get(observerProvider);
+    assertEquals("host01.test", proxies.get(0).address.getHostName());
+    assertEquals("host02.test", proxies.get(1).address.getHostName());
   }
 
   /**

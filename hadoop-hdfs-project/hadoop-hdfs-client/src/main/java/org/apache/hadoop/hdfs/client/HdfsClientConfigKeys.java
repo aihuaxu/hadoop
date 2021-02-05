@@ -123,7 +123,6 @@ public interface HdfsClientConfigKeys {
   boolean DFS_CLIENT_OBSERVER_READS_ENABLED_DEFAULT = false;
   String DFS_CLIENT_OBSERVER_READS_RANDOM_ORDER =
       "dfs.client.observer.reads.random.order";
-  boolean DFS_CLIENT_OBSERVER_READS_RANDOM_ORDER_DEFAULT = false;
   // Much code in hdfs is not yet updated to use these keys.
   // the initial delay (unit is ms) for locateFollowingBlock, the delay time
   // will increase exponentially(double) for each retry.
@@ -292,6 +291,7 @@ public interface HdfsClientConfigKeys {
     String  RANDOM_ORDER = PREFIX + "random.order";
     boolean RANDOM_ORDER_DEFAULT = false;
     String  RESOLVE_ADDRESS_NEEDED_KEY = PREFIX + "resolve-needed";
+    String  RESOLVE_ADDRESS_NEEDED_OBSERVER_KEY = PREFIX + "resolve-needed.observer";
     boolean RESOLVE_ADDRESS_NEEDED_DEFAULT = false;
     String RESOLVE_SERVICE_KEY = PREFIX + "resolver.impl";
     String  RESOLVE_ADDRESS_TO_FQDN = PREFIX + "resolver.useFQDN";

@@ -147,7 +147,7 @@ public class TestConfiguredFailoverProxyProvider {
     config.set(
         HdfsClientConfigKeys.DFS_HA_NAMENODES_KEY_PREFIX + "." + ns3, "nn");
     String domain = hostResolvable
-        ? MockDomainNameResolver.DOMAIN
+        ? MockDomainNameResolver.DOMAIN1
         : MockDomainNameResolver.UNKNOW_DOMAIN;
     config.set(
         HdfsClientConfigKeys.DFS_NAMENODE_RPC_ADDRESS_KEY + "." + ns3 + ".nn",

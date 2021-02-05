@@ -32,15 +32,22 @@ import com.google.common.annotations.VisibleForTesting;
  */
 public class MockDomainNameResolver implements DomainNameResolver {
 
-  public static final String DOMAIN = "test.foo.bar";
+  public static final String DOMAIN1 = "test1.foo.bar";
+  public static final String DOMAIN2 = "test2.foo.bar";
   // This host will be used to mock non-resolvable host
   public static final String UNKNOW_DOMAIN = "unknown.foo.bar";
   public static final byte[] BYTE_ADDR_1 = new byte[]{10, 1, 1, 1};
   public static final byte[] BYTE_ADDR_2 = new byte[]{10, 1, 1, 2};
+  public static final byte[] BYTE_ADDR_3 = new byte[]{10, 1, 1, 3};
+  public static final byte[] BYTE_ADDR_4 = new byte[]{10, 1, 1, 4};
   public static final String ADDR_1 = "10.1.1.1";
   public static final String ADDR_2 = "10.1.1.2";
+  public static final String ADDR_3 = "10.1.1.3";
+  public static final String ADDR_4 = "10.1.1.4";
   public static final String FQDN_1 = "host01.test";
   public static final String FQDN_2 = "host02.test";
+  public static final String FQDN_3 = "host03.test";
+  public static final String FQDN_4 = "host04.test";
 
   /** Internal mapping of domain names and IP addresses. */
   private Map<String, InetAddress[]> addrs = new TreeMap<>();
@@ -51,9 +58,14 @@ public class MockDomainNameResolver implements DomainNameResolver {
     try {
       InetAddress nn1Address = InetAddress.getByAddress(BYTE_ADDR_1);
       InetAddress nn2Address = InetAddress.getByAddress(BYTE_ADDR_2);
-      addrs.put(DOMAIN, new InetAddress[]{nn1Address, nn2Address});
+      InetAddress nn3Address = InetAddress.getByAddress(BYTE_ADDR_3);
+      InetAddress nn4Address = InetAddress.getByAddress(BYTE_ADDR_4);
+      addrs.put(DOMAIN1, new InetAddress[]{nn1Address, nn2Address});
+      addrs.put(DOMAIN2, new InetAddress[]{nn3Address, nn4Address});
       ptrMap.put(nn1Address, FQDN_1);
       ptrMap.put(nn2Address, FQDN_2);
+      ptrMap.put(nn3Address, FQDN_3);
+      ptrMap.put(nn4Address, FQDN_4);
     } catch (UnknownHostException e) {
       throw new RuntimeException(e);
     }

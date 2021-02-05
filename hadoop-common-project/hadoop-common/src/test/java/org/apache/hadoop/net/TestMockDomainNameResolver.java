@@ -52,7 +52,7 @@ public class TestMockDomainNameResolver {
     DomainNameResolver resolver = DomainNameResolverFactory.newInstance(
         conf, CommonConfigurationKeys.HADOOP_DOMAINNAME_RESOLVER_IMPL);
     InetAddress[] addrs = resolver.getAllByDomainName(
-        MockDomainNameResolver.DOMAIN);
+        MockDomainNameResolver.DOMAIN1);
 
     assertEquals(2, addrs.length);
     assertEquals(MockDomainNameResolver.ADDR_1, addrs[0].getHostAddress());
