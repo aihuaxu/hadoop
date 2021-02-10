@@ -53,8 +53,8 @@ import org.slf4j.LoggerFactory;
 /**
  * ScorerService will sort Peloton hosts based on host score.
  * The following four factors are considered to calculate host score:
- * - number of non-preemptible containers
  * - number of AM containers
+ * - number of non-preemptible containers
  * - number of containers
  * - container running time
  *
@@ -73,10 +73,10 @@ public class ScorerService extends AbstractService implements EventHandler<Score
   private static Comparator<Entry<String, HostScoreInfo>> SCORE_COMPARATOR =
     new Comparator<Entry<String, HostScoreInfo>>() {
       public int compare(Entry<String, HostScoreInfo> a, Entry<String, HostScoreInfo> b) {
-        if (a.getValue().numNonPreemptible != b.getValue().numNonPreemptible)
-          return a.getValue().numNonPreemptible - b.getValue().numNonPreemptible;
         if (a.getValue().numAMs != b.getValue().numAMs)
           return a.getValue().numAMs - b.getValue().numAMs;
+        if (a.getValue().numNonPreemptible != b.getValue().numNonPreemptible)
+          return a.getValue().numNonPreemptible - b.getValue().numNonPreemptible;
         if (a.getValue().numContainers != b.getValue().numContainers)
           return a.getValue().numContainers - b.getValue().numContainers;
         return a.getValue().containerRunningTime - b.getValue().containerRunningTime;
@@ -136,8 +136,8 @@ public class ScorerService extends AbstractService implements EventHandler<Score
     public String toString() {
       return "HostScoreInfo{" +
         "hostName='" + hostName + '\'' +
-        ", numNonPreemptible=" + numNonPreemptible +
         ", numAMs=" + numAMs +
+        ", numNonPreemptible=" + numNonPreemptible +
         ", numContainers=" + numContainers +
         ", containerRunningTime=" + containerRunningTime +
         '}';
