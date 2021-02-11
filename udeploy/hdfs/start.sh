@@ -102,6 +102,10 @@ function start_balancer() {
   source "${HADOOP_ENV}"; exec "${HDFS_CMD}" balancer -sortTopNodes -threshold "${BALANCER_THRESHOLD:-3}" 2>&1
 }
 
+function start_debug_container() {
+    while true; do sleep "${SLEEP_INTERVAL:-3600}"; exit; done
+}
+
 # setup system files/dirs.
 function setup_system() {
   chmod 755 /run
@@ -131,6 +135,9 @@ function main() {
       ;;
     balancer)
       start_balancer
+      ;;
+    debug)
+      start_debug_container
       ;;
     *)
       echo "ERROR: Unknown HDFS service container type: ${container_type}"
