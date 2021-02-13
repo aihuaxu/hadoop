@@ -18,16 +18,25 @@
 package org.apache.hadoop.ha;
 
 import static org.junit.Assert.*;
+import static org.mockito.Mockito.mock;
 
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.security.NoSuchAlgorithmException;
 
 import com.google.common.base.Supplier;
+import org.apache.commons.lang.reflect.FieldUtils;
+import org.apache.commons.lang.reflect.MethodUtils;
 import org.apache.commons.logging.impl.Log4JLogger;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.ha.HAServiceProtocol.HAServiceState;
 import org.apache.hadoop.ha.HAServiceProtocol.StateChangeRequestInfo;
 import org.apache.hadoop.ha.HealthMonitor.State;
 import org.apache.hadoop.ha.MiniZKFCCluster.DummyZKFC;
+import org.apache.hadoop.net.MockDomainNameResolver;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.util.Time;
 import org.apache.log4j.Level;
@@ -576,10 +585,32 @@ public class TestZKFailoverController extends ClientBaseWithFixes {
     cluster.getZkfc(1).gracefulFailoverToYou();
     cluster.getZkfc(0).gracefulFailoverToYou();
   }
+
+  @Test
+  public void testResolveDNSQuorum()
+          throws NoSuchMethodException, IllegalAccessException, InvocationTargetException {
+    ZKFailoverController controller = mock(ZKFailoverController.class);
+    Configuration confCopy = new Configuration(conf);
+
+    // Test quorum without DNS
+    controller.conf = confCopy;
+    Method initZKMethod = ZKFailoverController.class
+            .getDeclaredMethod("resolveQuorumIfNecessary", String.class);
+    initZKMethod.setAccessible(true);
+    String zkQuorum = (String)initZKMethod.invoke(controller, hostPort);
+    assertEquals(hostPort, zkQuorum);
+
+    // Test quorum with DNS
+    confCopy.set("ha.zookeeper.quorum", MockDomainNameResolver.DOMAIN1);
+    confCopy.set("ha.zookeeper.quorum.resolve-needed", "true");
+    confCopy.set("ha.zookeeper.quorum.resolver.impl",
+            "org.apache.hadoop.net.MockDomainNameResolver");
+    zkQuorum = (String)initZKMethod.invoke(controller, MockDomainNameResolver.DOMAIN1);
+    assertEquals("host01.test:2181,host02.test:2181", zkQuorum);
+  }
   
   private int runFC(DummyHAService target, String ... args) throws Exception {
     DummyZKFC zkfc = new DummyZKFC(conf, target);
     return zkfc.run(args);
   }
-
 }
