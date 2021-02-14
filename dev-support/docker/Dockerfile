@@ -152,7 +152,7 @@ RUN apt-get -q update && apt-get -q install -y bats
 ####
 # Install pylint (always want latest)
 ####
-RUN pip2 install --upgrade pip
+RUN pip2 install --upgrade pip==20.3.4
 RUN pip2 install pylint
 
 ####
@@ -166,7 +166,7 @@ RUN pip2 install python-dateutil
 RUN apt-get -y install nodejs && \
     ln -s /usr/bin/nodejs /usr/bin/node && \
     apt-get -y install npm && \
-    npm install npm@latest -g && \
+    npm install npm@6.14.11 -g && \
     npm install -g bower
 
 ###

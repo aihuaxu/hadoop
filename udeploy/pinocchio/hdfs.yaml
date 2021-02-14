@@ -1,16 +1,18 @@
 schema_version: 2.0.0
 service_name: hdfs
-service_type: java_8_standard
+service_type: java_standard
 
-java_8_standard:
+java_standard:
+  jdk_version: 'openjdk-8'
   build_cmds:
     - RUN echo 'This is hdfs build'
   post_build_cmds:
+    - RUN usermod -a -G sudo udocker && sed -i -e 's/%sudo\s\+ALL=(ALL:ALL)\s\+ALL/%sudo ALL=(ALL) NOPASSWD:ALL/g' /etc/sudoers
     - RUN mkdir -p /etc/ubernss && chown udocker:udocker /etc/ubernss && sed -Ei '/^passwd|^group/{/uber/!s/$/ uber/}' /etc/nsswitch.conf
-    - RUN sed -i -e 's/%sudo\s\+ALL=(ALL:ALL)\s\+ALL/%sudo ALL=(ALL) NOPASSWD:ALL/g' /etc/sudoers
-    - RUN mkdir -p /opt/hdfs/binary /opt/hdfs/conf /var/log/hadoop /opt/hadoop/keytabs /var/log/hadoop
+    - RUN mkdir -p /opt/hdfs/binary /opt/hdfs/conf /var/log/hadoop /opt/hadoop/keytabs
     - RUN chmod 777 /var/log/hadoop && chown -R udocker:udocker /opt/hdfs && chown -R udocker:udocker /opt/hadoop && chown -R udocker:udocker /run
     - RUN wget -O /tmp/hadoop.tar.gz http://artifactory.uber.internal:4587/artifactory/pub/hadoop/binary/${GIT_REF}/hadoop.tar.gz && tar -zxf /tmp/hadoop.tar.gz -C /opt/hdfs/binary --strip 1 && rm -f /tmp/hadoop.tar.gz
+    - RUN mkdir -p /usr/lib/jvm && ln -sf $(dirname $(dirname $(readlink /usr/bin/java))) /usr/lib/jvm/java-8-openjdk-amd64
 
 debian_packages_for_build:
   - name: cron

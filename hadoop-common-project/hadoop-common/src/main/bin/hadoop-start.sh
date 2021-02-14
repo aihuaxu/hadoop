@@ -78,3 +78,4 @@ case $component in
     echo $usage
     exit 1
   ;;
+esac
