@@ -403,16 +403,13 @@ public abstract class ZKFailoverController {
     LOG.info(String.format("Zookeeper quorum will be resolved with {}",
             dnr.getClass().getName()));
 
-    Collection<InetSocketAddress> resolvedHosts = new ArrayList<>();
+    List<String> resolvedHosts = new ArrayList<>();
     ConnectStringParser parser = new ConnectStringParser(zkQuorum);
     for (InetSocketAddress address : parser.getServerAddresses()) {
       String[] resolvedHostNames = dnr.getAllResolvedHostnameByDomainName(
               address.getHostName(), requireFQDN);
-      int port = address.getPort();
       for (String hostname : resolvedHostNames) {
-        InetSocketAddress resolvedAddress = new InetSocketAddress(
-                hostname, port);
-        resolvedHosts.add(resolvedAddress);
+        resolvedHosts.add(hostname + ":" + address.getPort());
       }
     }
 
