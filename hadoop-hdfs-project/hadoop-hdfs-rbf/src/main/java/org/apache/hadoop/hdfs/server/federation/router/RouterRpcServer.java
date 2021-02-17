@@ -199,6 +199,9 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol {
   /** Erasure coding calls. */
   private final ErasureCoding erasureCoding;
 
+  /** Control if redirect the user request from server side */
+  /** TODO there should be a client side configuration to control that */
+  private final boolean redirectEnabled = true;
 
   /**
    * Construct a router RPC server.
@@ -1178,6 +1181,12 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol {
     checkOperation(OperationCategory.READ);
 
     final List<RemoteLocation> locations = getLocationsForPath(src, false);
+    if (redirectEnabled) {
+      RedirectException redirect = new RedirectException();
+      redirect.setLocations(locations);
+      throw redirect;
+    }
+
     RemoteMethod method = new RemoteMethod("getFileInfo",
         new Class<?>[] {String.class}, new RemoteParam());
 
