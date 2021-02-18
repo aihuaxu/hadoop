@@ -2665,4 +2665,12 @@ public class DistributedFileSystem extends FileSystem {
       return super.resolvePath(p);
     return dfs.getRemoteLocation(Path.getPathWithoutSchemeAndAuthority(p).toString());
   }
+
+  @Override
+  public Path resolveFileSystem(Path p) throws IOException {
+    String authority = p.toUri().getAuthority();
+    if(authority == null || authority.isEmpty() || !resolvePath)
+      return super.resolvePath(p);
+    return dfs.getRemoteLocation(Path.getPathWithoutSchemeAndAuthority(p).toString());
+  }
 }
