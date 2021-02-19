@@ -68,7 +68,7 @@ public class TestConnectionManager {
 
     ConnectionPool pool1 = new ConnectionPool(
         conf, TEST_NN_ADDRESS, TEST_USER1, 0, 10);
-    addConnectionsToPool(pool1, 9, 4);
+    addConnectionsToPool(pool1, 10, 4);
     poolMap.put(new ConnectionPoolId(TEST_USER1, TEST_NN_ADDRESS), pool1);
 
     ConnectionPool pool2 = new ConnectionPool(
@@ -76,19 +76,19 @@ public class TestConnectionManager {
     addConnectionsToPool(pool2, 10, 10);
     poolMap.put(new ConnectionPoolId(TEST_USER2, TEST_NN_ADDRESS), pool2);
 
-    checkPoolConnections(TEST_USER1, 9, 4);
+    checkPoolConnections(TEST_USER1, 10, 4);
     checkPoolConnections(TEST_USER2, 10, 10);
 
     // Clean up first pool, one connection should be removed, and second pool
     // should remain the same.
     connManager.cleanup(pool1);
-    checkPoolConnections(TEST_USER1, 8, 4);
+    checkPoolConnections(TEST_USER1, 9, 4);
     checkPoolConnections(TEST_USER2, 10, 10);
 
     // Clean up the first pool again, it should have no effect since it reached
     // the MIN_ACTIVE_RATIO.
     connManager.cleanup(pool1);
-    checkPoolConnections(TEST_USER1, 8, 4);
+    checkPoolConnections(TEST_USER1, 9, 4);
     checkPoolConnections(TEST_USER2, 10, 10);
 
     // Make sure the number of connections doesn't go below minSize

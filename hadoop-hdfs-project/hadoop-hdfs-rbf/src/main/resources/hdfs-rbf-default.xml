@@ -175,6 +175,16 @@
   </property>
 
   <property>
+    <name>dfs.federation.router.admin.mount.check.enable</name>
+    <value>false</value>
+    <description>
+      If true, add/update mount table will include a destination check to make
+      sure the file exists in downstream namenodes, and changes to mount table
+      will fail if the file doesn't exist in any of the destination namenode.
+    </description>
+  </property>
+
+  <property>
     <name>dfs.federation.router.http-address</name>
     <value>0.0.0.0:50071</value>
     <description>
@@ -521,6 +531,24 @@
       The number of top real owners by tokens count to report in the JMX metrics.
       Real owners are the effective users whose cretential are used to generate
       the tokens.
+    </description>
+  </property>
+
+  <property>
+    <name>dfs.federation.router.connection.creator.queue-size</name>
+    <value>1000</value>
+    <description>
+      The size of the queue to create router to NameNode connections.
+    </description>
+  </property>
+
+  <property>
+    <name>dfs.federation.router.startup</name>
+    <value>REGULAR</value>
+    <description>
+      A flag to specify if a router is read/write or read-only. This property is
+      set at start based on the cli argument. Supported values are: REGULAR (R/W)
+      and OBSERVER (RO).
     </description>
   </property>
 

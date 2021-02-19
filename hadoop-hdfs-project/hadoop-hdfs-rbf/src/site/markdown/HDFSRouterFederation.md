@@ -186,9 +186,8 @@ And to stop it:
     [hdfs]$ $HADOOP_PREFIX/sbin/hadoop-daemon.sh --script $HADOOP_PREFIX/bin/hdfs stop dfsrouter
 
 ### Mount table management
-
-The mount table entries are pretty much the same as in [ViewFs](./ViewFs.html).
-A good practice for simplifying the management is to name the federated namespace with the same names as the destination namespaces.
+The mount table entries are pretty much the same as in [ViewFs](../hadoop-hdfs/ViewFs.html). Please make sure the downstream namespace path
+exists before creating mount table entry pointing to it. A good practice for simplifying the management is to name the federated namespace with the same names as the destination namespaces.
 For example, if we to mount `/data/app1` in the federated namespace, it is recommended to have that same name as in the destination namespace.
 
 The federation admin tool supports managing the mount table.
