@@ -586,29 +586,6 @@ public class TestZKFailoverController extends ClientBaseWithFixes {
     cluster.getZkfc(0).gracefulFailoverToYou();
   }
 
-  @Test
-  public void testResolveDNSQuorum()
-          throws NoSuchMethodException, IllegalAccessException, InvocationTargetException {
-    ZKFailoverController controller = mock(ZKFailoverController.class);
-    Configuration confCopy = new Configuration(conf);
-
-    // Test quorum without DNS
-    controller.conf = confCopy;
-    Method initZKMethod = ZKFailoverController.class
-            .getDeclaredMethod("resolveQuorumIfNecessary", String.class);
-    initZKMethod.setAccessible(true);
-    String zkQuorum = (String)initZKMethod.invoke(controller, hostPort);
-    assertEquals(hostPort, zkQuorum);
-
-    // Test quorum with DNS
-    confCopy.set("ha.zookeeper.quorum", MockDomainNameResolver.DOMAIN1);
-    confCopy.set("ha.zookeeper.quorum.resolve-needed", "true");
-    confCopy.set("ha.zookeeper.quorum.resolver.impl",
-            "org.apache.hadoop.net.MockDomainNameResolver");
-    zkQuorum = (String)initZKMethod.invoke(controller, MockDomainNameResolver.DOMAIN1);
-    assertEquals("host01.test:2181,host02.test:2181", zkQuorum);
-  }
-  
   private int runFC(DummyHAService target, String ... args) throws Exception {
     DummyZKFC zkfc = new DummyZKFC(conf, target);
     return zkfc.run(args);

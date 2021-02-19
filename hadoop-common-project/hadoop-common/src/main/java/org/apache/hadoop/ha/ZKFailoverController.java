@@ -19,11 +19,8 @@ package org.apache.hadoop.ha;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.net.UnknownHostException;
 import java.security.PrivilegedAction;
 import java.security.PrivilegedExceptionAction;
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.Executors;
@@ -56,7 +53,6 @@ import org.apache.hadoop.util.StringUtils;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.ZooDefs.Ids;
 import org.apache.hadoop.util.ToolRunner;
-import org.apache.zookeeper.client.ConnectStringParser;
 import org.apache.zookeeper.data.ACL;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -335,8 +331,7 @@ public abstract class ZKFailoverController {
 
   private void initZK() throws HadoopIllegalArgumentException, IOException,
       KeeperException {
-    zkQuorum = resolveQuorumIfNecessary(conf.get(ZK_QUORUM_KEY));
-
+    zkQuorum = conf.get(ZK_QUORUM_KEY);
     int zkTimeout = conf.getInt(ZK_SESSION_TIMEOUT_KEY,
         ZK_SESSION_TIMEOUT_DEFAULT);
     // Parse ACLs from configuration.
@@ -367,26 +362,9 @@ public abstract class ZKFailoverController {
     int maxRetryNum = conf.getInt(
         CommonConfigurationKeys.HA_FC_ELECTOR_ZK_OP_RETRIES_KEY,
         CommonConfigurationKeys.HA_FC_ELECTOR_ZK_OP_RETRIES_DEFAULT);
-    elector = new ActiveStandbyElector(zkQuorum,
-        zkTimeout, getParentZnode(), zkAcls, zkAuths,
-        new ElectorCallbacks(), maxRetryNum);
-  }
 
-  /**
-   * Resolve configured zookeeper quorum DNS into the quorum string if necessary.
-   * Otherwise, the original quorum is returned.
-   *
-   * @param zkQuorum the configured zookeeper quorum string or DNS string
-   * @return The zookeeper quorum string
-   * @throws IOException If there are issues resolving the addresses.
-   */
-  private String resolveQuorumIfNecessary(String zkQuorum) throws UnknownHostException {
-    boolean resolveNeeded =
+    boolean resolveQuorumNeeded =
             conf.getBoolean(RESOLVE_ADDRESS_NEEDED_KEY, RESOLVE_ADDRESS_NEEDED_DEFAULT);
-    if (zkQuorum == null || !resolveNeeded ) {
-      // Early return is no resolve is necessary
-      return zkQuorum;
-    }
 
     // decide whether to access server by IP or by host name
     boolean requireFQDN =
@@ -398,22 +376,10 @@ public abstract class ZKFailoverController {
             DomainNameResolver.class);
     DomainNameResolver dnr = ReflectionUtils.newInstance(resolverClass, conf);
 
-    // If the address needs to be resolved, get all of the IP addresses
-    // from this address and pass them into the proxy
-    LOG.info(String.format("Zookeeper quorum will be resolved with {}",
-            dnr.getClass().getName()));
-
-    List<String> resolvedHosts = new ArrayList<>();
-    ConnectStringParser parser = new ConnectStringParser(zkQuorum);
-    for (InetSocketAddress address : parser.getServerAddresses()) {
-      String[] resolvedHostNames = dnr.getAllResolvedHostnameByDomainName(
-              address.getHostName(), requireFQDN);
-      for (String hostname : resolvedHostNames) {
-        resolvedHosts.add(hostname + ":" + address.getPort());
-      }
-    }
-
-    return StringUtils.join(",", resolvedHosts);
+    elector = new ActiveStandbyElector(zkQuorum,
+            zkTimeout, getParentZnode(), zkAcls, zkAuths,
+            new ElectorCallbacks(), maxRetryNum, true,
+            resolveQuorumNeeded, requireFQDN, dnr);
   }
 
   private String getParentZnode() {
