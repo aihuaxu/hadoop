@@ -23,14 +23,21 @@ import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_PERMISSIONS_ENABLED_KEY;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.HDFSPolicyProvider;
+import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.hdfs.protocol.proto.RouterProtocolProtos.RouterAdminProtocolService;
 import org.apache.hadoop.hdfs.protocolPB.RouterAdminProtocolPB;
 import org.apache.hadoop.hdfs.protocolPB.RouterAdminProtocolServerSideTranslatorPB;
 import org.apache.hadoop.hdfs.server.federation.resolver.MountTableManager;
+import org.apache.hadoop.hdfs.server.federation.resolver.RemoteLocation;
 import org.apache.hadoop.hdfs.server.federation.store.MountTableStore;
 import org.apache.hadoop.hdfs.server.federation.store.protocol.AddMountTableEntryRequest;
 import org.apache.hadoop.hdfs.server.federation.store.protocol.AddMountTableEntryResponse;
@@ -46,6 +53,7 @@ import org.apache.hadoop.hdfs.server.federation.store.protocol.RemoveMountTableE
 import org.apache.hadoop.hdfs.server.federation.store.protocol.RemoveMountTableEntryResponse;
 import org.apache.hadoop.hdfs.server.federation.store.protocol.UpdateMountTableEntryRequest;
 import org.apache.hadoop.hdfs.server.federation.store.protocol.UpdateMountTableEntryResponse;
+import org.apache.hadoop.hdfs.server.federation.store.records.MountTable;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
@@ -53,6 +61,7 @@ import org.apache.hadoop.ipc.RPC.Server;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.service.AbstractService;
+import org.apache.hadoop.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -86,6 +95,7 @@ public class RouterAdminServer extends AbstractService
   private static String routerOwner;
   private static String superGroup;
   private static boolean isPermissionEnabled;
+  private boolean mountTableCheckDestination;
 
   public RouterAdminServer(Configuration conf, Router router)
       throws IOException {
@@ -138,6 +148,10 @@ public class RouterAdminServer extends AbstractService
     this.adminAddress = new InetSocketAddress(
         confRpcAddress.getHostName(), listenAddress.getPort());
     router.setAdminServerAddress(this.adminAddress);
+
+    this.mountTableCheckDestination = conf.getBoolean(
+        RBFConfigKeys.DFS_ROUTER_ADMIN_MOUNT_CHECK_ENABLE,
+        RBFConfigKeys.DFS_ROUTER_ADMIN_MOUNT_CHECK_ENABLE_DEFAULT);
   }
 
   /**
@@ -204,13 +218,80 @@ public class RouterAdminServer extends AbstractService
   @Override
   public AddMountTableEntryResponse addMountTableEntry(
       AddMountTableEntryRequest request) throws IOException {
+    verifyFileInDestinations(request.getEntry());
     return getMountTableStore().addMountTableEntry(request);
   }
 
   @Override
   public UpdateMountTableEntryResponse updateMountTableEntry(
       UpdateMountTableEntryRequest request) throws IOException {
+    verifyFileInDestinations(request.getEntry());
     return getMountTableStore().updateMountTableEntry(request);
+  }
+
+  /**
+   * Verify the file exists in destination nameservices to avoid dangling
+   * mount points. Throw IllegalArgumentException if doesn't exist. Skip
+   * verification if mountTableCheckDestination isn't enabled.
+   *
+   * @param entry the new mount points added, could be from add or update.
+   * @throws IOException
+   */
+  private void verifyFileInDestinations(MountTable entry)
+          throws IOException {
+    if (!this.mountTableCheckDestination) {
+      return;
+    }
+    List<RemoteLocation> locations = entry.getDestinations();
+    List<String> nsId =
+            getDestinationNameServices(entry.getSourcePath(), locations);
+
+    // get nameservices where no target file exists
+    Set<String> destNs = new HashSet<>(nsId);
+    List<String> nsWithoutFile = new ArrayList<>();
+    for (RemoteLocation location : locations) {
+      String ns = location.getNameserviceId();
+      if (!destNs.contains(ns)) {
+        nsWithoutFile.add(ns);
+      }
+    }
+
+    if (!nsWithoutFile.isEmpty()) {
+      throw new IllegalArgumentException("File not found in downstream " +
+              "nameservices: " + StringUtils.join(",", nsWithoutFile));
+    }
+  }
+
+  /**
+   * Get destination nameservices where the file in request exists.
+   *
+   * @param src source path in a mount table entry.
+   * @param locations remote locations to check against.
+   * @return list of nameservices where the dest file was found
+   * @throws IOException
+   */
+  private List<String> getDestinationNameServices(
+          String src, List<RemoteLocation> locations)
+          throws IOException {
+    final List<String> nsIds = new ArrayList<>();
+    RouterRpcServer rpcServer = this.router.getRpcServer();
+    RouterRpcClient rpcClient = rpcServer.getRPCClient();
+    RemoteMethod method = new RemoteMethod("getFileInfo",
+            new Class<?>[] {String.class}, new RemoteParam());
+    try {
+      Map<RemoteLocation, HdfsFileStatus> responses =
+              rpcClient.invokeConcurrent(
+                      locations, method, false, false, HdfsFileStatus.class);
+      for (RemoteLocation location : locations) {
+        if (responses.get(location) != null) {
+          nsIds.add(location.getNameserviceId());
+        }
+      }
+    } catch (IOException ioe) {
+      LOG.error("Cannot get location for {}: {}",
+              src, ioe.getMessage());
+    }
+    return nsIds;
   }
 
   @Override
