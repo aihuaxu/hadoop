@@ -7,6 +7,7 @@ import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
+import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,9 +41,10 @@ public class SecurityInfoMetrics {
     private static AtomicBoolean isInitialized = new AtomicBoolean(false);
 
     @Metric("# of YARN RM cancel delegation tokens") MutableGaugeLong sizeDelegationTokenCancel;
+    @Metric("# of failed renew KMS delegation token ops") MutableCounterLong numFailedKMSTokenRenew;
 
     static final MetricsInfo RECORD_INFO = info("SecurityInfoMetrics",
-            "Metrics for Size of YARN RM Cancel Delegation Tokens queue");
+            "Metrics for YARN RM Delegation Tokens");
 
     static SecurityInfoMetrics INSTANCE = null;
     private static MetricsRegistry registry;
@@ -65,7 +67,7 @@ public class SecurityInfoMetrics {
         registry.tag(RECORD_INFO, "ResourceManager");
         MetricsSystem ms = DefaultMetricsSystem.instance();
         if (ms != null) {
-            ms.register("SecurityInfoMetrics", "Metrics for Size of YARN RM Cancel Delegation Tokens queue", INSTANCE);
+            ms.register("SecurityInfoMetrics", "Metrics for YARN RM Delegation Tokens", INSTANCE);
         } else {
             LOG.warn("Failed to initialize SecurityInfoMetrics because DefaultMetricsSystem is null.");
         }
@@ -77,5 +79,9 @@ public class SecurityInfoMetrics {
 
     public long getSizeDelegationTokenCancel() {
         return sizeDelegationTokenCancel.value();
+    }
+
+    public synchronized void incrementNumFailedKMSRenew() {
+        numFailedKMSTokenRenew.incr();
     }
 }

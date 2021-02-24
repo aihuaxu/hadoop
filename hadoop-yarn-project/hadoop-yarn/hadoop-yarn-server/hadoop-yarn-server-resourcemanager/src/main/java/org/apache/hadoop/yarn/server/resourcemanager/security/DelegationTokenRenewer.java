@@ -551,6 +551,7 @@ public class DelegationTokenRenewer extends AbstractService {
               // Let's log and continue if kms token doesn't renew instead of failing the entire app.
               // Only a minority of apps need a kms token
               LOG.warn("Failed to renew kms token " + dttr, ioe);
+              securityInfoMetrics.incrementNumFailedKMSRenew();
               continue;
             }
             throw new IOException("Failed to renew token: " + dttr, ioe);
