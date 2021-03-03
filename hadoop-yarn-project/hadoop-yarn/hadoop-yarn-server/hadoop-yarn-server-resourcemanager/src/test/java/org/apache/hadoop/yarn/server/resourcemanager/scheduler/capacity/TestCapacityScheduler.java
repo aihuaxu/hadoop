@@ -183,7 +183,6 @@ public class TestCapacityScheduler {
   private static final String B = CapacitySchedulerConfiguration.ROOT + ".b";
   private static final String A1 = A + ".a1";
   private static final String A2 = A + ".a2";
-  private static final String A3 = A + ".a" + YarnConfiguration.LOW_PRIORITY_OPTIMISTIC_QUEUE_SUFFIX;
   private static final String B1 = B + ".b1";
   private static final String B2 = B + ".b2";
   private static final String B3 = B + ".b3";
@@ -196,8 +195,7 @@ public class TestCapacityScheduler {
   private static final String Y1 = P2 + ".y1";
   private static final String Y2 = P2 + ".y2";
   private static float A1_CAPACITY = 30;
-  private static float A2_CAPACITY = 69;
-  private static float A3_CAPACITY = 1;
+  private static float A2_CAPACITY = 70;
   private static float B1_CAPACITY = 79.2f;
   private static float B2_CAPACITY = 0.8f;
   private static float B3_CAPACITY = 20;
@@ -651,13 +649,11 @@ public class TestCapacityScheduler {
     conf.setCapacity(B, B_CAPACITY);
 
     // Define 2nd-level queues
-    conf.setQueues(A, new String[] {"a1", "a2", "a" + YarnConfiguration.LOW_PRIORITY_OPTIMISTIC_QUEUE_SUFFIX});
+    conf.setQueues(A, new String[] {"a1", "a2"});
     conf.setCapacity(A1, A1_CAPACITY);
     conf.setUserLimitFactor(A1, 100.0f);
     conf.setCapacity(A2, A2_CAPACITY);
     conf.setUserLimitFactor(A2, 100.0f);
-    conf.setCapacity(A3, A3_CAPACITY);
-    conf.setUserLimitFactor(A3, 100.0f);
 
     conf.setQueues(B, new String[] {"b1", "b2", "b3"});
     conf.setCapacity(B1, B1_CAPACITY);
@@ -1061,7 +1057,7 @@ public class TestCapacityScheduler {
   public void testCapacitySchedulerInfo() throws Exception {
     QueueInfo queueInfo = resourceManager.getResourceScheduler().getQueueInfo("a", true, true);
     Assert.assertEquals(queueInfo.getQueueName(), "a");
-    Assert.assertEquals(queueInfo.getChildQueues().size(), 3);
+    Assert.assertEquals(queueInfo.getChildQueues().size(), 2);
 
     List<QueueUserACLInfo> userACLInfo = resourceManager.getResourceScheduler().getQueueUserAclInfo();
     Assert.assertNotNull(userACLInfo);
@@ -1374,6 +1370,7 @@ public class TestCapacityScheduler {
 
     Application application_2 = new Application("user_0", "b2", resourceManager);
     application_2.submit();
+
     ResourceScheduler scheduler = resourceManager.getResourceScheduler();
 
     List<ApplicationAttemptId> appsInA1 = scheduler.getAppsInQueue("a1");

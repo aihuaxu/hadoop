@@ -756,75 +756,8 @@ public class TestClientRMService {
             .get(0).getApplicationId());
   }
 
-
-  @Test (timeout = 30000)
-  @SuppressWarnings ("rawtypes")
-  public void testAppSubmitLowPriorityQueue() throws Exception {
-    YarnScheduler yarnScheduler = mockYarnScheduler();
-    RMContext rmContext = mock(RMContext.class);
-    mockRMContext(yarnScheduler, rmContext);
-    RMStateStore stateStore = mock(RMStateStore.class);
-    when(rmContext.getStateStore()).thenReturn(stateStore);
-    RMAppManager appManager = new RMAppManager(rmContext, yarnScheduler,
-            null, mock(ApplicationACLsManager.class), new Configuration());
-    when(rmContext.getDispatcher().getEventHandler()).thenReturn(
-            new EventHandler<Event>() {
-              public void handle(Event event) {}
-            });
-    ApplicationId appIdA = getApplicationId(100);
-
-    ApplicationACLsManager mockAclsManager = mock(ApplicationACLsManager.class);
-    when(
-            mockAclsManager.checkAccess(UserGroupInformation.getCurrentUser(),
-                    ApplicationAccessType.VIEW_APP, null, appIdA)).thenReturn(true);
-
-    QueueACLsManager mockQueueACLsManager = mock(QueueACLsManager.class);
-    when(mockQueueACLsManager.checkAccess(any(UserGroupInformation.class),
-            any(QueueACL.class), any(RMApp.class), anyString(), anyListOf(String.class) )).thenReturn(true);
-    ClientRMService rmService =
-            new ClientRMService(rmContext, yarnScheduler, appManager,
-                    mockAclsManager, mockQueueACLsManager, null);
-    rmService.serviceInit(new YarnConfiguration());
-
-    // without name and queue, but with tags
-    Set<String> tags = new HashSet<>();
-    tags.add(YarnConfiguration.LOW_PRIORITY_APP_TAG);
-    SubmitApplicationRequest submitRequestA = mockSubmitAppRequest(
-            appIdA, null, null, tags);
-    try {
-      rmService.submitApplication(submitRequestA);
-    } catch (YarnException e) {
-      Assert.fail("Exception is not expected.");
-    }
-    RMApp appA = rmContext.getRMApps().get(appIdA);
-    Assert.assertNotEquals("app queue match",
-            YarnConfiguration.DEFAULT_QUEUE_NAME + YarnConfiguration.LOW_PRIORITY_OPTIMISTIC_QUEUE_SUFFIX,
-            appA.getQueue());
-
-    // with name, queue and tags
-    String name = MockApps.newAppName();
-    String queue = MockApps.newQueue();
-    ApplicationId appIdB = getApplicationId(101);
-    tags = new HashSet<>();
-    // Add upper case tag
-    tags.add(YarnConfiguration.LOW_PRIORITY_APP_TAG.toUpperCase());
-    SubmitApplicationRequest submitRequestB = mockSubmitAppRequest(
-            appIdB, name, queue, tags);
-    try {
-      rmService.submitApplication(submitRequestB);
-    } catch (YarnException e) {
-      Assert.fail("Exception is not expected.");
-    }
-    RMApp appB = rmContext.getRMApps().get(appIdB);
-    Assert.assertNotNull("app doesn't exist", appB);
-    Assert.assertEquals("app name doesn't match", name, appB.getName());
-    Assert.assertNotEquals("app queue match",
-            queue + YarnConfiguration.LOW_PRIORITY_OPTIMISTIC_QUEUE_SUFFIX,
-            appB.getQueue());
-  }
-
   @Test
-  public void testGetApplications() throws IOException, YarnException, Exception {
+  public void testGetApplications() throws IOException, YarnException {
     /**
      * 1. Submit 3 applications alternately in two queues
      * 2. Test each of the filters
@@ -978,7 +911,7 @@ public class TestClientRMService {
   @Test(timeout=4000)
   public void testConcurrentAppSubmit()
       throws IOException, InterruptedException, BrokenBarrierException,
-      YarnException, Exception {
+      YarnException {
     YarnScheduler yarnScheduler = mockYarnScheduler();
     RMContext rmContext = mock(RMContext.class);
     mockRMContext(yarnScheduler, rmContext);

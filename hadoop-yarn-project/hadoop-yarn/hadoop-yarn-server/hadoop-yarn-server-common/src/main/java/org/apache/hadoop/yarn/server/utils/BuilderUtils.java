@@ -26,7 +26,6 @@ import java.nio.ByteBuffer;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeSet;
 import java.util.Set;
 
 import org.apache.hadoop.classification.InterfaceAudience.Private;
@@ -398,7 +397,7 @@ public class BuilderUtils {
     report.setApplicationId(applicationId);
     report.setCurrentApplicationAttemptId(applicationAttemptId);
     report.setUser(user);
-    report.setQueue(getLowPriorityMappedQueue(tags, queue));
+    report.setQueue(queue);
     report.setName(name);
     report.setHost(host);
     report.setRpcPort(rpcPort);
@@ -528,39 +527,5 @@ public class BuilderUtils {
     appConf.readFields(dibb);
     tokensConf.rewind();
     return appConf;
-  }
-
-  private static String getLowPriorityMappedQueue(Set<String> appTags, String queue) {
-    Set<String> caseIgnoreAppTags = new TreeSet<>(new Comparator<String>() {
-      @Override
-      public int compare(String a, String b) {
-        return a.toLowerCase().compareTo(b.toLowerCase());
-      }
-    });
-
-    if (appTags != null) {
-      caseIgnoreAppTags.addAll(appTags);
-    }
-
-    /**
-     If appTag contains low priority tag and queue has low priority suffix, it means we have mapped to
-     different queue. Retrieve the original queue in such cases.
-     **/
-
-    // If app tag contains low priority tag and queue is one of the low priority queue
-    if (caseIgnoreAppTags.contains(YarnConfiguration.LOW_PRIORITY_APP_TAG)
-            && queue.toLowerCase().endsWith(YarnConfiguration.LOW_PRIORITY_OPTIMISTIC_QUEUE_SUFFIX)) {
-      // Iterate and get the tag for mapped queue
-      String lowPriorityOriginalQueuePrefix =
-              YarnConfiguration.YARN_INTERNAL_LOW_PRIORITY_ORIGINAL_QUEUE_PREFIX;
-      for (String appTag : caseIgnoreAppTags) {
-        if (appTag.startsWith(lowPriorityOriginalQueuePrefix)) {
-          // Get the mapped queue
-          String mappedQueue = appTag.substring(lowPriorityOriginalQueuePrefix.length(), appTag.length());
-          return mappedQueue;
-        }
-      }
-    }
-    return queue;
   }
 }

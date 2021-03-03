@@ -377,8 +377,7 @@ public class TestRMAppTransitions {
     ApplicationId applicationId = MockApps.newAppID(appId++);
     String user = MockApps.newUserName();
     String name = MockApps.newAppName();
-
-    String queue = submissionContext == null ? MockApps.newQueue() : submissionContext.getQueue();
+    String queue = MockApps.newQueue();
     // ensure max application attempts set to known value
     conf.setInt(YarnConfiguration.RM_AM_MAX_ATTEMPTS, maxAppAttempts);
     scheduler = mock(YarnScheduler.class);
@@ -1257,38 +1256,6 @@ public class TestRMAppTransitions {
     Assert.assertTrue("bad proxy url for app",
         report.getTrackingUrl().endsWith("/proxy/" + app.getApplicationId()
             + "/"));
-  }
-
-  @Test
-  public void testGetAppReportLowPriorityA() throws IOException {
-    ApplicationSubmissionContext submissionContext = new ApplicationSubmissionContextPBImpl();
-    submissionContext.setQueue("testQ" + YarnConfiguration.LOW_PRIORITY_OPTIMISTIC_QUEUE_SUFFIX);
-    Set<String> appTags = new HashSet<>();
-    appTags.add(YarnConfiguration.LOW_PRIORITY_APP_TAG);
-    appTags.add(YarnConfiguration.YARN_INTERNAL_LOW_PRIORITY_ORIGINAL_QUEUE_PREFIX + "originalQ");
-    submissionContext.setApplicationTags(appTags);
-
-    RMApp app = createNewTestApp(submissionContext);
-
-    assertAppState(RMAppState.NEW, app);
-    ApplicationReport report = app.createAndGetApplicationReport(null, true);
-    Assert.assertEquals("originalQ is not returned", report.getQueue(), "originalq");
-  }
-
-  @Test
-  public void testGetAppReportLowPriorityB() throws IOException {
-    ApplicationSubmissionContext submissionContext = new ApplicationSubmissionContextPBImpl();
-    submissionContext.setQueue("testQ");
-    Set<String> appTags = new HashSet<>();
-    appTags.add(YarnConfiguration.LOW_PRIORITY_APP_TAG);
-    appTags.add(YarnConfiguration.YARN_INTERNAL_LOW_PRIORITY_ORIGINAL_QUEUE_PREFIX + "originalQ");
-    submissionContext.setApplicationTags(appTags);
-
-    RMApp app = createNewTestApp(submissionContext);
-
-    assertAppState(RMAppState.NEW, app);
-    ApplicationReport report = app.createAndGetApplicationReport(null, true);
-    Assert.assertEquals("testQ is not returned", report.getQueue(), "testQ");
   }
 
   private void verifyApplicationFinished(RMAppState state) {
