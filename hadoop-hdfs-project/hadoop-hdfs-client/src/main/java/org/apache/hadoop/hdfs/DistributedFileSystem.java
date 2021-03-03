@@ -22,12 +22,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.URI;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.EnumSet;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
@@ -2664,5 +2659,22 @@ public class DistributedFileSystem extends FileSystem {
     if(authority == null || authority.isEmpty() || !resolvePath)
       return super.resolvePath(p);
     return dfs.getRemoteLocation(Path.getPathWithoutSchemeAndAuthority(p).toString());
+  }
+
+  @Override
+  public FileSystem[] getChildFileSystems() {
+    if (!resolvePath) return null;
+
+    try {
+      DistributedFileSystem dfs = new DistributedFileSystem();
+      dfs.initialize(new URI("hdfs://ns-neon-prod-dca1"), getConf());
+      return new FileSystem[] { dfs };
+
+      // TODO return dfs.getChildFileSystems();
+    } catch(Exception e) {
+
+    }
+
+    return null;
   }
 }

@@ -1563,4 +1563,15 @@ public interface ClientProtocol {
    */
   @Idempotent
   List<Path> getRemoteLocation(String src) throws IOException;
+
+  /**
+   * Call router to parse given path into the remote path and return remote file
+   * system info as well. The path may not exist yet.
+   *
+   * @param src source router path
+   * @return A list of resolved paths that are (supposed to be) the destinations of src
+   * @throws IOException
+   */
+  @Idempotent
+  ResolveResult getRemoteFileSystem(String src) throws IOException;
 }
