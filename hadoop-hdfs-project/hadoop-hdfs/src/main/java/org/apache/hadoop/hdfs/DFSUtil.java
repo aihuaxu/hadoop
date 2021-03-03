@@ -48,14 +48,7 @@ import java.net.URISyntaxException;
 import java.net.UnknownHostException;
 
 import java.security.SecureRandom;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Comparator;
-import java.util.Date;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 
 import org.apache.commons.cli.CommandLine;
@@ -73,6 +66,7 @@ import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier;
@@ -381,6 +375,62 @@ public class DFSUtil {
   public static String addKeySuffixes(String key, String... suffixes) {
     String keySuffix = DFSUtilClient.concatSuffixes(suffixes);
     return DFSUtilClient.addSuffix(key, keySuffix);
+  }
+
+  /**
+   * Retrieves the necessary cluster configuration entries used by the clients
+   * given a nameservice id from the configuration. This is typically used by
+   * router to r
+   * @param conf
+   * @param nsId
+   * @return
+   */
+  public static Map<String, String> getClusterConfiguration(
+          Configuration conf, String nsId) {
+    Map<String, String> clusterConf = new HashMap<>();
+
+    // Add client configurations
+    String[] configKeys = {
+            HdfsClientConfigKeys.Failover.PROXY_PROVIDER_KEY_PREFIX,
+            DFSConfigKeys.DFS_HA_AUTO_FAILOVER_ENABLED_KEY,
+            HdfsClientConfigKeys.DFS_HA_NAMENODES_KEY_PREFIX,
+            HdfsClientConfigKeys.DFS_HA_OBSERVER_NAMENODES_KEY_PREFIX
+    };
+
+    for (String configKey : configKeys) {
+      String nsConfigKey = addKeySuffixes(configKey, nsId);
+      String configValue = conf.get(nsConfigKey);
+      if (configValue != null) {
+        clusterConf.put(nsConfigKey, configValue);
+      }
+    }
+
+    // Add NameNode configurations
+    configKeys = new String[]{
+            HdfsClientConfigKeys.DFS_NAMENODE_RPC_ADDRESS_KEY,
+            HdfsClientConfigKeys.DFS_NAMENODE_HTTP_ADDRESS_KEY,
+            HdfsClientConfigKeys.DFS_NAMENODE_HTTPS_ADDRESS_KEY
+    };
+
+    for (String configKey : configKeys) {
+      // Non-HA key
+      String nnConfigKey = addKeySuffixes(configKey, nsId);
+      String configValue = conf.get(nnConfigKey);
+      if (configValue != null) {
+        clusterConf.put(nnConfigKey, configValue);
+      }
+
+      // HA keys
+      for (String nnId : DFSUtilClient.getNameNodeIds(conf, nsId)) {
+          nnConfigKey = addKeySuffixes(configKey, nsId, nnId);
+          configValue = conf.get(nnConfigKey);
+          if (configValue != null) {
+            clusterConf.put(nnConfigKey, configValue);
+          }
+        }
+    }
+
+    return clusterConf;
   }
 
   /**

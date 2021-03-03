@@ -19,20 +19,9 @@
 package org.apache.hadoop.hdfs;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_HA_NAMENODES_KEY_PREFIX;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_INTERNAL_NAMESERVICES_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_BACKUP_ADDRESS_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_HTTPS_PORT_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_HTTP_ADDRESS_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_HTTP_PORT_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_RPC_ADDRESS_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_SECONDARY_HTTP_ADDRESS_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_SERVICE_RPC_ADDRESS_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMESERVICES;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMESERVICE_ID;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_SERVER_HTTPS_KEYPASSWORD_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_SERVER_HTTPS_KEYSTORE_PASSWORD_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_SERVER_HTTPS_TRUSTSTORE_PASSWORD_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.*;
+import static org.apache.hadoop.hdfs.client.HdfsClientConfigKeys.DFS_HA_OBSERVER_NAMENODES_KEY_PREFIX;
+import static org.apache.hadoop.hdfs.client.HdfsClientConfigKeys.Failover.PROXY_PROVIDER_KEY_PREFIX;
 import static org.apache.hadoop.test.GenericTestUtils.assertExceptionContains;
 import static org.apache.hadoop.test.PlatformAssumptions.assumeNotWindows;
 import static org.hamcrest.CoreMatchers.not;
@@ -540,8 +529,7 @@ public class TestDFSUtil {
     assertEquals(null, DFSUtil.getNamenodeNameServiceId(conf));
     assertEquals(null, DFSUtil.getSecondaryNameServiceId(conf));
 
-    String proxyProviderKey = HdfsClientConfigKeys.Failover.
-        PROXY_PROVIDER_KEY_PREFIX + ".ns2";
+    String proxyProviderKey = PROXY_PROVIDER_KEY_PREFIX + ".ns2";
     conf.set(proxyProviderKey, "org.apache.hadoop.hdfs.server.namenode.ha."
         + "ConfiguredFailoverProxyProvider");
     Collection<URI> uris = getInternalNameServiceUris(conf, DFS_NAMENODE_RPC_ADDRESS_KEY);
@@ -613,7 +601,7 @@ public class TestDFSUtil {
     conf.set(DFSUtil.addKeySuffixes(
         DFS_NAMENODE_HTTP_ADDRESS_KEY, "ns1", "nn2"), nnaddr2);
 
-    conf.set(HdfsClientConfigKeys.Failover.PROXY_PROVIDER_KEY_PREFIX + "." + logicalHostName,
+    conf.set(PROXY_PROVIDER_KEY_PREFIX + "." + logicalHostName,
         ConfiguredFailoverProxyProvider.class.getName());
     return conf;
   }
@@ -684,8 +672,7 @@ public class TestDFSUtil {
      * resolve the logical URI of ns1 based on the configured value at
      * dfs.namenode.servicerpc-address.ns1, which is {@link NS1_NN_ADDR}
      */
-    String proxyProviderKey = HdfsClientConfigKeys.Failover.
-        PROXY_PROVIDER_KEY_PREFIX + ".ns1";
+    String proxyProviderKey = PROXY_PROVIDER_KEY_PREFIX + ".ns1";
     conf.set(proxyProviderKey, "org.apache.hadoop.hdfs.server.namenode.ha."
         + "IPFailoverProxyProvider");
 
@@ -800,8 +787,7 @@ public class TestDFSUtil {
     conf.set(DFSUtil.addKeySuffixes(
         DFS_NAMENODE_SERVICE_RPC_ADDRESS_KEY, "ns1"), NS1_NN_ADDR);
 
-    String proxyProviderKey = HdfsClientConfigKeys.Failover.
-        PROXY_PROVIDER_KEY_PREFIX + ".ns1";
+    String proxyProviderKey = PROXY_PROVIDER_KEY_PREFIX + ".ns1";
     conf.set(proxyProviderKey, "org.apache.hadoop.hdfs.server.namenode.ha."
         + "ConfiguredFailoverProxyProvider");
 
@@ -1065,4 +1051,40 @@ public class TestDFSUtil {
     }
   }
 
+  @Test
+  public void testGetClusterConfiguration() {
+    Configuration conf = new HdfsConfiguration();
+    conf.set(DFSUtil.addKeySuffixes(PROXY_PROVIDER_KEY_PREFIX, "ns1"),
+            "org.apache.hadoop.hdfs.server.namenode.ha.ConfiguredFailoverProxyProvider");
+    conf.set(DFSUtil.addKeySuffixes(DFS_HA_AUTO_FAILOVER_ENABLED_KEY, "ns1"),
+            "true");
+    conf.set(DFSUtil.addKeySuffixes(DFS_HA_NAMENODES_KEY_PREFIX, "ns1"),
+            "nn1,onn1");
+    conf.set(DFSUtil.addKeySuffixes(DFS_HA_OBSERVER_NAMENODES_KEY_PREFIX, "ns1"),
+            "onn1");
+
+    conf.set(DFSUtil.addKeySuffixes(DFS_NAMENODE_RPC_ADDRESS_KEY, "ns1", "nn1"),
+            "nn1:8020");
+    conf.set(DFSUtil.addKeySuffixes(DFS_NAMENODE_HTTP_ADDRESS_KEY, "ns1", "nn1"),
+            "nn1:50070");
+    conf.set(DFSUtil.addKeySuffixes(DFS_NAMENODE_HTTP_ADDRESS_KEY, "ns1", "nn1"),
+            "nn1:50470");
+
+    conf.set(DFSUtil.addKeySuffixes(DFS_NAMENODE_RPC_ADDRESS_KEY, "ns1", "onn1"),
+            "onn1:8020");
+    conf.set(DFSUtil.addKeySuffixes(DFS_NAMENODE_HTTP_ADDRESS_KEY, "ns1", "onn1"),
+            "onn1:50070");
+    conf.set(DFSUtil.addKeySuffixes(DFS_NAMENODE_HTTP_ADDRESS_KEY, "ns1", "onn1"),
+            "onn1:50470");
+
+    Map<String, String> clusterConf = DFSUtil.getClusterConfiguration(conf, "ns1");
+
+    assertEquals("org.apache.hadoop.hdfs.server.namenode.ha.ConfiguredFailoverProxyProvider",
+            clusterConf.get(PROXY_PROVIDER_KEY_PREFIX + ".ns1"));
+    assertEquals("true", clusterConf.get(DFS_HA_AUTO_FAILOVER_ENABLED_KEY + ".ns1"));
+    assertEquals("nn1,onn1", clusterConf.get(DFS_HA_NAMENODES_KEY_PREFIX + ".ns1"));
+    assertEquals("onn1", clusterConf.get(DFS_HA_OBSERVER_NAMENODES_KEY_PREFIX + ".ns1"));
+    assertEquals("nn1:8020", clusterConf.get(DFS_NAMENODE_RPC_ADDRESS_KEY + ".ns1.nn1"));
+    assertEquals("nn2:8020", clusterConf.get(DFS_NAMENODE_RPC_ADDRESS_KEY + ".ns1.nn2"));
+  }
 }

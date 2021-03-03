@@ -20,6 +20,7 @@ package org.apache.hadoop.hdfs.server.federation.resolver;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;

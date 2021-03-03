@@ -24,13 +24,7 @@ import static org.apache.hadoop.hdfs.server.federation.FederationTestUtils.delet
 import static org.apache.hadoop.hdfs.server.federation.FederationTestUtils.getFileStatus;
 import static org.apache.hadoop.hdfs.server.federation.FederationTestUtils.verifyFileExists;
 import static org.apache.hadoop.hdfs.server.federation.MiniRouterDFSCluster.TEST_STRING;
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 import java.io.IOException;
 import java.lang.reflect.Method;
@@ -51,19 +45,8 @@ import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.DFSClient;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.client.HdfsDataOutputStream;
-import org.apache.hadoop.hdfs.protocol.AddErasureCodingPolicyResponse;
-import org.apache.hadoop.hdfs.protocol.BlockStoragePolicy;
-import org.apache.hadoop.hdfs.protocol.ClientProtocol;
-import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
-import org.apache.hadoop.hdfs.protocol.DirectoryListing;
-import org.apache.hadoop.hdfs.protocol.ECBlockGroupStats;
-import org.apache.hadoop.hdfs.protocol.ErasureCodingPolicy;
-import org.apache.hadoop.hdfs.protocol.ErasureCodingPolicyInfo;
-import org.apache.hadoop.hdfs.protocol.ErasureCodingPolicyState;
+import org.apache.hadoop.hdfs.protocol.*;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.DatanodeReportType;
-import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
-import org.apache.hadoop.hdfs.protocol.LocatedBlock;
-import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.server.federation.MiniRouterDFSCluster;
 import org.apache.hadoop.hdfs.server.federation.MiniRouterDFSCluster.NamenodeContext;
 import org.apache.hadoop.hdfs.server.federation.MiniRouterDFSCluster.RouterContext;
@@ -1177,6 +1160,32 @@ public class TestRouterRpc {
     // Expect expcetion when routing the request to namenode
     try {
       nnProtocol.getRemoteLocation(src);
+    } catch (Exception e) {
+      assertNotNull(e);
+      assertTrue(e.getMessage().contains("getRemoteLocation is not implemented"));
+    }
+  }
+
+  @Test
+  public void testGetRemoteFileSystem() throws IOException {
+    RouterRpcServer rpcServer = router.getRouter().getRpcServer();
+    // mount point /ns1 -> ns1/target-ns1 is pre-defined in testSetup().
+    String src = "/ns1";
+    ResolveResult resolveResult = rpcServer.getRemoteFileSystem(src);
+    assertEquals(1, resolveResult.getResolvedPaths().size());
+    assertEquals("hdfs://ns1/target-ns1", resolveResult.getResolvedPaths().get(0).toString());
+
+    assertNotNull(resolveResult.getConf().get("dfs.namenode.rpc-address.ns1"));
+    assertNotNull(resolveResult.getConf().get("dfs.namenode.http-address.ns1"));
+    assertNotNull(resolveResult.getConf().get("dfs.namenode.https-address.ns1"));
+
+    assertNull(resolveResult.getConf().get("dfs.namenode.rpc-address.ns0"));
+    assertNull(resolveResult.getConf().get("dfs.namenode.http-address.ns0"));
+    assertNull(resolveResult.getConf().get("dfs.namenode.https-address.ns0"));
+
+    // Expect expcetion when routing the request to namenode
+    try {
+      nnProtocol.getRemoteFileSystem(src);
     } catch (Exception e) {
       assertNotNull(e);
       assertTrue(e.getMessage().contains("getRemoteLocation is not implemented"));

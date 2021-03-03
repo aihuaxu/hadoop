@@ -60,40 +60,12 @@ import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.HDFSPolicyProvider;
 import org.apache.hadoop.hdfs.inotify.EventBatchList;
-import org.apache.hadoop.hdfs.protocol.AddErasureCodingPolicyResponse;
-import org.apache.hadoop.hdfs.protocol.BlockStoragePolicy;
-import org.apache.hadoop.hdfs.protocol.CacheDirectiveEntry;
-import org.apache.hadoop.hdfs.protocol.CacheDirectiveInfo;
-import org.apache.hadoop.hdfs.protocol.CachePoolEntry;
-import org.apache.hadoop.hdfs.protocol.CachePoolInfo;
-import org.apache.hadoop.hdfs.protocol.ClientProtocol;
-import org.apache.hadoop.hdfs.protocol.CorruptFileBlocks;
-import org.apache.hadoop.hdfs.protocol.DatanodeID;
-import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
-import org.apache.hadoop.hdfs.protocol.DirectoryListing;
-import org.apache.hadoop.hdfs.protocol.ECBlockGroupStats;
-import org.apache.hadoop.hdfs.protocol.EncryptionZone;
-import org.apache.hadoop.hdfs.protocol.ErasureCodingPolicy;
-import org.apache.hadoop.hdfs.protocol.ErasureCodingPolicyInfo;
-import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
+import org.apache.hadoop.hdfs.protocol.*;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.DatanodeReportType;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.ReencryptAction;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.RollingUpgradeAction;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.SafeModeAction;
-import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
-import org.apache.hadoop.hdfs.protocol.HdfsLocatedFileStatus;
-import org.apache.hadoop.hdfs.protocol.LastBlockWithStatus;
-import org.apache.hadoop.hdfs.protocol.LocatedBlock;
-import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
-import org.apache.hadoop.hdfs.protocol.OpenFileEntry;
-import org.apache.hadoop.hdfs.protocol.OpenFilesIterator;
 import org.apache.hadoop.hdfs.protocol.OpenFilesIterator.OpenFilesType;
-import org.apache.hadoop.hdfs.protocol.ReplicatedBlockStats;
-import org.apache.hadoop.hdfs.protocol.RollingUpgradeInfo;
-import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
-import org.apache.hadoop.hdfs.protocol.SnapshotDiffReportListing;
-import org.apache.hadoop.hdfs.protocol.SnapshottableDirectoryStatus;
-import org.apache.hadoop.hdfs.protocol.ZoneReencryptionStatus;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.ClientNamenodeProtocol;
 import org.apache.hadoop.hdfs.protocolPB.ClientNamenodeProtocolPB;
 import org.apache.hadoop.hdfs.protocolPB.ClientNamenodeProtocolServerSideTranslatorPB;
@@ -2538,6 +2510,44 @@ public class RouterRpcServer extends AbstractService implements ClientProtocol {
         resolvedPathList.add(new Path(fullQualifiedPath));
       }
       return resolvedPathList;
+    } catch (IOException ioe) {
+      throw ioe;
+    }
+  }
+
+  @Override
+  public ResolveResult getRemoteFileSystem(String src) throws IOException {
+    try {
+      // Check the location for this path
+      FileSubclusterResolver resolver = this.router.getSubclusterResolver();
+      final PathLocation location =
+              resolver.getDestinationForPath(src);
+      if (location == null) {
+        throw new IOException("Cannot find locations for " + src + " in " +
+                resolver);
+      }
+
+      List<RemoteLocation> remoteLocations = location.getDestinations();
+      if (remoteLocations == null || remoteLocations.size() == 0) {
+        throw new IOException("No resolved path found");
+      }
+
+      List<Path> resolvedPathList = new ArrayList<>();
+      Map<String, String> remoteConf = new HashMap<>();
+
+      Set<String> processedNameServices = new HashSet<>();
+      for (RemoteLocation rl : remoteLocations) {
+        String fullQualifiedPath = HDFS_URI_SCHEME + "://" +
+                rl.getNameserviceId() + "/" +
+                rl.getDest();
+        resolvedPathList.add(new Path(fullQualifiedPath));
+        if (!processedNameServices.contains(rl.getNameserviceId())) {
+          remoteConf.putAll(DFSUtil.getClusterConfiguration(conf,
+                  rl.getNameserviceId()));
+          processedNameServices.add(rl.getNameserviceId());
+        }
+      }
+      return new ResolveResult(resolvedPathList, remoteConf);
     } catch (IOException ioe) {
       throw ioe;
     }

@@ -828,6 +828,20 @@ message GetRemoteLocationResponseProto {
   repeated string resolvedPaths = 1;
 }
 
+message GetRemoteFileSystemRequestProto {
+  optional string srcPath = 1;
+}
+
+message RemoteFileSystemConfigEntryProto {
+  required string key = 1;
+  required string value = 2;
+}
+
+message GetRemoteFileSystemResponseProto {
+  repeated string resolvedPaths = 1;
+  repeated RemoteFileSystemConfigEntryProto configEntries = 2;
+}
+
 service ClientNamenodeProtocol {
   rpc getBlockLocations(GetBlockLocationsRequestProto)
       returns(GetBlockLocationsResponseProto);
@@ -1014,4 +1028,6 @@ service ClientNamenodeProtocol {
       returns(ListOpenFilesResponseProto);
   rpc getRemoteLocation(GetRemoteLocationRequestProto)
       returns(GetRemoteLocationResponseProto);
+  rpc getRemoteFileSystem(GetRemoteFileSystemRequestProto)
+      returns(GetRemoteFileSystemResponseProto);
 }
