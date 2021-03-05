@@ -1607,6 +1607,10 @@ public class YarnConfiguration extends Configuration {
   public static final String NM_DOCKER_CONTAINER_CGROUP_PARENT = NM_PREFIX + "docker.cgroup-parent";
   public static final String NM_FORCE_RUN_AS_DOCKER_ENABLED = NM_PREFIX + "force-docker-runtime.enabled";
 
+  /** Configurations to enable SPIFFE based authentication for dockerized applications */
+  public static final String NM_DOCKER_SPIFFE_LABEL_KEY = NM_PREFIX + "docker.spiffe.label.key";
+  public static final String NM_DOCKER_SPIFFE_LABEL_VALUE_PREFIX = NM_PREFIX + "docker.spiffe.label.value-prefix";
+
   /**
    * Comma separated list of runtimes that are allowed when using
    * LinuxContainerExecutor. The allowed values are:

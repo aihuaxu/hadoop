@@ -24,6 +24,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.registry.client.binding.RegistryPathUtils;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Shell;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.yarn.api.records.ContainerId;
@@ -45,6 +46,7 @@ import org.apache.hadoop.yarn.server.nodemanager.containermanager.runtime.Contai
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.runtime.ContainerRuntimeConstants;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.runtime.ContainerRuntimeContext;
 import org.junit.Assert;
+import org.junit.Assume;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
@@ -55,6 +57,7 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.*;
@@ -496,6 +499,48 @@ public class TestDockerContainerRuntime {
     Assert.assertEquals("  user=run_as_user", dockerCommands.get(counter++));
     Assert.assertEquals("  workdir=/test_container_work_dir",
             dockerCommands.get(counter++));
+  }
+
+  @Test
+  public void testSpiffeDockerLabelExistsWithSecurityEnabled()
+          throws ContainerExecutionException, PrivilegedOperationException,
+          IOException {
+    Assume.assumeTrue(UserGroupInformation.isSecurityEnabled());
+    DockerLinuxContainerRuntime runtime = new DockerLinuxContainerRuntime(
+            mockExecutor, mockCGroupsHandler);
+    conf.set(YarnConfiguration.NM_DOCKER_SPIFFE_LABEL_KEY, "org.apache.hadoop.spiffe");
+    conf.set(YarnConfiguration.NM_DOCKER_SPIFFE_LABEL_VALUE_PREFIX, "yarn/uidNumber/");
+    runtime.initialize(conf);
+    runtime.launchContainer(builder.build());
+
+    PrivilegedOperation op = capturePrivilegedOperationAndVerifyArgs();
+    List<String> args = op.getArguments();
+    String dockerCommandFile = args.get(11);
+
+    byte[] dockerCommand = Files.readAllBytes(Paths.get(dockerCommandFile));
+    String dockerCommandStr = new String(dockerCommand, StandardCharsets.UTF_8);
+    Assert.assertTrue(dockerCommandStr.contains("org.apache.hadoop.spiffe:yarn/uidNumber/"));
+  }
+
+  @Test
+  public void testSpiffeDockerLabelDoesNotExistWithSecurityDisabled()
+          throws ContainerExecutionException, PrivilegedOperationException,
+          IOException {
+    Assume.assumeFalse(UserGroupInformation.isSecurityEnabled());
+    DockerLinuxContainerRuntime runtime = new DockerLinuxContainerRuntime(
+            mockExecutor, mockCGroupsHandler);
+    conf.set(YarnConfiguration.NM_DOCKER_SPIFFE_LABEL_KEY, "org.apache.hadoop.spiffe");
+    conf.set(YarnConfiguration.NM_DOCKER_SPIFFE_LABEL_VALUE_PREFIX, "yarn/uidNumber/");
+    runtime.initialize(conf);
+    runtime.launchContainer(builder.build());
+
+    PrivilegedOperation op = capturePrivilegedOperationAndVerifyArgs();
+    List<String> args = op.getArguments();
+    String dockerCommandFile = args.get(11);
+
+    byte[] dockerCommand = Files.readAllBytes(Paths.get(dockerCommandFile));
+    String dockerCommandStr = new String(dockerCommand, StandardCharsets.UTF_8);
+    Assert.assertFalse(dockerCommandStr.contains("org.apache.hadoop.spiffe=yarn/uidNumber/"));
   }
 
   @Test

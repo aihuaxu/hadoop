@@ -220,6 +220,8 @@ public class DockerLinuxContainerRuntime implements LinuxContainerRuntime {
   private int userRemappingGidThreshold;
   private Set<String> capabilities;
   private boolean delayedRemovalAllowed;
+  private String dockerSpiffeLabelKey;
+  private String dockerSpiffeLabelValuePrefix;
 
   /**
    * Return whether the given environment variables indicate that the operation
@@ -323,6 +325,11 @@ public class DockerLinuxContainerRuntime implements LinuxContainerRuntime {
     delayedRemovalAllowed = conf.getBoolean(
         YarnConfiguration.NM_DOCKER_ALLOW_DELAYED_REMOVAL,
         YarnConfiguration.DEFAULT_NM_DOCKER_ALLOW_DELAYED_REMOVAL);
+
+    dockerSpiffeLabelKey = conf.getTrimmed(
+        YarnConfiguration.NM_DOCKER_SPIFFE_LABEL_KEY);
+    dockerSpiffeLabelValuePrefix = conf.getTrimmed(
+        YarnConfiguration.NM_DOCKER_SPIFFE_LABEL_VALUE_PREFIX);
   }
 
   private Set<String> getDockerCapabilitiesFromConf() throws
@@ -599,8 +606,8 @@ public class DockerLinuxContainerRuntime implements LinuxContainerRuntime {
     Path containerWorkDir = ctx.getExecutionAttribute(CONTAINER_WORK_DIR);
     String[] groups = null;
 
+    String uid = getUserIdInfo(runAsUser);
     if (enableUserReMapping) {
-      String uid = getUserIdInfo(runAsUser);
       groups = getGroupIdInfo(runAsUser);
       String gid = groups[0];
       if(Integer.parseInt(uid) < userRemappingUidThreshold) {
@@ -736,7 +743,24 @@ public class DockerLinuxContainerRuntime implements LinuxContainerRuntime {
       runCommand.setOverrideCommandWithArgs(overrideCommands);
     }
 
-    String containerLabelStr = conf.get(YarnConfiguration.NM_DOCKER_CONTAINER_LABEL);
+    String containerLabelStr = conf.getTrimmed(YarnConfiguration.NM_DOCKER_CONTAINER_LABEL, "");
+
+    /**
+     * Add labels required by spiffe auth only if security is enabled.
+     * If security is disabled, do not add these labels, as there is no authentication before
+     * job submission.
+     */
+    if (UserGroupInformation.isSecurityEnabled() && dockerSpiffeLabelKey != null &&
+            dockerSpiffeLabelValuePrefix != null) {
+      // Add docker label com.uber.spiffe:yarn/uidNumber/900021
+      String spiffeUIDNumberPath = dockerSpiffeLabelValuePrefix + uid;
+      String spiffeDockerLabel = String.format("%s:%s", dockerSpiffeLabelKey, spiffeUIDNumberPath);
+      if (containerLabelStr.equals("")) {
+        containerLabelStr = spiffeDockerLabel;
+      } else {
+        containerLabelStr += String.format(",%s", spiffeDockerLabel);
+      }
+    }
     if (!Strings.isNullOrEmpty(containerLabelStr)) {
       runCommand.setLabels(containerLabelStr.trim().split("\\s*,\\s*"));
     }
