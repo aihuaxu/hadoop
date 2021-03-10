@@ -20,6 +20,8 @@ package org.apache.hadoop.yarn.server.resourcemanager;
 
 import static org.apache.hadoop.metrics2.lib.Interns.info;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -32,12 +34,12 @@ import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableGaugeInt;
 import org.apache.hadoop.metrics2.lib.MutableRate;
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.yarn.nodelabels.CommonNodeLabelsManager;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.QueueMetrics;
 
 @InterfaceAudience.Private
 @Metrics(context="yarn")
 public class ClusterMetrics {
-  
-  private static AtomicBoolean isInitialized = new AtomicBoolean(false);
 
   @Metric("# of active stressed NMs") MutableGaugeInt numStressedNodes;
   @Metric("# of active NMs") MutableGaugeInt numActiveNMs;
@@ -54,39 +56,63 @@ public class ClusterMetrics {
 
   private static final MetricsInfo RECORD_INFO = info("ClusterMetrics",
   "Metrics for the Yarn Cluster");
-  
-  private static volatile ClusterMetrics INSTANCE = null;
-  private static MetricsRegistry registry;
-  
-  public static ClusterMetrics getMetrics() {
-    if(!isInitialized.get()){
-      synchronized (ClusterMetrics.class) {
-        if(INSTANCE == null){
-          INSTANCE = new ClusterMetrics();
-          registerMetrics();
-          isInitialized.set(true);
-        }
-      }
-    }
-    return INSTANCE;
+  protected static final MetricsInfo CLUSTER_PARTITION_INFO =
+          info("ClusterPartition", "Metrics by Partition");
+  protected final MetricsRegistry registry;
+
+  // Map to hold per partition metrics
+  private static final Map<String, ClusterMetrics> CLUSTER_METRICS_MAP =
+          new HashMap<>();
+  // Default partition
+  private static final String DEFAULT_PARTITION = CommonNodeLabelsManager.NO_LABEL;
+
+  public ClusterMetrics() {
+    registry = new MetricsRegistry(RECORD_INFO);
   }
 
-  private static void registerMetrics() {
-    registry = new MetricsRegistry(RECORD_INFO);
-    registry.tag(RECORD_INFO, "ResourceManager");
+  public static ClusterMetrics getMetrics() {
+    return getMetrics(DEFAULT_PARTITION);
+  }
+
+  protected ClusterMetrics tag(MetricsInfo info, String value) {
+    registry.tag(info, value);
+    return this;
+  }
+
+  protected static StringBuilder sourceName(String partition) {
+    StringBuilder sb = new StringBuilder(RECORD_INFO.name());
+    sb.append(",partition").append('=').append(partition);
+    return sb;
+  }
+
+  public synchronized static ClusterMetrics getMetrics(String partition) {
+    ClusterMetrics metrics = CLUSTER_METRICS_MAP.get(partition);
+    if (metrics == null) {
+      metrics = new ClusterMetrics().tag(CLUSTER_PARTITION_INFO, partition);
+      registerMetrics(partition, metrics);
+      CLUSTER_METRICS_MAP.put(partition, metrics);
+    }
+    return metrics;
+  }
+
+  private static void registerMetrics(String partition, ClusterMetrics instance) {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     if (ms != null) {
-      ms.register("ClusterMetrics", "Metrics for the Yarn Cluster", INSTANCE);
+      // Keep it backward compatible
+      if (partition.equals(DEFAULT_PARTITION)) {
+        ms.register("ClusterMetrics", "Cluster Metrics for the Default Partition", instance);
+      } else {
+        ms.register(sourceName(partition).toString(), "Cluster Metrics for partition:" + partition, instance);
+      }
     }
   }
 
   @VisibleForTesting
   synchronized static void destroy() {
-    isInitialized.set(false);
-    INSTANCE = null;
+    CLUSTER_METRICS_MAP.clear();
   }
   
-  //Active Nodemanagers
+  //Active NodeManagers
   public int getNumActiveNMs() {
     return numActiveNMs.value();
   }

@@ -820,10 +820,15 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
   private static NodeHealthStatus updateRMNodeFromStatusEvents(
       RMNodeImpl rmNode, RMNodeStatusEvent statusEvent) {
     // Switch the last heartbeatresponse.
-
     NodeHealthStatus remoteNodeHealthStatus = statusEvent.getNodeHealthStatus();
     String remoteNodeHealthReport = remoteNodeHealthStatus.getHealthReport();
-
+    List<String>labels = new ArrayList<>(rmNode.getNodeLabels());
+    String label;
+    if (labels.size() == 0) {
+      label = CommonNodeLabelsManager.NO_LABEL;
+    } else {
+      label = labels.get(0);
+    }
     // Process the stressed node signal
     // Remote node is not reporting stress
     if (!remoteNodeHealthStatus.isNodeStressed()) {
@@ -833,53 +838,56 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
               isContainerRunningAllowable(rmNode, remoteNodeHealthStatus);
       // Remove from the stressed map
       if (!remoteNodeUnhealthyStressed &&
-              rmNode.context.getStressedRMNodes().containsKey(rmNode.nodeId)) {
+              rmNode.context.checkIfNodeIsStressed(label, rmNode.nodeId)) {
         // Remove the node from the stressed map
-        rmNode.context.getStressedRMNodes().remove(rmNode.nodeId);
-        ClusterMetrics.getMetrics().decrStressedNodes();
-        LOG.info("Removing the node:"+rmNode.toString() + " from the stressed state");
+        rmNode.context.removeStressedNode(label, rmNode.nodeId);
+        ClusterMetrics.getMetrics(label).decrStressedNodes();
+        LOG.info("Removing the node : "+ rmNode.toString() + " from the stressed state");
       }
       // Copy the remote health report as it is
       rmNode.setHealthReport(remoteNodeHealthReport);
     } else {
       // Remote node is reporting stress
       // Local node is also stressed
-      if (rmNode.context.getStressedRMNodes().containsKey(rmNode.nodeId)) {
+      if (rmNode.context.checkIfNodeIsStressed(label, rmNode.nodeId)) {
         // Copy the remote health report as it is
+        LOG.info("Node is already stressed : " + rmNode.toString() + " in the label : " + label);
         rmNode.setHealthReport(remoteNodeHealthReport);
       } else {
         // Local node state is not stressed
         // Check if a node could be added to stressed map
-        if (rmNode.context.canAddStressedNodes()) {
-          // Put the stressed node in the stressed map
-          rmNode.context.getStressedRMNodes().put(rmNode.nodeId, rmNode);
-          ClusterMetrics.getMetrics().incrStressedNodes();
+        if (rmNode.context.addStressedNode(label, rmNode)) {
+          ClusterMetrics.getMetrics(label).incrStressedNodes();
           LOG.info("Put the node : " + rmNode.toString() + " in the stressed state");
-
           // Copy the remote health report as it is
           rmNode.setHealthReport(remoteNodeHealthReport);
         } else {
-          LOG.warn("Not adding the node : " + rmNode.toString() +
-              " to the stressed state due to the threshold");
-
+          LOG.info("Not adding the node : " + rmNode.toString() +
+                  " to the stressed state due to the threshold limit for the label : " + label);
           // If not, remove stress from healthReport and copy the remaining healthReport as it is
           String healthReport = removeStressFromHealthReport(remoteNodeHealthReport);
           rmNode.setHealthReport(healthReport);
         }
       }
     }
-    // Process the node unhealthy when health report actually allows to let containers drain
+    // Process the node healthy when health report actually allows to let containers drain
     if (!remoteNodeHealthStatus.getIsNodeHealthy() &&
             isContainerRunningAllowable(rmNode, remoteNodeHealthStatus)) {
       // Add this node as healthy if it can be added to stressed map or already in stress
-      if (rmNode.context.canAddStressedNodes() ||
-              rmNode.context.getStressedRMNodes().containsKey(rmNode.getNodeID())) {
+      boolean alreadyInStressedState = rmNode.context.checkIfNodeIsStressed(label, rmNode.nodeId);
+      if (!alreadyInStressedState) {
+         alreadyInStressedState = rmNode.context.addStressedNode(label, rmNode);
+         // increment metrics if successfully added to the threshold map
+        if (alreadyInStressedState) {
+          ClusterMetrics.getMetrics(label).incrStressedNodes();
+        }
+      }
+      if (alreadyInStressedState) {
         remoteNodeHealthStatus.setIsNodeHealthy(true);
         // Append node stress message
         rmNode.setHealthReport(remoteNodeHealthReport + ";" + NODE_STRESSED_MSG);
         LOG.info("Put the node : " + rmNode.toString() + " in the stressed state as it is unhealthy but " +
                 "allow draining of containers");
-        rmNode.context.getStressedRMNodes().put(rmNode.nodeId, rmNode);
       }
     }
 
@@ -912,17 +920,25 @@ public class RMNodeImpl implements RMNode, EventHandler<RMNodeEvent> {
 
   // This function cleans stressed signals from node
   private static void cleanStressedSignalsFromNodeIfPresent(RMNodeImpl rmNode) {
-    if (rmNode != null &&
-        rmNode.context.getStressedRMNodes().containsKey(rmNode.nodeId)) {
+    if (rmNode != null) {
+      String label;
+      List<String>labels = new ArrayList<>(rmNode.getNodeLabels());
+      if (labels.size() == 0) {
+        // Default label
+        label = CommonNodeLabelsManager.NO_LABEL;
+      } else {
+        // Take first label
+        label = labels.get(0);
+      }
       // Remove node from the stressed map
-      rmNode.context.getStressedRMNodes().remove(rmNode.nodeId);
-      ClusterMetrics.getMetrics().decrStressedNodes();
-      LOG.info("Removing the node:"+rmNode.toString() + " from the stressed state");
-
-      // Also remove stressed report
-      String healthReport = rmNode.getHealthReport();
-      String removeStressedReport = removeStressFromHealthReport(healthReport);
-      rmNode.setHealthReport(removeStressedReport);
+      if (rmNode.context.removeStressedNode(label, rmNode.getNodeID())) {
+        ClusterMetrics.getMetrics(label).decrStressedNodes();
+        LOG.info("Removing the node:" + rmNode.toString() + " from the stressed state");
+        // Also remove stressed report
+        String healthReport = rmNode.getHealthReport();
+        String removeStressedReport = removeStressFromHealthReport(healthReport);
+        rmNode.setHealthReport(removeStressedReport);
+      }
     }
   }
 

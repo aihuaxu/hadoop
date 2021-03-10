@@ -19,6 +19,8 @@
 package org.apache.hadoop.yarn.server.resourcemanager;
 
 import java.nio.ByteBuffer;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
@@ -76,7 +78,8 @@ public class RMActiveServiceContext {
   private final ConcurrentMap<NodeId, RMNode> inactiveNodes =
       new ConcurrentHashMap<NodeId, RMNode>();
 
-  private final ConcurrentMap<NodeId, RMNode> stressedNodes =
+  // Map of partition to stressed nodes
+  private final ConcurrentMap<String, ConcurrentMap<NodeId, RMNode>> stressedNodes =
       new ConcurrentHashMap<>();
 
   private final ConcurrentMap<ApplicationId, ByteBuffer> systemCredentials =
@@ -204,7 +207,7 @@ public class RMActiveServiceContext {
 
   @Private
   @Unstable
-  public ConcurrentMap<NodeId, RMNode> getStressedRMNodes() {
+  public ConcurrentMap<String, ConcurrentMap<NodeId, RMNode>> getStressedRMNodes() {
     return this.stressedNodes;
   }
 

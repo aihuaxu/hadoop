@@ -453,6 +453,7 @@ public class RMNodeLabelsManager extends CommonNodeLabelsManager {
           // update labels
           RMNodeLabel label = labelCollections.get(NO_LABEL);
           label.removeNode(oldNM.resource);
+          rmContext.removeStressedNode(NO_LABEL, nodeId);
 
           // update queues, all queue can access this node
           for (Queue q : queueCollections.values()) {
@@ -466,6 +467,7 @@ public class RMNodeLabelsManager extends CommonNodeLabelsManager {
               continue;
             }
             label.removeNode(oldNM.resource);
+            rmContext.removeStressedNode(labelName, nodeId);
           }
 
           // update queues, only queue can access this node will be subtract

@@ -19,6 +19,7 @@
 package org.apache.hadoop.yarn.server.resourcemanager;
 
 import java.nio.ByteBuffer;
+import java.util.Map;
 import java.util.concurrent.ConcurrentMap;
 
 import org.apache.hadoop.conf.Configuration;
@@ -73,9 +74,13 @@ public interface RMContext extends ApplicationMasterServiceContext {
 
   ConcurrentMap<NodeId, RMNode> getInactiveRMNodes();
 
-  ConcurrentMap<NodeId, RMNode> getStressedRMNodes();
+  ConcurrentMap<String, ConcurrentMap<NodeId, RMNode>> getStressedRMNodes();
 
-  boolean canAddStressedNodes();
+  boolean checkIfNodeIsStressed(String partition, NodeId nodeId);
+
+  boolean addStressedNode(String partition, RMNode rmNode);
+
+  boolean removeStressedNode(String partition, NodeId nodeId);
 
   ConcurrentMap<NodeId, RMNode> getRMNodes();
 

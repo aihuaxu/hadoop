@@ -24,6 +24,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceAudience.Public;
@@ -307,10 +309,22 @@ public class YarnConfiguration extends Configuration {
   public static final String RM_THRESHOLD_PERCENTAGE_STRESSED_NODES =
           RM_PREFIX + "threshold.percentage.stressed.nodes";
   public static final double DEFAULT_THRESHOLD_PERCENTAGE_STRESSED_NODES = 10.0;
+  private static final Log LOG = LogFactory.getLog(YarnConfiguration.class);
 
-  public static double thresholdPercentageOfStressedNodes(Configuration conf) {
-    return conf.getDouble(YarnConfiguration.RM_THRESHOLD_PERCENTAGE_STRESSED_NODES,
-            DEFAULT_THRESHOLD_PERCENTAGE_STRESSED_NODES);
+  public static double thresholdPercentageOfStressedNodes(Configuration conf, String label) {
+    String dynamicPartitionConf;
+    if (label.isEmpty()) {
+      dynamicPartitionConf = YarnConfiguration.RM_THRESHOLD_PERCENTAGE_STRESSED_NODES;
+    } else {
+      dynamicPartitionConf = String.format(YarnConfiguration.RM_THRESHOLD_PERCENTAGE_STRESSED_NODES + ".%s",
+              label);
+    }
+    // Try to get the threshold for this label
+    // else revert to the default threshold
+    double val = conf.getDouble(dynamicPartitionConf,
+            conf.getDouble(YarnConfiguration.RM_THRESHOLD_PERCENTAGE_STRESSED_NODES,
+                    YarnConfiguration.DEFAULT_THRESHOLD_PERCENTAGE_STRESSED_NODES));
+    return val;
   }
 
   /**

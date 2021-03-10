@@ -69,6 +69,7 @@ import org.apache.hadoop.yarn.api.records.ResourceRequest;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
+import org.apache.hadoop.yarn.nodelabels.CommonNodeLabelsManager;
 import org.apache.hadoop.yarn.proto.YarnServiceProtos.SchedulerResourceTypes;
 import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
 import org.apache.hadoop.yarn.server.resourcemanager.nodelabels.RMNodeLabelsManager;
@@ -1342,9 +1343,18 @@ public class CapacityScheduler extends
       return null;
     }
 
+    String label;
+    List<String>labels = new ArrayList<>(node.getRMNode().getNodeLabels());
+    if (labels.size() == 0) {
+      // Default label
+      label = CommonNodeLabelsManager.NO_LABEL;
+    } else {
+      // Take first label
+      label = labels.get(0);
+    }
     // Check if node is stressed and scheduling on stressed node is not allowed
     if (!schedulingOnStressedNodesAllowed &&
-        rmContext.getStressedRMNodes().containsKey(node.getNodeID())) {
+        rmContext.checkIfNodeIsStressed(label, node.getNodeID())) {
       LOG.warn("Trying to schedule on a stressed node, when it is not allowed." +
           " Stressed node : " + node.getNodeName());
       return null;

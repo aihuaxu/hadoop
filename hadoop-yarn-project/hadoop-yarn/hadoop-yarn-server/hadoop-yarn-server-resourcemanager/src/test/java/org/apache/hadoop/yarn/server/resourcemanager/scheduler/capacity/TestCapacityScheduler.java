@@ -69,6 +69,7 @@ import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
 import org.apache.hadoop.yarn.factories.RecordFactory;
 import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
 import org.apache.hadoop.yarn.ipc.YarnRPC;
+import org.apache.hadoop.yarn.nodelabels.CommonNodeLabelsManager;
 import org.apache.hadoop.yarn.server.api.protocolrecords.UpdateNodeResourceRequest;
 import org.apache.hadoop.yarn.server.resourcemanager.AdminService;
 import org.apache.hadoop.yarn.server.resourcemanager.Application;
@@ -4301,7 +4302,7 @@ public class TestCapacityScheduler {
         (FiCaSchedulerNode)
             scheduler.getNodeTracker().getNode(nm2.getNodeId());
 
-    scheduler.getRMContext().getStressedRMNodes().put(nm2.getNodeId(), node.getRMNode());
+    scheduler.getRMContext().addStressedNode(CommonNodeLabelsManager.NO_LABEL, node.getRMNode());
 
     // schedulerNode is stressed, try allocate a container
     scheduler.allocateContainersToNode(new SimpleCandidateNodeSet<>(node), true);

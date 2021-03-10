@@ -46,6 +46,7 @@ import org.apache.hadoop.yarn.api.records.ResourceOption;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.event.EventHandler;
 import org.apache.hadoop.yarn.event.InlineDispatcher;
+import org.apache.hadoop.yarn.nodelabels.CommonNodeLabelsManager;
 import org.apache.hadoop.yarn.server.api.protocolrecords.NodeHeartbeatResponse;
 import org.apache.hadoop.yarn.server.api.records.NodeHealthStatus;
 import org.apache.hadoop.yarn.server.api.records.NodeStatus;
@@ -695,7 +696,8 @@ public class TestRMNodeTransitions {
 
     // Change in the node running status
     Assert.assertEquals(NodeState.UNHEALTHY, node.getState());
-    Assert.assertEquals(0, rmContext.getStressedRMNodes().size());
+    Assert.assertEquals(0, rmContext.getStressedRMNodes().get(CommonNodeLabelsManager.NO_LABEL).
+            size());
     // Node should not have stressed in the health report
     Assert.assertTrue(!node.getHealthReport().contains("NODE_STRESSED"));
 
@@ -757,7 +759,7 @@ public class TestRMNodeTransitions {
     // Node should change to unhealthy
     Assert.assertEquals(NodeState.UNHEALTHY, node.getState());
     // Node should be removed from stressed map
-    Assert.assertEquals(0, rmContext.getStressedRMNodes().size());
+    Assert.assertEquals(0, rmContext.getStressedRMNodes().get(CommonNodeLabelsManager.NO_LABEL).size());
     // Node should have permission issue
     Assert.assertTrue(node.getHealthReport().contains("permission issue;"));
 
@@ -784,7 +786,7 @@ public class TestRMNodeTransitions {
 
     // Change in the node running status
     Assert.assertEquals(NodeState.RUNNING, node.getState());
-    Assert.assertEquals(1, rmContext.getStressedRMNodes().size());
+    Assert.assertEquals(1, rmContext.getStressedRMNodes().get(CommonNodeLabelsManager.NO_LABEL).size());
 
     node = getRunningNode();
     rmContext.getRMNodes().put(node.getNodeID(), node);
@@ -801,7 +803,7 @@ public class TestRMNodeTransitions {
     // Node should continue to RUNNING
     Assert.assertEquals(NodeState.RUNNING, node.getState());
     // Node should continue to be in stressed map
-    Assert.assertEquals(1, rmContext.getStressedRMNodes().size());
+    Assert.assertEquals(1, rmContext.getStressedRMNodes().get(CommonNodeLabelsManager.NO_LABEL).size());
     // Node should have correct error report
     Assert.assertTrue(node.getHealthReport().contains("1/2 log-dirs usable space is below configured utilization"));
 
@@ -828,7 +830,7 @@ public class TestRMNodeTransitions {
 
     // Node should become unhealthy
     Assert.assertEquals(NodeState.RUNNING, nodeA.getState());
-    Assert.assertEquals(1, rmContext.getStressedRMNodes().size());
+    Assert.assertEquals(1, rmContext.getStressedRMNodes().get(CommonNodeLabelsManager.NO_LABEL).size());
     Assert.assertTrue(nodeA.getHealthReport().contains("NODE_STRESSED"));
     Assert.assertTrue(nodeA.getHealthReport().contains("unhealthy"));
 
@@ -850,7 +852,7 @@ public class TestRMNodeTransitions {
     // Only 50% of the nodes could be in stressed state
     // This node should not go to the UNHEALTHY state
     Assert.assertEquals(NodeState.RUNNING, nodeB.getState());
-    Assert.assertEquals(1, rmContext.getStressedRMNodes().size());
+    Assert.assertEquals(1, rmContext.getStressedRMNodes().get(CommonNodeLabelsManager.NO_LABEL).size());
     Assert.assertTrue(!nodeB.getHealthReport().contains("NODE_STRESSED"));
 
     rmContext.getStressedRMNodes().clear();
@@ -866,7 +868,7 @@ public class TestRMNodeTransitions {
     RMNodeImpl nodeA = getUnhealthyNode();
     rmContext.getRMNodes().put(nodeA.getNodeID(), nodeA);
     nodeA.setHealthReport("NODE_STRESSED");
-    rmContext.getStressedRMNodes().put(nodeA.getNodeID(), nodeA);
+    rmContext.addStressedNode("", nodeA);
 
     NodeHealthStatus status = NodeHealthStatus.newInstance(false, "unhealthy;NODE_STRESSED",
             System.currentTimeMillis());
@@ -877,7 +879,8 @@ public class TestRMNodeTransitions {
 
     // Unhealthy nodes should not have stressed signal
     Assert.assertEquals(NodeState.UNHEALTHY, nodeA.getState());
-    Assert.assertEquals(0, rmContext.getStressedRMNodes().size());
+    Assert.assertEquals(0, rmContext.getStressedRMNodes().get(CommonNodeLabelsManager.NO_LABEL).
+            size());
     Assert.assertTrue(!nodeA.getHealthReport().contains("NODE_STRESSED"));
     Assert.assertTrue(nodeA.getHealthReport().contains("unhealthy"));
 
@@ -895,7 +898,7 @@ public class TestRMNodeTransitions {
     nodeA.setHealthReport("NODE_STRESSED");
 
     rmContext.getRMNodes().put(nodeA.getNodeID(), nodeA);
-    rmContext.getStressedRMNodes().put(nodeA.getNodeID(), nodeA);
+    rmContext.addStressedNode("", nodeA);
 
     NodeHealthStatus status = NodeHealthStatus.newInstance(true, "",
             System.currentTimeMillis());
@@ -905,7 +908,7 @@ public class TestRMNodeTransitions {
     nodeA.handle(new RMNodeStatusEvent(nodeA.getNodeID(), nodeStatus, null));
 
     Assert.assertEquals(NodeState.RUNNING, nodeA.getState());
-    Assert.assertEquals(0, rmContext.getStressedRMNodes().size());
+    Assert.assertEquals(0, rmContext.getStressedRMNodes().get(CommonNodeLabelsManager.NO_LABEL).size());
     Assert.assertTrue(!nodeA.getHealthReport().contains("NODE_STRESSED"));
     Assert.assertTrue(nodeA.getHealthReport().equals(""));
 
@@ -958,7 +961,7 @@ public class TestRMNodeTransitions {
             null, null, status, null, null,
             null);
     nodeA.handle(new RMNodeStatusEvent(nodeA.getNodeID(), nodeStatus, null));
-    Assert.assertEquals(rmContext.getStressedRMNodes().size(), 1);
+    Assert.assertEquals(rmContext.getStressedRMNodes().get(CommonNodeLabelsManager.NO_LABEL).size(), 1);
     Assert.assertTrue(nodeA.getHealthReport().contains("NODE_STRESSED"));
 
     Assert.assertEquals("Stressed Nodes", initialStressed + 1,
@@ -988,7 +991,7 @@ public class TestRMNodeTransitions {
             null, null, status, null, null,
             null);
     nodeA.handle(new RMNodeStatusEvent(nodeA.getNodeID(), nodeStatus, null));
-    Assert.assertEquals(1, rmContext.getStressedRMNodes().size());
+    Assert.assertEquals(1, rmContext.getStressedRMNodes().get(CommonNodeLabelsManager.NO_LABEL).size());
 
     RMNodeImpl nodeB = getRunningNode("ver1", 4096);
     rmContext.getRMNodes().put(nodeB.getNodeID(), nodeB);
@@ -1002,7 +1005,8 @@ public class TestRMNodeTransitions {
 
     // All of the nodes could be stressed
     // This node should  go to the UNHEALTHY state
-    Assert.assertEquals(2, rmContext.getStressedRMNodes().size());
+    Assert.assertEquals(2, rmContext.getStressedRMNodes().
+            get(CommonNodeLabelsManager.NO_LABEL).size());
 
     Assert.assertEquals("Stressed Nodes", initialStressed + 2,
         cm.getNumStressedNodes());
@@ -1031,7 +1035,7 @@ public class TestRMNodeTransitions {
             null, null, status, null, null,
             null);
     nodeA.handle(new RMNodeStatusEvent(nodeA.getNodeID(), nodeStatus, null));
-    Assert.assertEquals(1, rmContext.getStressedRMNodes().size());
+    Assert.assertEquals(1, rmContext.getStressedRMNodes().get(CommonNodeLabelsManager.NO_LABEL).size());
 
     rmContext.getStressedRMNodes().clear();
     rmContext.getRMNodes().clear();
@@ -1054,7 +1058,8 @@ public class TestRMNodeTransitions {
             null, null, status, null, null,
             null);
     nodeA.handle(new RMNodeStatusEvent(nodeA.getNodeID(), nodeStatus, null));
-    Assert.assertEquals(0, rmContext.getStressedRMNodes().size());
+    Assert.assertEquals(0, rmContext.getStressedRMNodes().
+            get(CommonNodeLabelsManager.NO_LABEL).size());
 
     rmContext.getStressedRMNodes().clear();
     rmContext.getRMNodes().clear();
@@ -1072,18 +1077,19 @@ public class TestRMNodeTransitions {
 
     RMNodeImpl nodeA = getUnhealthyNode();
     rmContext.getRMNodes().put(nodeA.getNodeID(), nodeA);
-    rmContext.getStressedRMNodes().put(nodeA.getNodeID(), nodeA);
+    rmContext.addStressedNode("", nodeA);
     nodeA.setHealthReport("healthy;NODE_STRESSED");
 
     nodeA.handle(new RMNodeDecommissioningEvent(nodeA.getNodeID(), Integer.MAX_VALUE));
 
     Assert.assertEquals(NodeState.DECOMMISSIONING, nodeA.getState());
-    Assert.assertEquals(0, rmContext.getStressedRMNodes().size());
+    Assert.assertEquals(0, rmContext.getStressedRMNodes().
+            get(CommonNodeLabelsManager.NO_LABEL).size());
     Assert.assertTrue(!nodeA.getHealthReport().contains("NODE_STRESSED"));
 
     RMNodeImpl nodeB = getUnhealthyNode();
     rmContext.getRMNodes().put(nodeA.getNodeID(), nodeA);
-    rmContext.getStressedRMNodes().put(nodeA.getNodeID(), nodeA);
+    rmContext.addStressedNode("", nodeB);
     nodeA.setHealthReport("healthy;NODE_STRESSED");
 
     Assert.assertEquals("Stressed Nodes", initialStressed - 1,
@@ -1093,7 +1099,8 @@ public class TestRMNodeTransitions {
     nodeB.handle(new RMNodeEvent(nodeB.getNodeID(), RMNodeEventType.EXPIRE));
 
     Assert.assertEquals(NodeState.LOST, nodeB.getState());
-    Assert.assertEquals(0, rmContext.getStressedRMNodes().size());
+    Assert.assertEquals(0, rmContext.getStressedRMNodes().
+            get(CommonNodeLabelsManager.NO_LABEL).size());
     Assert.assertTrue(!nodeB.getHealthReport().contains("NODE_STRESSED"));
 
     Assert.assertEquals("Stressed Nodes", initialStressed - 2,
@@ -1365,12 +1372,12 @@ public class TestRMNodeTransitions {
     Assert.assertEquals(NodeState.DECOMMISSIONING, node.getState());
     Assert.assertTrue(!node.getHealthReport().contains("NODE_STRESSED"));
     Assert.assertTrue(node.getHealthReport().contains("sick"));
-    Assert.assertEquals(0, rmContext.getStressedRMNodes().size());
+    Assert.assertEquals(0, rmContext.getStressedRMNodes().get(CommonNodeLabelsManager.NO_LABEL).size());
     nodeStatus.setKeepAliveApplications(null);
     node.handle(new RMNodeStatusEvent(node.getNodeID(), nodeStatus, null));
     Assert.assertTrue(!node.getHealthReport().contains("NODE_STRESSED"));
     Assert.assertTrue(node.getHealthReport().contains("sick"));
-    Assert.assertEquals(0, rmContext.getStressedRMNodes().size());
+    Assert.assertEquals(0, rmContext.getStressedRMNodes().get(CommonNodeLabelsManager.NO_LABEL).size());
     Assert.assertEquals(NodeState.DECOMMISSIONED, node.getState());
   }
 

@@ -21,6 +21,8 @@ package org.apache.hadoop.yarn.server.resourcemanager;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
 import org.apache.commons.logging.Log;
@@ -282,20 +284,55 @@ public class RMContextImpl implements RMContext {
   }
 
   @Override
-  public boolean canAddStressedNodes() {
-    double thresholdPercentage = YarnConfiguration.thresholdPercentageOfStressedNodes(getYarnConfiguration());
+  public boolean checkIfNodeIsStressed(String label, NodeId nodeId) {
+    Map<NodeId, RMNode> stressedPartitionMap = getStressedRMNodes().get(label);
+    if (stressedPartitionMap != null &&
+            stressedPartitionMap.containsKey(nodeId)) {
+      return true;
+    }
+    return false;
+  }
 
+  @Override
+  public boolean addStressedNode(String label, RMNode rmNode) {
+    double thresholdPercentage = YarnConfiguration.thresholdPercentageOfStressedNodes(getYarnConfiguration(),
+            label);
+    // Add map if not present for this label
+    getStressedRMNodes().putIfAbsent(label, new ConcurrentHashMap<NodeId, RMNode>());
     // Current number of stressed nodes
-    int stressedNodes = getStressedRMNodes().size();
-    // Total nodes
-    int totalNodes = getRMNodes().size();
-
+    int stressedNodes = getStressedRMNodes().get(label).size();
+    int totalNodesInPartition;
+    // Total nodes in this label
+    RMNodeLabelsManager nlm = getNodeLabelManager();
+    if (nlm == null) {
+      totalNodesInPartition = getRMNodes().size();
+    } else {
+      totalNodesInPartition = getNodeLabelManager().getActiveNMCountPerLabel(label);
+    }
     // Percentage of stressed nodes if one more node is added to stressed map
-    double stressedNodesPercentage = ((stressedNodes + 1) * 100.0 ) / totalNodes;
+    double stressedNodesPercentage = ((stressedNodes + 1) * 100.0) / totalNodesInPartition;
+    // Return false, if node is already present or can't be added due to threshold
+    // Return true otherwise
+    if (stressedNodesPercentage <= thresholdPercentage) {
+      LOG.info(String.format("Adding the node:%s to the stressed map in the label:%s", rmNode.toString(), label));
+      getStressedRMNodes().get(label).putIfAbsent(rmNode.getNodeID(), rmNode);
+      return true;
+    } else {
+      LOG.info(String.format("Not adding the node:%s to the stressed map in the label:%s", rmNode.toString(), label));
+      return false;
+    }
+  }
 
-    // Return false, if violation of threshold occurs
-    // Return true, if no violation of threshold occurs
-    return stressedNodesPercentage <= thresholdPercentage;
+  @Override
+  public boolean removeStressedNode(String label, NodeId nodeId) {
+    Map<NodeId, RMNode> stressedPartitionMap =
+            getStressedRMNodes().putIfAbsent(label, new ConcurrentHashMap<NodeId, RMNode>());
+    if (stressedPartitionMap != null && stressedPartitionMap.containsKey(nodeId)) {
+      LOG.info(String.format("Removing the node:%s from the stressed map in the label:%s", nodeId, label));
+      stressedPartitionMap.remove(nodeId);
+      return true;
+    }
+    return false;
   }
 
   public String getHAZookeeperConnectionState() {
@@ -341,7 +378,7 @@ public class RMContextImpl implements RMContext {
   }
 
   @Override
-  public ConcurrentMap<NodeId, RMNode> getStressedRMNodes() {
+  public ConcurrentMap<String, ConcurrentMap<NodeId, RMNode>> getStressedRMNodes() {
     return activeServiceContext.getStressedRMNodes();
   }
 
