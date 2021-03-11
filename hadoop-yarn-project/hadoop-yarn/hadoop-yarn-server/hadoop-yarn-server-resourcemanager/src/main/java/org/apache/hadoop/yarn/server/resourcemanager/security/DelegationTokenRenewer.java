@@ -231,8 +231,10 @@ public class DelegationTokenRenewer extends AbstractService {
         Future<?> future =
             renewerService.submit(new DelegationTokenRenewerRunnable(evt));
         futures.put(evt, future);
+        securityInfoMetrics.incrementNumDelegationTokenRenewerFutures();
       } else {
         pendingEventQueue.add(evt);
+        securityInfoMetrics.incrementNumDelegationTokenRenewerPendingEventQueue();
       }
     } finally {
       serviceStateLock.readLock().unlock();
@@ -443,6 +445,7 @@ public class DelegationTokenRenewer extends AbstractService {
       boolean shouldCancelAtEnd, String user, Configuration tokenConf) {
     processDelegationTokenRenewerEvent(new DelegationTokenRenewerAppSubmitEvent(
       applicationId, ts, shouldCancelAtEnd, user, tokenConf));
+    LOG.debug("Added application for token renew," + " appId = " + applicationId);
   }
 
   /**
@@ -462,6 +465,8 @@ public class DelegationTokenRenewer extends AbstractService {
     processDelegationTokenRenewerEvent(
         new DelegationTokenRenewerAppRecoverEvent(applicationId, ts,
             shouldCancelAtEnd, user, tokenConf));
+    LOG.debug("Added application for token renew during recovering,"
+      + " appId = " + applicationId);
   }
 
 
@@ -999,45 +1004,59 @@ public class DelegationTokenRenewer extends AbstractService {
      */
     @Override
     public void run() {
+      LOG.info("Started to run");
       while (true) {
-        Iterator<Map.Entry<DelegationTokenRenewerEvent, Future<?>>> iterator = futures.entrySet().iterator();
         try{
           Thread.sleep(10000);
         } catch (Exception e) {
           LOG.info("Thread sleep failed" + e);
         }
+        LOG.info("Start to check renewer future timeout");
+        int numFutureNotStarted = 0;
+        Iterator<Map.Entry<DelegationTokenRenewerEvent, Future<?>>> iterator = futures.entrySet().iterator();
         while(iterator.hasNext()) {
           Map.Entry<DelegationTokenRenewerEvent, Future<?>> entry = iterator.next();
           DelegationTokenRenewerEvent evt = entry.getKey();
           Future<?> future = entry.getValue();
+          LOG.debug("Checking renewer future timeout for app " + evt.getApplicationId() + ", evt = " + evt);
           try {
             if (future.isDone() || future.isCancelled()){
               // Clean up event from futures if event is Done or Cancelled
               iterator.remove();
               LOG.info(String.format("Removed Done/Cancel task: %s from futures Map", evt.getApplicationId().toString()));
-            } else {
+            } else if (evt.getIfStarted()) {
+              // wait for the future timeout only if this future started running
               future.get(tokenRenewerThreadTimeout, TimeUnit.MILLISECONDS);
+            } else {
+              numFutureNotStarted++;
             }
           } catch (TimeoutException e) {
             // Cancel thread and retry the same event in case of timeout
+            LOG.info("Token renew timeout for app " + evt.getApplicationId() + ", evt = " + evt);
             if (future != null && !future.isDone() && !future.isCancelled()) {
               future.cancel(true);
               iterator.remove();
               if (evt.getAttempt() < tokenRenewerThreadRetryMaxAttempts) {
+                LOG.debug("Renew timeout but will retry for app " + evt.getApplicationId()
+                  + ", attempted: " + evt.getAttempt()
+                  + ", maxAttempts: " + tokenRenewerThreadRetryMaxAttempts
+                  + ", evt = " + evt);
                 renewalTimer.schedule(
                         getTimerTask((AbstractDelegationTokenRenewerAppEvent) evt),
                         tokenRenewerThreadRetryInterval);
               } else {
-                LOG.info(
-                        "Exhausted max retry attempts = " + tokenRenewerThreadRetryMaxAttempts + " in token renewer "
-                                + "thread for = " + evt.getApplicationId());
+                LOG.warn(
+                        "Exhausted max retry attempts = " + tokenRenewerThreadRetryMaxAttempts
+                          + " in token renewer thread for app " + evt.getApplicationId()
+                          + ", evt = " + evt);
               }
             }
           } catch (Exception e) {
-            LOG.info("Problem in submitting renew tasks in token renewer "
-                    + "thread.", e);
+            LOG.warn("Problem in submitting renew tasks in token renewer "
+                    + "thread, evt = " + evt, e);
           }
         }
+        LOG.info("Number of futures that have not started: " + numFutureNotStarted);
       }
     }
   }
@@ -1059,6 +1078,7 @@ public class DelegationTokenRenewer extends AbstractService {
     
     @Override
     public void run() {
+      evt.setIfStarted(true);
       if (evt instanceof DelegationTokenRenewerAppSubmitEvent) {
         DelegationTokenRenewerAppSubmitEvent appSubmitEvt =
             (DelegationTokenRenewerAppSubmitEvent) evt;
@@ -1167,6 +1187,12 @@ public class DelegationTokenRenewer extends AbstractService {
     private Configuration getTokenConf() {
       return tokenConf;
     }
+
+    @Override
+    public String toString() {
+      return  "[user=" + user + "; tokens=" + credentials.getAllTokens()
+        + "; shouldCancelAtEnd=" + shouldCancelAtEnd + "]";
+    }
   }
   
   enum DelegationTokenRenewerEventType {
@@ -1180,6 +1206,11 @@ public class DelegationTokenRenewer extends AbstractService {
 
     private ApplicationId appId;
     private int attempt = 1;
+
+    //The flag isStarted indicates whether the future handling this event starts running
+    //DelegationTokenRenewerPoolTracker will only wait for the running futures till timeout
+    //For those not started futures, the pool tracker will skip checking
+    private volatile boolean ifStarted = false;
 
     public DelegationTokenRenewerEvent(ApplicationId appId,
         DelegationTokenRenewerEventType type) {
@@ -1201,6 +1232,14 @@ public class DelegationTokenRenewer extends AbstractService {
 
     public void setAttempt(int attempt) {
       this.attempt = attempt;
+    }
+
+    public boolean getIfStarted() {
+      return ifStarted;
+    }
+
+    public void setIfStarted(boolean ifStarted) {
+      this.ifStarted = ifStarted;
     }
   }
 

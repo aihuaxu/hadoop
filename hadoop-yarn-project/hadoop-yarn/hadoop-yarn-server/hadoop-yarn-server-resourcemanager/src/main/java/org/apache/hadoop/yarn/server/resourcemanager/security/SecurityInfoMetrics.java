@@ -42,6 +42,8 @@ public class SecurityInfoMetrics {
 
     @Metric("# of YARN RM cancel delegation tokens") MutableGaugeLong sizeDelegationTokenCancel;
     @Metric("# of failed renew KMS delegation token ops") MutableCounterLong numFailedKMSTokenRenew;
+    @Metric("# of RM DelegationTokenRenewer futures") MutableCounterLong numDelegationTokenRenewerFutures;
+    @Metric("# of RM DelegationTokenRenewer pendingEventQueue") MutableCounterLong numDelegationTokenRenewerPendingEventQueue;
 
     static final MetricsInfo RECORD_INFO = info("SecurityInfoMetrics",
             "Metrics for YARN RM Delegation Tokens");
@@ -84,4 +86,13 @@ public class SecurityInfoMetrics {
     public synchronized void incrementNumFailedKMSRenew() {
         numFailedKMSTokenRenew.incr();
     }
+
+    public synchronized void incrementNumDelegationTokenRenewerFutures() {
+        numDelegationTokenRenewerFutures.incr();
+    }
+
+    public synchronized void incrementNumDelegationTokenRenewerPendingEventQueue() {
+        numDelegationTokenRenewerPendingEventQueue.incr();
+    }
+
 }
