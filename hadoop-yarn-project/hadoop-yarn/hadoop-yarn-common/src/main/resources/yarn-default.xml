@@ -181,6 +181,16 @@
   </property>
 
   <property>
+    <name>yarn.resourcemanager.principal.pattern</name>
+    <value>*</value>
+    <!-- Make sure yarn RM accept everything-->
+    <description>
+      A client-side RegEx that can be configured to control
+      allowed realms to authenticate with (useful in cross-realm env.)
+    </description>
+  </property>
+
+  <property>
     <description>
     The Kerberos principal to be used for spnego filter for the RM web
     interface.
