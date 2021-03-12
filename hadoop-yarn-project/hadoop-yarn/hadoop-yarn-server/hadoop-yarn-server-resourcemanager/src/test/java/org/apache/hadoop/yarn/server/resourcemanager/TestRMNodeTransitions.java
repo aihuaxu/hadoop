@@ -26,12 +26,13 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Random;
+import java.io.IOException;
+import java.util.*;
 
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.ha.HAServiceProtocol;
 import org.apache.hadoop.util.HostsFileReader;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
@@ -46,10 +47,13 @@ import org.apache.hadoop.yarn.api.records.ResourceOption;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.event.EventHandler;
 import org.apache.hadoop.yarn.event.InlineDispatcher;
+import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.nodelabels.CommonNodeLabelsManager;
 import org.apache.hadoop.yarn.server.api.protocolrecords.NodeHeartbeatResponse;
+import org.apache.hadoop.yarn.server.api.protocolrecords.ReplaceLabelsOnNodeRequest;
 import org.apache.hadoop.yarn.server.api.records.NodeHealthStatus;
 import org.apache.hadoop.yarn.server.api.records.NodeStatus;
+import org.apache.hadoop.yarn.server.resourcemanager.nodelabels.RMNodeLabelsManager;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer
     .AllocationExpirationInfo;
@@ -89,6 +93,7 @@ public class TestRMNodeTransitions {
 
   private RMContext rmContext;
   private YarnScheduler scheduler;
+  private ResourceManager rm;
 
   private SchedulerEventType eventType;
   private List<ContainerStatus> completedContainers = new ArrayList<ContainerStatus>();
@@ -116,7 +121,6 @@ public class TestRMNodeTransitions {
   @Before
   public void setUp() throws Exception {
     InlineDispatcher rmDispatcher = new InlineDispatcher();
-    
     rmContext =
         new RMContextImpl(rmDispatcher, mock(ContainerAllocationExpirer.class),
           null, null, mock(DelegationTokenRenewer.class), null, null, null,
@@ -1111,6 +1115,62 @@ public class TestRMNodeTransitions {
   }
 
   @Test
+  // Test label change of node and corresponding change in the stressed node map
+  public void testStressedLabelTransition() throws IOException, YarnException {
+    MockRM rm = new MockRM();
+    rm.adminService.isCentralizedNodeLabelConfiguration = true;
+    RMContext rmContext = rm.getRMContext();
+    ((RMContextImpl) rm.getRMContext())
+            .setHAServiceState(HAServiceProtocol.HAServiceState.ACTIVE);
+    RMNodeLabelsManager labelMgr = rm.getRMContext().getNodeLabelManager();
+
+    Configuration conf = new YarnConfiguration();
+    conf.set(YarnConfiguration.RM_THRESHOLD_PERCENTAGE_STRESSED_NODES, "100.0");
+    ((RMContextImpl) rmContext).setYarnConfiguration(conf);
+    RMNodeImpl nodeA = getRunningNode(rmContext);
+    labelMgr.addLabelsToNode(ImmutableMap.of(nodeA.getNodeID(),  RMNodeLabelsManager.EMPTY_STRING_SET));
+    labelMgr.activateNode(nodeA.getNodeID(), nodeA.getTotalCapability());
+
+    rmContext.getRMNodes().put(nodeA.getNodeID(), nodeA);
+    nodeA.setHealthReport("NODE_STRESSED");
+    NodeHealthStatus status = NodeHealthStatus.newInstance(true, "NODE_STRESSED",
+            System.currentTimeMillis());
+    NodeStatus nodeStatus = NodeStatus.newInstance(nodeA.getNodeID(), 0,
+            null, null, status, null, null,
+            null);
+    nodeA.handle(new RMNodeStatusEvent(nodeA.getNodeID(), nodeStatus, null));
+
+    // Unhealthy nodes should not have stressed signal
+    Assert.assertEquals(1, rmContext.getStressedRMNodes().get(CommonNodeLabelsManager.NO_LABEL).
+            size());
+    Assert.assertTrue(nodeA.getHealthReport().contains("NODE_STRESSED"));
+
+    // Now we have to trigger label change and make sure that the node is moved to different label
+    labelMgr.addToCluserNodeLabelsWithDefaultExclusivity(ImmutableSet.of("x"));
+    rm.adminService.replaceLabelsOnNode(ReplaceLabelsOnNodeRequest
+            .newInstance(ImmutableMap.of(nodeA.getNodeID(),
+                    (Set<String>) ImmutableSet.of("x"))));
+    status = NodeHealthStatus.newInstance(true, "NODE_STRESSED",
+            System.currentTimeMillis());
+    nodeStatus = NodeStatus.newInstance(nodeA.getNodeID(), 0,
+            null, null, status, null, null,
+            null);
+    nodeA.handle(new RMNodeStatusEvent(nodeA.getNodeID(), nodeStatus, null));
+
+    // Unhealthy node in partition "x" should have stressed signal
+    Assert.assertEquals(1, rmContext.getStressedRMNodes().get("x").
+            size());
+    // Default label should have no node in stressed mode
+    Assert.assertEquals(0, rmContext.getStressedRMNodes().get(CommonNodeLabelsManager.NO_LABEL).
+            size());
+    Assert.assertTrue(nodeA.getHealthReport().contains("NODE_STRESSED"));
+
+    rmContext.getStressedRMNodes().clear();
+    rmContext.getRMNodes().clear();
+    rm.close();
+  }
+
+  @Test
   public void testUnknownNodeId() {
     NodeId nodeId =
         NodesListManager.createUnknownNodeId("host1");
@@ -1130,6 +1190,16 @@ public class TestRMNodeTransitions {
 
   private RMNodeImpl getRunningNode(String nmVersion) {
     return getRunningNode(nmVersion, 0);
+  }
+
+  private RMNodeImpl getRunningNode(RMContext rmContext) {
+    NodeId nodeId = BuilderUtils.newNodeId("localhost", 0);
+    Resource capability = Resource.newInstance(4096, 4);
+    RMNodeImpl node = new RMNodeImpl(nodeId, rmContext, "localhost", 0, 0, null,
+            capability, null);
+    node.handle(new RMNodeStartedEvent(node.getNodeID(), null, null));
+    Assert.assertEquals(NodeState.RUNNING, node.getState());
+    return node;
   }
 
   private RMNodeImpl getRunningNode(String nmVersion, int port) {
