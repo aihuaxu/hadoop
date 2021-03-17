@@ -66,6 +66,8 @@ class FSPermissionChecker implements AccessControlEnforcer {
       .append(inodeAttrib.getGroupName()).append(':')
       .append(inodeAttrib.isDirectory() ? 'd' : '-')
       .append(inodeAttrib.getFsPermission());
+
+    // TODO add ACL here
     if (deniedFromAcl) {
       sb.append("+");
     }
@@ -417,15 +419,15 @@ class FSPermissionChecker implements AccessControlEnforcer {
     boolean hasPermission = !foundMatch && mode.getOtherAction().implies(access);
 
     // To debug user permission issue
-    if (LOG.isDebugEnabled() && !hasPermission) {
-      String aclString = "";
+    if (!hasPermission) {
+      StringBuilder aclString = new StringBuilder();
 
       for (int pos = 0, entry; pos < aclFeature.getEntriesSize(); pos++) {
         entry = aclFeature.getEntryAt(pos);
-        aclString += AclEntryStatusFormat.toAclEntry(entry);
+        aclString.append(AclEntryStatusFormat.toAclEntry(entry));
       }
 
-      LOG.debug(getUser() + " permission - Groups:" + groups + ", ACL:" + aclString);
+      LOG.warn(String.format("%s permission - Groups:%s, ACL:%s", getUser(), groups, aclString));
     }
 
     return hasPermission;
