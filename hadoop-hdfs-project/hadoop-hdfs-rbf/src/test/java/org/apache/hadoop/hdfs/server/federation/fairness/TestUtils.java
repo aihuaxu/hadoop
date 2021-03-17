@@ -15,28 +15,30 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.hdfs.server.federation.fairness;
 
-import java.io.IOException;
+import static org.junit.Assert.assertEquals;
 
-/**
- * Exception when no permits are available for handlers.
- */
-public class NoPermitAvailableException extends IOException {
+import org.junit.Before;
+import org.junit.Test;
 
-  private static final long serialVersionUID = 1L;
+public class TestUtils {
 
-  public NoPermitAvailableException(String nsId) {
-    super("No permits available for nsId: " + nsId);
-  }
+    private Utils utils;
 
-  /**
-   * A constructor for LimitMaxPolicyController, with indication of both NS ID and
-   * permit type for exceptions.
-   * @param nsId the NS ID to obtain permit against.
-   * @param permitType the type of permit intend to obtain, could be 'GLOBAL' or 'LOCAL'.
-   */
-  public NoPermitAvailableException(String nsId, String permitType) {
-    super("No permits available for nsId: " + nsId + ", permit type: " + permitType);
-  }
+    @Before
+    public void setup() {
+        utils = new Utils();
+    }
+
+    @Test
+    public void TestGetNsId() {
+        assertEquals("ns0", utils.getNsId("ns0.nn1"));
+        assertEquals("ns0", utils.getNsId("ns0.nn2"));
+        assertEquals("ns3", utils.getNsId("ns3"));
+        assertEquals("", utils.getNsId("ns1.nn2.badSuffix"));
+        assertEquals("", utils.getNsId(null));
+        assertEquals("", utils.getNsId(""));
+    }
 }

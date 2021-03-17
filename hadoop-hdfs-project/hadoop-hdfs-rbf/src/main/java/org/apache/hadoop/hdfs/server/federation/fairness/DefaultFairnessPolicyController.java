@@ -31,6 +31,7 @@ import java.util.Collection;
 import java.util.Arrays;
 import java.util.concurrent.Semaphore;
 
+import static org.apache.hadoop.hdfs.server.federation.router.Constants.CONCURRENT_NS;
 import static org.apache.hadoop.hdfs.server.federation.router.RBFConfigKeys.DFS_ROUTER_MONITOR_NAMENODE;
 import static org.apache.hadoop.hdfs.server.federation.router.RBFConfigKeys.DFS_ROUTER_HANDLER_COUNT_KEY;
 import static org.apache.hadoop.hdfs.server.federation.router.RBFConfigKeys.DFS_ROUTER_HANDLER_COUNT_DEFAULT;
@@ -46,7 +47,6 @@ public class DefaultFairnessPolicyController implements
   private static final Logger LOG =
           LoggerFactory.getLogger(DefaultFairnessPolicyController.class);
 
-  private static final String CONCURRENT_NS = "concurrent";
   /** Hash table to hold semaphore for each configured name service. */
   private Map<String, Semaphore> permits;
 
@@ -76,35 +76,26 @@ public class DefaultFairnessPolicyController implements
     Set<String> unassignedNS = new HashSet();
 
     for (String namenode : namenodes) {
-      String[] namenodeSplit = namenode.split("\\.");
-      String nsId;
-      if (namenodeSplit.length == 2) {
-        nsId = namenodeSplit[0];
-      } else if (namenodeSplit.length == 1) {
-        nsId = namenode;
-      } else {
-        String errorMsg = "Wrong name service specified :" +
-                Arrays.toString(namenodeSplit);
+      String nsId = Utils.getNsId(namenode);
+      if (nsId.isEmpty()) {
+        String errorMsg = "Wrong name service specified :" + namenode;
         LOG.error(errorMsg);
-        throw new PermitAllocationException(
-                errorMsg);
+        throw new PermitAllocationException(errorMsg);
       }
-      if (nsId != null) {
-        int dedicatedHandlers =
-                conf.getInt(DFS_ROUTER_FAIR_HANDLER_COUNT_KEY_PREFIX + nsId, 0);
-        LOG.info("Dedicated handlers {} for ns {} ", dedicatedHandlers, nsId);
-        if (dedicatedHandlers > 0) {
-          if (!this.permits.containsKey(nsId)) {
-            handlerCount -= dedicatedHandlers;
-            // Total handlers should not be less than sum of dedicated
-            // handlers.
-            validateCount(handlerCount, 0);
-            this.permits.put(nsId, new Semaphore(dedicatedHandlers));
-            logAssignment(nsId, dedicatedHandlers);
-          }
-        } else {
-          unassignedNS.add(nsId);
+      int dedicatedHandlers =
+              conf.getInt(DFS_ROUTER_FAIR_HANDLER_COUNT_KEY_PREFIX + nsId, 0);
+      LOG.info("Dedicated handlers {} for ns {} ", dedicatedHandlers, nsId);
+      if (dedicatedHandlers > 0) {
+        if (!this.permits.containsKey(nsId)) {
+          handlerCount -= dedicatedHandlers;
+          // Total handlers should not be less than sum of dedicated
+          // handlers.
+          validateCount(handlerCount, 0);
+          this.permits.put(nsId, new Semaphore(dedicatedHandlers));
+          logAssignment(nsId, dedicatedHandlers);
         }
+      } else {
+        unassignedNS.add(nsId);
       }
     }
 

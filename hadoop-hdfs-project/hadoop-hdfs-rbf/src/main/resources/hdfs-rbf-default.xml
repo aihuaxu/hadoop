@@ -518,8 +518,28 @@
     <name>dfs.federation.router.fairness.policy.controller.class</name>
     <value>org.apache.hadoop.hdfs.server.federation.fairness.DefaultFairnessPolicyController</value>
     <description>
-      Default handler allocation model to be used if
-      dfs.federation.router.fairness.enable is enabled.
+      Default handler allocation model to be used if dfs.federation.router.fairness.enable is enabled.
+      Supported policy controllers are under org.apache.hadoop.hdfs.server.federation.fairness folder.
+    </description>
+  </property>
+
+  <property>
+    <name>dfs.federation.router.fairness.acquire-timeout</name>
+    <value>100</value>
+    <description>
+      Timeout in milliseconds used for LimitMaxPolicyController. Default value is 100.
+      This is the wait time when acquiring a permit in fairness manager.
+    </description>
+  </property>
+
+  <property>
+    <name>dfs.federation.router.fairness.max-ratio.global</name>
+    <value>0.5f</value>
+    <description>
+      A ratio for setting max allowed handlers in LimitMaxPolicyController. Default value is 0.5f, 50% of total
+      available handlers defined in dfs.federation.router.handler.count. This global ration will be applied to
+      each name services without explicit override.
+      An example override is dfs.federation.router.fairness.max-ratio.ns1 -> 0.3f
     </description>
   </property>
 

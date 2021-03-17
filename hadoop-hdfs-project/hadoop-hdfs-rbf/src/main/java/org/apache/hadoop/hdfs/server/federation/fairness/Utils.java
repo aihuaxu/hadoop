@@ -15,28 +15,30 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.hdfs.server.federation.fairness;
 
-import java.io.IOException;
-
 /**
- * Exception when no permits are available for handlers.
+ * Utils holds shared/utility functions for fairness classes.
  */
-public class NoPermitAvailableException extends IOException {
+public class Utils {
 
-  private static final long serialVersionUID = 1L;
-
-  public NoPermitAvailableException(String nsId) {
-    super("No permits available for nsId: " + nsId);
-  }
-
-  /**
-   * A constructor for LimitMaxPolicyController, with indication of both NS ID and
-   * permit type for exceptions.
-   * @param nsId the NS ID to obtain permit against.
-   * @param permitType the type of permit intend to obtain, could be 'GLOBAL' or 'LOCAL'.
-   */
-  public NoPermitAvailableException(String nsId, String permitType) {
-    super("No permits available for nsId: " + nsId + ", permit type: " + permitType);
-  }
+    /**
+     * getNsId extracts name service from the given namenode string.
+     * An example namenode value is 'ns0.nn1'.
+     *
+     * @param namenode a namenode string consisting of ns ID and namenode hostname.
+     * @return the extracted ns ID or empty string if input is invalid.
+     */
+    public static String getNsId (String namenode) {
+        if (namenode == null || namenode.equals(""))
+            return "";
+        String[] namenodeSplit = namenode.split("\\.");
+        if (namenodeSplit.length == 2) {
+            return namenodeSplit[0];
+        } else if (namenodeSplit.length == 1) {
+            return namenode;
+        }
+        return "";
+    }
 }

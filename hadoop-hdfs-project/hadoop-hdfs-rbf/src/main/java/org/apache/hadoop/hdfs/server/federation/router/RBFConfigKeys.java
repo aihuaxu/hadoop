@@ -286,4 +286,12 @@ public class RBFConfigKeys extends CommonConfigurationKeysPublic {
       DefaultFairnessPolicyController.class;
   public static final String DFS_ROUTER_FAIR_HANDLER_COUNT_KEY_PREFIX =
       FEDERATION_ROUTER_FAIRNESS_PREFIX + "handler.count.";
+  public static final String DFS_ROUTER_FAIR_HANDLER_MAX_RATIO_KEY_PREFIX =
+          FEDERATION_ROUTER_FAIRNESS_PREFIX + "max-ratio.";
+  public static final String DFS_ROUTER_FAIR_HANDLER_MAX_RATIO_GLOBAL_KEY =
+          DFS_ROUTER_FAIR_HANDLER_MAX_RATIO_KEY_PREFIX + "global";
+  public static final float DFS_ROUTER_FAIR_HANDLER_MAX_RATIO_GLOBAL_DEFAULT = 0.5f;
+  public static final String DFS_ROUTER_FAIR_HANDLER_ACQUIRE_TIMEOUT_KEY =
+          FEDERATION_ROUTER_FAIRNESS_PREFIX + "acquire-timeout";
+  public static final long DFS_ROUTER_FAIR_HANDLER_ACQUIRE_TIMEOUT_DEFAULT = 100;
 }
