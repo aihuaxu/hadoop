@@ -24,9 +24,8 @@ import org.apache.hadoop.hdfs.LogVerificationAppender;
 import org.apache.log4j.Level;
 import org.junit.Test;
 
-import static org.apache.hadoop.hdfs.server.federation.router.RBFConfigKeys.DFS_ROUTER_HANDLER_COUNT_KEY;
-import static org.apache.hadoop.hdfs.server.federation.router.RBFConfigKeys.DFS_ROUTER_MONITOR_NAMENODE;
-import static org.apache.hadoop.hdfs.server.federation.router.RBFConfigKeys.DFS_ROUTER_FAIR_HANDLER_COUNT_KEY_PREFIX;
+import static org.apache.hadoop.hdfs.server.federation.router.Constants.CONCURRENT_NS;
+import static org.apache.hadoop.hdfs.server.federation.router.RBFConfigKeys.*;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -42,9 +41,6 @@ public class TestRouterFairnessManager {
   private static String nameServices =
           "ns1.nn1, ns1.nn2, ns2.nn1, ns2.nn2";
 
-  /** Name service keyword to identify fan-out calls . */
-  private final String concurrentNS = "concurrent";
-
   @Test
   public void testHandlerAllocationEqualAssignment() throws IOException {
     FairnessManager fairnessManager = getFairnessManager(30);
@@ -55,7 +51,7 @@ public class TestRouterFairnessManager {
   public void testHandlerAllocationWithLeftOverHandler() throws IOException {
     FairnessManager fairnessManager = getFairnessManager(31);
     // One extra handler should be allocated to commons.
-    assertTrue(fairnessManager.grantPermission(concurrentNS));
+    assertTrue(fairnessManager.grantPermission(CONCURRENT_NS));
     verifyHandlerAllocation(fairnessManager);
   }
 
@@ -77,13 +73,13 @@ public class TestRouterFairnessManager {
     // concurrent should have 5 permits.
     while (i < 5) {
       assertTrue(fairnessManager.grantPermission("ns2"));
-      assertTrue(fairnessManager.grantPermission(concurrentNS));
+      assertTrue(fairnessManager.grantPermission(CONCURRENT_NS));
       i++;
     }
 
     assertFalse(fairnessManager.grantPermission("ns1"));
     assertFalse(fairnessManager.grantPermission("ns2"));
-    assertFalse(fairnessManager.grantPermission(concurrentNS));
+    assertFalse(fairnessManager.grantPermission(CONCURRENT_NS));
   }
 
   @Test
@@ -118,6 +114,27 @@ public class TestRouterFairnessManager {
     conf.setInt(DFS_ROUTER_FAIR_HANDLER_COUNT_KEY_PREFIX + "ns1", 2);
     String errorMsg = "Available handlers -1 lower than min 0";
     verifyInstantiationError(conf, errorMsg);
+  }
+
+  @Test
+  public void testLimitMaxPolicyController() throws IOException {
+    Configuration conf = createConf(4);
+    conf.setStrings(DFS_ROUTER_POLICY_CONTROLLER_DRIVER_CLASS,
+        "org.apache.hadoop.hdfs.server.federation.fairness.LimitMaxPolicyController");
+    FairnessManager fm = new FairnessManager(conf);
+    assertTrue(fm.grantPermission("ns1"));
+    assertTrue(fm.grantPermission("ns1"));
+    // The 3rd ns1 permit should fail as it exceeds total ns1 permits.
+    assertFalse(fm.grantPermission("ns1"));
+    assertTrue(fm.grantPermission("ns2"));
+    assertTrue(fm.grantPermission("ns2"));
+    // The first concurrent ns permit should fail as running out of global permits.
+    assertFalse(fm.grantPermission("concurrent"));
+
+    fm.releasePermission("ns1");
+    // The 3rd ns2 permit should fail as it exceeds total ns1 permits.
+    assertFalse(fm.grantPermission("ns2"));
+    assertTrue(fm.grantPermission("concurrent"));
   }
 
   private void verifyInstantiationError(Configuration conf, String msg)
@@ -160,20 +177,20 @@ public class TestRouterFairnessManager {
     while (i < 10) {
       assertTrue(fairnessManager.grantPermission("ns1"));
       assertTrue(fairnessManager.grantPermission("ns2"));
-      assertTrue(fairnessManager.grantPermission(concurrentNS));
+      assertTrue(fairnessManager.grantPermission(CONCURRENT_NS));
       i++;
     }
     assertFalse(fairnessManager.grantPermission("ns1"));
     assertFalse(fairnessManager.grantPermission("ns2"));
-    assertFalse(fairnessManager.grantPermission(concurrentNS));
+    assertFalse(fairnessManager.grantPermission(CONCURRENT_NS));
 
     fairnessManager.releasePermission("ns1");
     fairnessManager.releasePermission("ns2");
-    fairnessManager.releasePermission(concurrentNS);
+    fairnessManager.releasePermission(CONCURRENT_NS);
 
     assertTrue(fairnessManager.grantPermission("ns1"));
     assertTrue(fairnessManager.grantPermission("ns2"));
-    assertTrue(fairnessManager.grantPermission(concurrentNS));
+    assertTrue(fairnessManager.grantPermission(CONCURRENT_NS));
   }
 
   private Configuration createConf(int handlers) {

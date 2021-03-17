@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.hdfs.server.federation.fairness;
 
+import static org.apache.hadoop.hdfs.server.federation.router.RBFConfigKeys.DFS_ROUTER_FAIR_HANDLER_ACQUIRE_TIMEOUT_KEY;
+import static org.apache.hadoop.hdfs.server.federation.router.RBFConfigKeys.DFS_ROUTER_POLICY_CONTROLLER_DRIVER_CLASS;
 import static org.apache.hadoop.test.GenericTestUtils.assertExceptionContains;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -25,7 +27,9 @@ import static org.junit.Assert.fail;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -66,7 +70,7 @@ public class TestRouterHandlersFairness {
     }
   }
 
-  private void setupCluster(boolean fairnessEnable, boolean ha)
+  private void setupCluster(boolean fairnessEnable, boolean ha, Map<String, String> additionalProps)
           throws Exception {
     // Build and start a federated cluster
     cluster = new StateStoreDFSCluster(ha, 2);
@@ -78,6 +82,11 @@ public class TestRouterHandlersFairness {
     // Fairness control
     routerConf.setBoolean(
             RBFConfigKeys.DFS_ROUTER_NAMESERVICE_FAIRNESS_ENABLE, fairnessEnable);
+    if (additionalProps != null) {
+      for ( String propKey : additionalProps.keySet()) {
+        routerConf.set(propKey, additionalProps.get(propKey));
+      }
+    }
 
     // With two name services configured, each nameservice has 1 permit and
     // fan-out calls have 1 permit.
@@ -95,13 +104,24 @@ public class TestRouterHandlersFairness {
 
   @Test
   public void testFairnessControlOff() throws Exception {
-    setupCluster(false, false);
+    setupCluster(false, false, null);
     startLoadTest(false);
   }
 
   @Test
   public void testFairnessControlOn() throws Exception {
-    setupCluster(true, false);
+    setupCluster(true, false, null);
+    startLoadTest(true);
+  }
+
+  @Test
+  public void testFairnessControlOnWithLimitMaxPolicy() throws Exception {
+    Map<String, String> additionalProps = new HashMap<>();
+    additionalProps.put(DFS_ROUTER_POLICY_CONTROLLER_DRIVER_CLASS,
+            "org.apache.hadoop.hdfs.server.federation.fairness.LimitMaxPolicyController");
+    // This is needed as the default timeout is 100 milliseconds, and likely not hit permit grant failure.
+    additionalProps.put(DFS_ROUTER_FAIR_HANDLER_ACQUIRE_TIMEOUT_KEY, "0");
+    setupCluster(true, false, additionalProps);
     startLoadTest(true);
   }
 

@@ -1168,10 +1168,10 @@ public class TestRouterRpc {
     assertEquals(1, resolvedPaths.size());
     assertEquals("hdfs://ns1/target-ns1", resolvedPaths.get(0).toString());
 
-    // If a path doesn't exist in mount table, it should be resolved under default namespace ns0
+    // If a path doesn't exist in mount table, it should be resolved under default namespace(s)
     String noEntrySrc = "/no-entry";
     resolvedPaths = rpcServer.getRemoteLocation(noEntrySrc);
-    assertEquals(1, resolvedPaths.size());
+    // Only verify the first as it works for both TestRouterRpc and TestRouterRpcMultiDestination.
     assertEquals("hdfs://ns0/no-entry", resolvedPaths.get(0).toString());
 
     // Expect expcetion when routing the request to namenode
