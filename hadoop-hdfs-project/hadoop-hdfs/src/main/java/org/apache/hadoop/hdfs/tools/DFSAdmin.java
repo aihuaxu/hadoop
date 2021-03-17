@@ -454,6 +454,7 @@ public class DFSAdmin extends FsShell {
     "\t[-getDatanodeInfo <datanode_host:ipc_port>]\n" +
     "\t[-metasave filename]\n" +
     "\t[-triggerBlockReport [-incremental] <datanode_host:ipc_port>] [-namenode <namenode_host:ipc_port>]]\n" +
+    "\t[-setDelayDataNodeForTest <datanode_host:ipc_port> <true/false> <delayTimeInMsPerPacket>]\n" +
     "\t[-listOpenFiles]\n" +
     "\t[-help [cmd]]\n";
 
@@ -675,6 +676,23 @@ public class DFSAdmin extends FsShell {
       inSafeMode = nn.setSafeMode(SafeModeAction.SAFEMODE_GET, false);
     }
     return inSafeMode;
+  }
+
+  public int setDelayDataNodeForTest(String[] argv) throws IOException {
+    final String hostPort = argv[1];
+    ClientDatanodeProtocol dnProxy = getDataNodeProxy(hostPort);
+    boolean delayDataNode = Boolean.parseBoolean(argv[2]);
+    long delayTimeInMs = delayDataNode ? Long.parseLong(argv[3]) : 0L;
+    try {
+      dnProxy.setDelayDataNodeForTest(delayDataNode, delayTimeInMs);
+    } catch (IOException e) {
+      System.err.println("setDelayDataNodeForTest error: " + e);
+      return 1;
+    }
+    System.out.println((delayDataNode ? "Enable" : "Disable")
+            + " DataNode " + hostPort + " read for Test. "
+            + (delayDataNode ? "Delay " + delayTimeInMs + " ms per packet" : ""));
+    return 0;
   }
 
   public int triggerBlockReport(String[] argv) throws IOException {
@@ -1222,6 +1240,12 @@ public class DFSAdmin extends FsShell {
         + "\tIf 'incremental' is specified, it will be an incremental\n"
         + "\tblock report; otherwise, it will be a full block report.\n";
 
+    String setDelayDataNodeForTest =
+      "-setDelayDataNodeForTest <datanode_host:ipc_port> <true/false> <delayTimeInMsPerPacket>\n"
+        + "\tEnable/Disable the delay on DataNode for read ops.\n"
+        + "\tIf enabling the feature, use the parameter delayTimeInMsPerPacket\n"
+        + "\tto specify the delay time for each packet sent to the client.\n";
+
     String listOpenFiles = "-listOpenFiles\n"
         + "\tList all open files currently managed by the NameNode along\n"
         + "\twith client name and client machine accessing them.\n";
@@ -1326,6 +1350,7 @@ public class DFSAdmin extends FsShell {
       System.out.println(evictWriters);
       System.out.println(getDatanodeInfo);
       System.out.println(triggerBlockReport);
+      System.out.println(setDelayDataNodeForTest);
       System.out.println(listOpenFiles);
       System.out.println(help);
       System.out.println();
@@ -1882,6 +1907,9 @@ public class DFSAdmin extends FsShell {
     } else if ("-triggerBlockReport".equals(cmd)) {
       System.err.println("Usage: hdfs dfsadmin"
           + " [-triggerBlockReport [-incremental] <datanode_host:ipc_port> [-namenode <namenode_host:ipc_port>]]");
+    } else if ("-setDelayDataNodeForTest".equals(cmd)) {
+      System.err.println("Usage: hdfs dfsadmin"
+          + " [-setDelayDataNodeForTest <datanode_host:ipc_port> <true/false> <delayTimeInMsPerPacket>]");
     } else if ("-listOpenFiles".equals(cmd)) {
       System.err.println("Usage: hdfs dfsadmin [-listOpenFiles]");
     } else if ("-fairCallQueueBlackList".equals(cmd)) {
@@ -2035,6 +2063,11 @@ public class DFSAdmin extends FsShell {
         printUsage(cmd);
         return exitCode;
       }
+    } else if ("-setDelayDataNodeForTest".equals(cmd)) {
+      if (argv.length < 3 || argv.length > 4) {
+        printUsage(cmd);
+        return exitCode;
+      }
     } else if ("-listOpenFiles".equals(cmd)) {
       if (argv.length != 1) {
         printUsage(cmd);
@@ -2124,6 +2157,8 @@ public class DFSAdmin extends FsShell {
         exitCode = reconfig(argv, i);
       } else if ("-triggerBlockReport".equals(cmd)) {
         exitCode = triggerBlockReport(argv);
+      } else if ("-setDelayDataNodeForTest".equals(cmd)) {
+        exitCode = setDelayDataNodeForTest(argv);
       } else if ("-listOpenFiles".equals(cmd)) {
         exitCode = listOpenFiles();
       } else if ("-fairCallQueueBlackList".equals(cmd)) {

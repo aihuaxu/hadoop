@@ -3085,6 +3085,16 @@ public class DataNode extends ReconfigurableBase
     }
   }
 
+  @Override
+  public void setDelayDataNodeForTest(boolean delayDataNodeForTest,
+          long delayTimeInMsPerPacket) {
+    if (delayDataNodeForTest) {
+      BlockSender.enableDelayDataNodeForRead(delayTimeInMsPerPacket);
+    } else {
+      BlockSender.disableDelayDataNodeForRead();
+    }
+  }
+
   /**
    * @param addr rpc address of the namenode
    * @return true if the datanode is connected to a NameNode at the

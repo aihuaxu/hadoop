@@ -182,4 +182,10 @@ public interface ClientDatanodeProtocol {
    * @return balancer bandwidth
    */
   long getBalancerBandwidth() throws IOException;
+
+  /**
+   * Delay the datanode read for testing
+   */
+  void setDelayDataNodeForTest(boolean delayForRead, long delayTimeInMsPerPacket)
+          throws IOException;
 }
