@@ -42,8 +42,17 @@ public class SecurityInfoMetrics {
 
     @Metric("# of YARN RM cancel delegation tokens") MutableGaugeLong sizeDelegationTokenCancel;
     @Metric("# of failed renew KMS delegation token ops") MutableCounterLong numFailedKMSTokenRenew;
-    @Metric("# of RM DelegationTokenRenewer futures") MutableCounterLong numDelegationTokenRenewerFutures;
-    @Metric("# of RM DelegationTokenRenewer pendingEventQueue") MutableCounterLong numDelegationTokenRenewerPendingEventQueue;
+    @Metric("# of RM DelegationTokenRenewer futures") MutableGaugeLong dtrNumFutures;
+    @Metric("# of RM DelegationTokenRenewer pendingEventQueue") MutableGaugeLong dtrNumPendingEventQueue;
+
+    @Metric("DelegationTokenRenewerLoopTracker timeout check running time") MutableCounterLong dtrTimeoutCheckRunningTime;
+    @Metric("# of RM DelegationTokenRenewer futures completed") MutableGaugeLong dtrNumFutureCompleted;
+    @Metric("# of RM DelegationTokenRenewer futures not started") MutableGaugeLong dtrNumFutureNotStarted;
+    @Metric("# of RM DelegationTokenRenewer timeout") MutableGaugeLong dtrNumFutureTimeout;
+    @Metric("# of RM DelegationTokenRenewer timeout and need to retry") MutableGaugeLong dtrNumFutureTimeoutNeedRetry;
+    @Metric("# of RM DelegationTokenRenewer timeout and will not retry") MutableGaugeLong dtrNumFutureTimeoutWithoutRetry;
+    @Metric("# of RM DelegationTokenRenewer timeout exceeded max retries") MutableGaugeLong dtrNumFutureTimeoutExceedMaxRetries;
+    @Metric("# of RM DelegationTokenRenewer timeout check exceptions") MutableCounterLong dtrNumTimeoutCheckExceptions;
 
     static final MetricsInfo RECORD_INFO = info("SecurityInfoMetrics",
             "Metrics for YARN RM Delegation Tokens");
@@ -87,12 +96,43 @@ public class SecurityInfoMetrics {
         numFailedKMSTokenRenew.incr();
     }
 
-    public synchronized void incrementNumDelegationTokenRenewerFutures() {
-        numDelegationTokenRenewerFutures.incr();
+    public synchronized void setDtrNumFutures(int size) {
+        dtrNumFutures.set(size);
     }
 
-    public synchronized void incrementNumDelegationTokenRenewerPendingEventQueue() {
-        numDelegationTokenRenewerPendingEventQueue.incr();
+    public synchronized void setDtrNumPendingEventQueue(int size) {
+        dtrNumPendingEventQueue.set(size);
     }
 
+    public synchronized void incrementDtrTimeoutCheckRunningTime(long runningTime) {
+        dtrTimeoutCheckRunningTime.incr(runningTime);
+    }
+
+    public synchronized void setDtrNumFutureCompleted(int num) {
+        dtrNumFutureCompleted.set(num);
+    }
+
+    public synchronized void setDtrNumFutureNotStarted(int num) {
+        dtrNumFutureNotStarted.set(num);
+    }
+
+    public synchronized void setDtrNumFutureTimeout(int num) {
+        dtrNumFutureTimeout.set(num);
+    }
+
+    public synchronized void setDtrNumFutureTimeoutWithoutRetry(int num) {
+        dtrNumFutureTimeoutWithoutRetry.set(num);
+    }
+
+    public synchronized void setDtrNumFutureTimeoutNeedRetry(int num) {
+        dtrNumFutureTimeoutNeedRetry.set(num);
+    }
+
+    public synchronized void setDtrNumFutureTimeoutExceedMaxRetries(int num) {
+        dtrNumFutureTimeoutExceedMaxRetries.set(num);
+    }
+
+    public synchronized void incrementDtrNumTimeoutCheckExceptions() {
+        dtrNumTimeoutCheckExceptions.incr();
+    }
 }

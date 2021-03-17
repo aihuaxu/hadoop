@@ -598,15 +598,18 @@ public class YarnConfiguration extends Configuration {
   public static final String RM_DT_RENEWER_THREAD_TIMEOUT =
       RM_PREFIX + "delegation-token-renewer.thread-timeout";
   public static final long DEFAULT_RM_DT_RENEWER_THREAD_TIMEOUT =
-      TimeUnit.SECONDS.toMillis(60); // 60 Seconds
+      TimeUnit.SECONDS.toMillis(3); // 3 Seconds
+  public static final String RM_DT_RENEWER_THREAD_TIMEOUT_INTERVAL =
+    RM_PREFIX + "delegation-token-renewer.thread-timeout-interval";
+  public static final long DEFAULT_RM_DT_RENEWER_THREAD_TIMEOUT_INTERVAL =
+    TimeUnit.SECONDS.toMillis(10); // 10 Seconds
   public static final String RM_DT_RENEWER_THREAD_RETRY_INTERVAL =
       RM_PREFIX + "delegation-token-renewer.thread-retry-interval";
   public static final long DEFAULT_RM_DT_RENEWER_THREAD_RETRY_INTERVAL =
       TimeUnit.SECONDS.toMillis(60); // 60 Seconds
   public static final String RM_DT_RENEWER_THREAD_RETRY_MAX_ATTEMPTS =
       RM_PREFIX + "delegation-token-renewer.thread-retry-max-attempts";
-  public static final int DEFAULT_RM_DT_RENEWER_THREAD_RETRY_MAX_ATTEMPTS =
-      5;
+  public static final int DEFAULT_RM_DT_RENEWER_THREAD_RETRY_MAX_ATTEMPTS = 10;
 
   public static final String RECOVERY_ENABLED = RM_PREFIX + "recovery.enabled";
   public static final boolean DEFAULT_RM_RECOVERY_ENABLED = false;

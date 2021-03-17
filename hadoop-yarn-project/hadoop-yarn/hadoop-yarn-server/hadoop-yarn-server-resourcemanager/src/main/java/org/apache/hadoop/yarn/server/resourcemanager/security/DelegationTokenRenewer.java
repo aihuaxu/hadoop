@@ -41,7 +41,6 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -118,6 +117,7 @@ public class DelegationTokenRenewer extends AbstractService {
   private boolean hasProxyUserPrivileges;
   private long credentialsValidTimeRemaining;
   private long tokenRenewerThreadTimeout;
+  private long tokenRenewerThreadTimeoutInterval;
   private long tokenRenewerThreadRetryInterval;
   private int tokenRenewerThreadRetryMaxAttempts;
   private final Map<DelegationTokenRenewerEvent, Future<?>> futures =
@@ -158,6 +158,10 @@ public class DelegationTokenRenewer extends AbstractService {
         conf.getTimeDuration(YarnConfiguration.RM_DT_RENEWER_THREAD_TIMEOUT,
             YarnConfiguration.DEFAULT_RM_DT_RENEWER_THREAD_TIMEOUT,
             TimeUnit.MILLISECONDS);
+    tokenRenewerThreadTimeoutInterval =
+      conf.getTimeDuration(YarnConfiguration.RM_DT_RENEWER_THREAD_TIMEOUT_INTERVAL,
+        YarnConfiguration.DEFAULT_RM_DT_RENEWER_THREAD_TIMEOUT_INTERVAL,
+        TimeUnit.MILLISECONDS);
     tokenRenewerThreadRetryInterval = conf.getTimeDuration(
         YarnConfiguration.RM_DT_RENEWER_THREAD_RETRY_INTERVAL,
         YarnConfiguration.DEFAULT_RM_DT_RENEWER_THREAD_RETRY_INTERVAL,
@@ -208,14 +212,15 @@ public class DelegationTokenRenewer extends AbstractService {
       delayedRemovalThread.start();
     }
 
+    //Start token renewer timeout check thread before renewer tasks coming in
+    if (delegationTokenRenewerPoolTrackerFlag) {
+      renewerService.submit(new DelegationTokenRenewerPoolTracker());
+    }
+
     setLocalSecretManagerAndServiceAddr();
     serviceStateLock.writeLock().lock();
     isServiceStarted = true;
     serviceStateLock.writeLock().unlock();
-
-    if (delegationTokenRenewerPoolTrackerFlag) {
-      renewerService.submit(new DelegationTokenRenewerPoolTracker());
-    }
 
     while(!pendingEventQueue.isEmpty()) {
       processDelegationTokenRenewerEvent(pendingEventQueue.take());
@@ -231,10 +236,10 @@ public class DelegationTokenRenewer extends AbstractService {
         Future<?> future =
             renewerService.submit(new DelegationTokenRenewerRunnable(evt));
         futures.put(evt, future);
-        securityInfoMetrics.incrementNumDelegationTokenRenewerFutures();
+        securityInfoMetrics.setDtrNumFutures(futures.size());
       } else {
         pendingEventQueue.add(evt);
-        securityInfoMetrics.incrementNumDelegationTokenRenewerPendingEventQueue();
+        securityInfoMetrics.setDtrNumPendingEventQueue(pendingEventQueue.size());
       }
     } finally {
       serviceStateLock.readLock().unlock();
@@ -1006,57 +1011,92 @@ public class DelegationTokenRenewer extends AbstractService {
     public void run() {
       LOG.info("Started to run");
       while (true) {
+        // Step 1: Sleep thread-timeout-interval
         try{
-          Thread.sleep(10000);
+          //In case there are only a few renew futures running
+          //and HDFS either NN or Router is temporarily too busy to renew token,
+          //sleep sometime before next round of renew timeout check,
+          //to avoid max retries of token renew all quickly fail
+          Thread.sleep(tokenRenewerThreadTimeoutInterval);
         } catch (Exception e) {
-          LOG.info("Thread sleep failed" + e);
+          LOG.error("Thread sleep failed", e);
         }
-        LOG.info("Start to check renewer future timeout");
-        int numFutureNotStarted = 0;
-        Iterator<Map.Entry<DelegationTokenRenewerEvent, Future<?>>> iterator = futures.entrySet().iterator();
-        while(iterator.hasNext()) {
-          Map.Entry<DelegationTokenRenewerEvent, Future<?>> entry = iterator.next();
-          DelegationTokenRenewerEvent evt = entry.getKey();
-          Future<?> future = entry.getValue();
-          LOG.debug("Checking renewer future timeout for app " + evt.getApplicationId() + ", evt = " + evt);
-          try {
-            if (future.isDone() || future.isCancelled()){
-              // Clean up event from futures if event is Done or Cancelled
-              iterator.remove();
-              LOG.info(String.format("Removed Done/Cancel task: %s from futures Map", evt.getApplicationId().toString()));
-            } else if (evt.getIfStarted()) {
-              // wait for the future timeout only if this future started running
-              future.get(tokenRenewerThreadTimeout, TimeUnit.MILLISECONDS);
-            } else {
-              numFutureNotStarted++;
-            }
-          } catch (TimeoutException e) {
-            // Cancel thread and retry the same event in case of timeout
-            LOG.info("Token renew timeout for app " + evt.getApplicationId() + ", evt = " + evt);
-            if (future != null && !future.isDone() && !future.isCancelled()) {
-              future.cancel(true);
-              iterator.remove();
-              if (evt.getAttempt() < tokenRenewerThreadRetryMaxAttempts) {
-                LOG.debug("Renew timeout but will retry for app " + evt.getApplicationId()
-                  + ", attempted: " + evt.getAttempt()
-                  + ", maxAttempts: " + tokenRenewerThreadRetryMaxAttempts
-                  + ", evt = " + evt);
-                renewalTimer.schedule(
-                        getTimerTask((AbstractDelegationTokenRenewerAppEvent) evt),
-                        tokenRenewerThreadRetryInterval);
+
+        // Step 2: Check renewer future timeout
+        long timeoutCheckStartTime = System.currentTimeMillis();
+        LOG.debug("Start to check renewer future timeout");
+        try {
+          int numTotal = 0;
+          int numFutureNotStarted = 0;
+          int numFutureCompleted = 0;
+          int numFutureTimeout = 0;
+          int numFutureTimeoutNeedRetry = 0;
+          int numFutureTimeoutExceedMaxRetries = 0;
+          int numFutureTimeoutWithoutRetry = 0;
+          Iterator<Map.Entry<DelegationTokenRenewerEvent, Future<?>>> iterator = futures.entrySet().iterator();
+          while(iterator.hasNext()) {
+            numTotal++;
+            Map.Entry<DelegationTokenRenewerEvent, Future<?>> entry = iterator.next();
+            DelegationTokenRenewerEvent evt = entry.getKey();
+            Future<?> future = entry.getValue();
+            LOG.debug("Checking renewer future timeout, evt = " + evt);
+            try {
+              if (future.isDone() || future.isCancelled()){
+                numFutureCompleted++;
+                // Clean up event from futures if event is Done or Cancelled
+                iterator.remove();
+                LOG.debug(String.format("Removed Done/Cancel task: %s from futures Map", evt.getApplicationId().toString()));
+              } else if (evt.getRenewStartTime() > 0
+                && System.currentTimeMillis() > evt.getRenewStartTime() + tokenRenewerThreadTimeout) {
+                // Token renew thread already started, check whether its running time has exceeded the timeout
+                // Cancel thread and retry the same event in case of timeout
+                LOG.debug("Token renew timeout, evt = " + evt);
+                numFutureTimeout++;
+                if (future != null && !future.isDone() && !future.isCancelled()) {
+                  future.cancel(true);
+                  iterator.remove();
+                  if (evt.getAttempt() < tokenRenewerThreadRetryMaxAttempts) {
+                    numFutureTimeoutNeedRetry++;
+                    LOG.debug("Renew timeout but will retry, evt = " + evt
+                      + ", attempted: " + evt.getAttempt()
+                      + ", maxAttempts: " + tokenRenewerThreadRetryMaxAttempts);
+                    renewalTimer.schedule(
+                      getTimerTask((AbstractDelegationTokenRenewerAppEvent) evt),
+                      tokenRenewerThreadRetryInterval);
+                  } else {
+                    numFutureTimeoutExceedMaxRetries++;
+                    LOG.warn(
+                      "Exhausted max retry attempts " + tokenRenewerThreadRetryMaxAttempts
+                        + ", evt = " + evt);
+                  }
+                } else {
+                  numFutureTimeoutWithoutRetry++;
+                }
               } else {
-                LOG.warn(
-                        "Exhausted max retry attempts = " + tokenRenewerThreadRetryMaxAttempts
-                          + " in token renewer thread for app " + evt.getApplicationId()
-                          + ", evt = " + evt);
+                numFutureNotStarted++;
               }
+            } catch (Exception e) {
+              LOG.warn("Problem in submitting renew tasks in token renewer "
+                + "thread, evt = " + evt, e);
             }
-          } catch (Exception e) {
-            LOG.warn("Problem in submitting renew tasks in token renewer "
-                    + "thread, evt = " + evt, e);
           }
+          long timeoutCheckRunningTime = System.currentTimeMillis() - timeoutCheckStartTime;
+          securityInfoMetrics.setDtrNumFutureCompleted(numFutureCompleted);
+          securityInfoMetrics.setDtrNumFutureNotStarted(numFutureNotStarted);
+          securityInfoMetrics.setDtrNumFutureTimeout(numFutureTimeout);
+          securityInfoMetrics.setDtrNumFutureTimeoutNeedRetry(numFutureTimeoutNeedRetry);
+          securityInfoMetrics.setDtrNumFutureTimeoutExceedMaxRetries(numFutureTimeoutExceedMaxRetries);
+          securityInfoMetrics.setDtrNumFutureTimeoutWithoutRetry(numFutureTimeoutWithoutRetry);
+          securityInfoMetrics.incrementDtrTimeoutCheckRunningTime(timeoutCheckRunningTime);
+          LOG.info(String.format("Timeout check finished in %d millis, number of futures - total: %d,"
+            + " completed: %s, not started: %d, timeout: %d, timeout but will retry: %d,"
+              + " exhausted max retries: %d, timeout and need not retry: %d",
+            timeoutCheckRunningTime, numTotal, numFutureCompleted, numFutureNotStarted, numFutureTimeout,
+            numFutureTimeoutNeedRetry, numFutureTimeoutExceedMaxRetries, numFutureTimeoutWithoutRetry));
+        } catch (Exception e) {
+          securityInfoMetrics.incrementDtrNumTimeoutCheckExceptions();
+          LOG.error("Renewer future timeout loop failed", e);
         }
-        LOG.info("Number of futures that have not started: " + numFutureNotStarted);
       }
     }
   }
@@ -1078,7 +1118,7 @@ public class DelegationTokenRenewer extends AbstractService {
     
     @Override
     public void run() {
-      evt.setIfStarted(true);
+      evt.setRenewStartTime(System.currentTimeMillis());
       if (evt instanceof DelegationTokenRenewerAppSubmitEvent) {
         DelegationTokenRenewerAppSubmitEvent appSubmitEvt =
             (DelegationTokenRenewerAppSubmitEvent) evt;
@@ -1110,8 +1150,7 @@ public class DelegationTokenRenewer extends AbstractService {
             .handle(new RMAppEvent(event.getApplicationId(), RMAppEventType.START));
       } catch (Throwable t) {
         LOG.warn(
-            "Unable to add the application to the delegation token renewer.",
-            t);
+            "Rejecting the application because failed to add it to the delegation token renewer, evt=" + event, t);
         // Sending APP_REJECTED is fine, since we assume that the
         // RMApp is in NEW state and thus we havne't yet informed the
         // Scheduler about the existence of the application
@@ -1190,7 +1229,7 @@ public class DelegationTokenRenewer extends AbstractService {
 
     @Override
     public String toString() {
-      return  "[user=" + user + "; tokens=" + credentials.getAllTokens()
+      return  "[appId=" + getApplicationId() + "; user=" + user + "; tokens=" + credentials.getAllTokens()
         + "; shouldCancelAtEnd=" + shouldCancelAtEnd + "]";
     }
   }
@@ -1210,7 +1249,7 @@ public class DelegationTokenRenewer extends AbstractService {
     //The flag isStarted indicates whether the future handling this event starts running
     //DelegationTokenRenewerPoolTracker will only wait for the running futures till timeout
     //For those not started futures, the pool tracker will skip checking
-    private volatile boolean ifStarted = false;
+    private volatile long renewStartTime = 0;
 
     public DelegationTokenRenewerEvent(ApplicationId appId,
         DelegationTokenRenewerEventType type) {
@@ -1234,12 +1273,12 @@ public class DelegationTokenRenewer extends AbstractService {
       this.attempt = attempt;
     }
 
-    public boolean getIfStarted() {
-      return ifStarted;
+    public long getRenewStartTime() {
+      return renewStartTime;
     }
 
-    public void setIfStarted(boolean ifStarted) {
-      this.ifStarted = ifStarted;
+    public void setRenewStartTime(long renewStartTime) {
+      this.renewStartTime = renewStartTime;
     }
   }
 
