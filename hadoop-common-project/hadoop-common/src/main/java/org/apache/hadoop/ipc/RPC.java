@@ -587,6 +587,29 @@ public class RPC {
         fallbackToSimpleAuth);
   }
 
+  /**
+   * Get a protocol proxy that contains a proxy connection to a remote server
+   * with provided connection Id. This is to support multiple ipc connections
+   * for each user by providing different connection Id.
+   *
+   * @param protocol protocol
+   * @param clientVersion client's version
+   * @param connId client connection identifier
+   * @param conf configuration
+   * @param factory socket factory
+   * @return the proxy
+   * @throws IOException if any error occurs
+   */
+  public static <T> ProtocolProxy<T> getProtocolProxy(Class<T> protocol,
+      long clientVersion, ConnectionId connId, Configuration conf,
+      SocketFactory factory) throws IOException {
+    if (UserGroupInformation.isSecurityEnabled()) {
+      SaslRpcServer.init(conf);
+    }
+    return getProtocolEngine(protocol, conf).getProxy(protocol, clientVersion,
+        connId, conf, factory);
+  }
+
    /**
     * Construct a client-side proxy object with the default SocketFactory
     * @param <T>

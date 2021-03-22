@@ -131,6 +131,12 @@ public class RBFConfigKeys extends CommonConfigurationKeysPublic {
       FEDERATION_ROUTER_PREFIX + "client.reject.overload";
   public static final boolean DFS_ROUTER_CLIENT_REJECT_OVERLOAD_DEFAULT = false;
 
+  public static final String DFS_ROUTER_IPC_CONNECTION_SIZE =
+          FEDERATION_ROUTER_PREFIX + "ipc.connection.size";
+  public static final int DFS_ROUTER_IPC_CONNECTION_SIZE_DEFAULT =
+          64;
+
+
   // HDFS Router State Store connection
   public static final String FEDERATION_FILE_RESOLVER_CLIENT_CLASS =
       FEDERATION_ROUTER_PREFIX + "file.resolver.client.class";
