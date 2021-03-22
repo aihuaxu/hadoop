@@ -16,4 +16,7 @@
 # limitations under the License.
 
 set -e               # exit on error
-mvn clean package -DskipTests
+
+MAVEN_OPTS="-Xms256m -Xmx1536m" mvn clean install -DskipTests -T 32
+cd hadoop-hdfs-project
+MAVEN_OPTS="-Xms256m -Xmx1536m" mvn clean test -fn -Pparallel-tests
