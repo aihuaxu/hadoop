@@ -49,7 +49,8 @@ public class ConnectionPoolId implements Comparable<ConnectionPoolId> {
    * @param ugi Information of the user issuing the request.
    * @param nnId Namenode address with port.
    */
-  public ConnectionPoolId(final UserGroupInformation ugi, final String nnId) {
+  public ConnectionPoolId(final UserGroupInformation ugi,
+                          final String nnId) {
     this.nnId = nnId;
     this.ugi = ugi;
   }

@@ -197,12 +197,13 @@ public class ConnectionManager {
    * is reserved for a single user and cannot be reused until free.
    *
    * @param ugi       User group information.
+   * @param nsId      Name service Id for the namenodes.
    * @param nnAddress Namenode address for the connection.
    * @return Proxy client to connect to nnId as UGI.
    * @throws IOException If the connection cannot be obtained.
    */
   public ConnectionContext getConnection(
-          UserGroupInformation ugi, String nnAddress) throws IOException {
+          UserGroupInformation ugi, String nsId, String nnAddress) throws IOException {
 
     // Check if the manager is shutdown
     if (!this.running) {
@@ -229,7 +230,7 @@ public class ConnectionManager {
         pool = this.pools.get(connectionId);
         if (pool == null) {
           pool = new ConnectionPool(
-              this.conf, nnAddress, ugi, this.minSize, this.maxSize,
+              this.conf, nsId, nnAddress, ugi, this.minSize, this.maxSize,
               this.minActiveRatio);
           this.pools.put(connectionId, pool);
         }
