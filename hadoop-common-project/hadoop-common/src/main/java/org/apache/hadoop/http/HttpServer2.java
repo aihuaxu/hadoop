@@ -47,6 +47,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletRequestWrapper;
 import javax.servlet.http.HttpServletResponse;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
@@ -58,6 +59,7 @@ import org.apache.hadoop.conf.ConfServlet;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configuration.IntegerRanges;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.jmx.JMXJsonServlet;
 import org.apache.hadoop.log.LogLevel;
 import org.apache.hadoop.security.AuthenticationFilterInitializer;
@@ -85,6 +87,7 @@ import org.eclipse.jetty.server.SslConnectionFactory;
 import org.eclipse.jetty.server.handler.ContextHandlerCollection;
 import org.eclipse.jetty.server.handler.HandlerCollection;
 import org.eclipse.jetty.server.handler.RequestLogHandler;
+import org.eclipse.jetty.server.handler.StatisticsHandler;
 import org.eclipse.jetty.server.session.AbstractSessionManager;
 import org.eclipse.jetty.server.session.SessionHandler;
 import org.eclipse.jetty.servlet.DefaultServlet;
@@ -175,6 +178,9 @@ public final class HttpServer2 implements FilterContainer {
   private static final String X_FRAME_VALUE = "xFrameOption";
   private static final String X_FRAME_ENABLED = "X_FRAME_ENABLED";
 
+
+  private StatisticsHandler statsHandler;
+  private HttpServer2Metrics metrics;
 
   /**
    * Class to construct instances of HTTP server with specific options.
@@ -573,6 +579,16 @@ public final class HttpServer2 implements FilterContainer {
     final String appDir = getWebAppsPath(name);
     addDefaultApps(contexts, appDir, conf);
     webServer.setHandler(handlers);
+
+    // Jetty StatisticsHandler should be the first handler.
+    // The handler returns 503 if there is no next handler and the response is
+    // not committed. In Apache Hadoop, there are some servlets that do not
+    // commit (i.e. close) the response. Therefore the handler fails.
+    if (conf.getBoolean(CommonConfigurationKeysPublic.HADOOP_HTTP_METRICS_ENABLED,
+            CommonConfigurationKeysPublic.HADOOP_HTTP_METRICS_ENABLED_DEFAULT)) {
+      statsHandler = new StatisticsHandler();
+      webServer.insertHandler(statsHandler);
+    }
 
     Map<String, String> xFrameParams = new HashMap<>();
     xFrameParams.put(X_FRAME_ENABLED,
@@ -1132,6 +1148,17 @@ public final class HttpServer2 implements FilterContainer {
       try {
         openListeners();
         webServer.start();
+
+        if (statsHandler != null) {
+          // Create metrics source for each HttpServer2 instance.
+          // Use port number to make the metrics source name unique.
+          int port = -1;
+          for (ServerConnector connector : listeners) {
+            port = connector.getLocalPort();
+            break;
+          }
+          metrics = HttpServer2Metrics.create(statsHandler, port);
+        }
       } catch (IOException ex) {
         LOG.info("HttpServer.start() threw a non Bind IOException", ex);
         throw ex;
@@ -1310,6 +1337,9 @@ public final class HttpServer2 implements FilterContainer {
 
     try {
       webServer.stop();
+      if (metrics != null) {
+        metrics.remove();
+      }
     } catch (Exception e) {
       LOG.error("Error while stopping web server for webapp "
           + webAppContext.getDisplayName(), e);
@@ -1651,4 +1681,10 @@ public final class HttpServer2 implements FilterContainer {
       throw new IllegalArgumentException("Unexpected value in xFrameOption.");
     }
   }
+
+  @VisibleForTesting
+  HttpServer2Metrics getMetrics() {
+    return metrics;
+  }
+
 }

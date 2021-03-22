@@ -29,6 +29,7 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.ConfigurationWithLogging;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.http.HttpServer2;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.security.authorize.AccessControlList;
 import org.apache.hadoop.security.ssl.SSLFactory;
 import org.slf4j.Logger;
@@ -129,6 +130,7 @@ public class HttpFSServerWebServer {
   }
 
   public void start() throws IOException {
+    DefaultMetricsSystem.initialize("httpfs");
     httpServer.start();
   }
 
@@ -138,6 +140,7 @@ public class HttpFSServerWebServer {
 
   public void stop() throws Exception {
     httpServer.stop();
+    DefaultMetricsSystem.shutdown();
   }
 
   public URL getUrl() {

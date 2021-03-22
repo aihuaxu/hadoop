@@ -20,6 +20,7 @@ package org.apache.hadoop.http;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configuration.IntegerRanges;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.http.HttpServer2.QuotingInputFilter.RequestQuoter;
 import org.apache.hadoop.http.resource.JerseyResource;
 import org.apache.hadoop.net.NetUtils;
@@ -145,6 +146,8 @@ public class TestHttpServer extends HttpServerFunctionalTest {
   @BeforeClass public static void setup() throws Exception {
     Configuration conf = new Configuration();
     conf.setInt(HttpServer2.HTTP_MAX_THREADS_KEY, MAX_THREADS);
+    conf.setBoolean(
+        CommonConfigurationKeysPublic.HADOOP_HTTP_METRICS_ENABLED, true);
     server = createTestServer(conf);
     server.addServlet("echo", "/echo", EchoServlet.class);
     server.addServlet("echomap", "/echomap", EchoMapServlet.class);
@@ -267,6 +270,19 @@ public class TestHttpServer extends HttpServerFunctionalTest {
     assertEquals(200, conn.getResponseCode());
     assertEquals(MediaType.TEXT_HTML + ";" + JettyUtils.UTF_8,
         conn.getContentType());
+  }
+
+  @Test
+  public void testHttpServer2Metrics() throws Exception {
+    final HttpServer2Metrics metrics = server.getMetrics();
+    final int before = metrics.responses2xx();
+    final URL servletUrl = new URL(baseUrl, "/echo?echo");
+    final HttpURLConnection conn =
+        (HttpURLConnection)servletUrl.openConnection();
+    conn.connect();
+    assertEquals(200, conn.getResponseCode());
+    final int after = metrics.responses2xx();
+    assertTrue(after > before);
   }
 
   @Test

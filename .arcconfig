@@ -1,5 +1,5 @@
 {
   "project_id": "hadoop-common",
   "conduit_uri": "https://code.uberinternal.com/",
-  "git.default-relative-commit": "origin/release-int-3.1.0"
+  "git.default-relative-commit": "origin/master-int-3.1.0"
 }
