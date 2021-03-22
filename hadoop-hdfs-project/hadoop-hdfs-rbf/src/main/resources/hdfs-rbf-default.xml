@@ -580,4 +580,12 @@
     </description>
   </property>
 
+  <property>
+    <name>dfs.federation.router.ipc.connection.size</name>
+    <value>64</value>
+    <description>
+     The size of ipc connections to be used by each router pool.
+    </description>
+  </property>
+
 </configuration>

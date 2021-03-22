@@ -1563,7 +1563,7 @@ public class Client implements AutoCloseable {
     InetSocketAddress address;
     UserGroupInformation ticket;
     final Class<?> protocol;
-    private static final int PRIME = 16777619;
+    protected static final int PRIME = 16777619;
     private final int rpcTimeout;
     private final int maxIdleTime; //connections will be culled if it was idle for 
     //maxIdleTime msecs
@@ -1577,8 +1577,17 @@ public class Client implements AutoCloseable {
     private final int pingInterval; // how often sends ping to the server in msecs
     private String saslQop; // here for testing
     private final Configuration conf; // used to get the expected kerberos principal name
-    
-    ConnectionId(InetSocketAddress address, Class<?> protocol, 
+
+    protected ConnectionId(final ConnectionId cid) {
+      this(cid.address,
+              cid.protocol,
+              cid.ticket,
+              cid.rpcTimeout,
+              cid.connectionRetryPolicy,
+              cid.conf);
+    }
+
+    public ConnectionId(InetSocketAddress address, Class<?> protocol,
                  UserGroupInformation ticket, int rpcTimeout,
                  RetryPolicy connectionRetryPolicy, Configuration conf) {
       this.protocol = protocol;
@@ -1622,7 +1631,7 @@ public class Client implements AutoCloseable {
       return ticket;
     }
     
-    private int getRpcTimeout() {
+    int getRpcTimeout() {
       return rpcTimeout;
     }
     
@@ -1734,6 +1743,10 @@ public class Client implements AutoCloseable {
     @Override
     public String toString() {
       return address.toString();
+    }
+
+    RetryPolicy getRetryPolicy() {
+      return connectionRetryPolicy;
     }
   }  
 

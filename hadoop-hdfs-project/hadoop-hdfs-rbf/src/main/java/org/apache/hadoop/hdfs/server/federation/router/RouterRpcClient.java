@@ -315,7 +315,7 @@ public class RouterRpcClient {
         connUGI = UserGroupInformation.createProxyUser(
           ugi.getUserName(), routerUser);
       }
-      connection = this.connectionManager.getConnection(connUGI, rpcAddress);
+      connection = this.connectionManager.getConnection(connUGI, nsId, rpcAddress);
       LOG.debug("User {} NN {} is using connection {}",
           ugi.getUserName(), rpcAddress, connection);
     } catch (Exception ex) {

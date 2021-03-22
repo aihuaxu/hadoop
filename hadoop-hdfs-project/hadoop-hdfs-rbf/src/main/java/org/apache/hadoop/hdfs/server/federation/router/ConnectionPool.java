@@ -41,6 +41,7 @@ import org.apache.hadoop.hdfs.protocolPB.ClientNamenodeProtocolTranslatorPB;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.io.retry.RetryUtils;
+import org.apache.hadoop.ipc.Client;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.net.NetUtils;
@@ -65,7 +66,6 @@ public class ConnectionPool {
   private static final Logger LOG =
       LoggerFactory.getLogger(ConnectionPool.class);
 
-
   /** Configuration settings for the connection pool. */
   private final Configuration conf;
 
@@ -75,6 +75,8 @@ public class ConnectionPool {
   private final String namenodeAddress;
   /** User for this connections. */
   private final UserGroupInformation ugi;
+  /** Name service id */
+  private final String nsId;
 
   /** Pool of connections. We mimic a COW array. */
   private volatile List<ConnectionContext> connections = new ArrayList<>();
@@ -91,8 +93,18 @@ public class ConnectionPool {
   /** The last time a connection was active. */
   private volatile long lastActiveTime = 0;
 
+  /** Increasing number to differentiate different connections. */
+  private AtomicInteger index = new AtomicInteger(0);
 
-  protected ConnectionPool(Configuration config, String address,
+  /** Number of ipc connections this pool can create */
+  private final int numIpcConnections;
+
+  /** Create one base connectionId and calculate hashCode to reuse */
+  private final Client.ConnectionId baseConnectionId;
+  private final int baseConnectionIdHashCode;
+
+  protected ConnectionPool(Configuration config, String nsId,
+                           String address,
       UserGroupInformation user, int minPoolSize, int maxPoolSize,
       float minActiveRatio) throws IOException {
 
@@ -100,6 +112,7 @@ public class ConnectionPool {
 
     // Connection pool target
     this.ugi = user;
+    this.nsId = nsId;
     this.namenodeAddress = address;
     this.connectionPoolId =
         new ConnectionPoolId(this.ugi, this.namenodeAddress);
@@ -108,6 +121,11 @@ public class ConnectionPool {
     this.minSize = minPoolSize;
     this.maxSize = maxPoolSize;
     this.minActiveRatio = minActiveRatio;
+
+    numIpcConnections = resolveNumIpcConnections(config);
+
+    baseConnectionId = createBaseConnectionId(config, address, user);
+    baseConnectionIdHashCode = baseConnectionId.hashCode();
 
     // Add minimum connections to the pool
     for (int i=0; i<this.minSize; i++) {
@@ -152,6 +170,28 @@ public class ConnectionPool {
    */
   protected ConnectionPoolId getConnectionPoolId() {
     return this.connectionPoolId;
+  }
+
+  /**
+   * Resolve the configuration for number of ipc connections for the pool in the
+   * following order: user setting for a cluster > cluster setting > global setting
+   * @param conf configuration
+   * @return  Number of IPC connections for the pool
+   */
+  protected int resolveNumIpcConnections(Configuration conf) {
+    int globalNumIpcConnections =
+            conf.getInt(RBFConfigKeys.DFS_ROUTER_IPC_CONNECTION_SIZE,
+                    RBFConfigKeys.DFS_ROUTER_IPC_CONNECTION_SIZE_DEFAULT);
+
+    String clusterSpecificKey = RBFConfigKeys.DFS_ROUTER_IPC_CONNECTION_SIZE +
+            "." + nsId;
+
+    String userSpecificKey = clusterSpecificKey + "." + ugi.getShortUserName();
+
+    int numIpcConnections = conf.getInt(userSpecificKey,
+            conf.getInt(clusterSpecificKey, globalNumIpcConnections));
+
+    return numIpcConnections;
   }
 
   /**
@@ -345,7 +385,9 @@ public class ConnectionPool {
    * @throws IOException
    */
   public ConnectionContext newConnection() throws IOException {
-    return newConnection(this.conf, this.namenodeAddress, this.ugi);
+    return newConnection(this.conf,
+            this.namenodeAddress,
+            this.index.getAndUpdate(x -> {return (x+1) % numIpcConnections;} ));
   }
 
   /**
@@ -356,40 +398,54 @@ public class ConnectionPool {
    *
    * @param conf Configuration for the connection.
    * @param nnAddress Address of server supporting the ClientProtocol.
-   * @param ugi User context.
+   * @param index Index of the new connection.
    * @return Proxy for the target ClientProtocol that contains the user's
    *         security context.
    * @throws IOException If it cannot be created.
    */
-  protected static ConnectionContext newConnection(Configuration conf,
-      String nnAddress, UserGroupInformation ugi)
-          throws IOException {
+  protected ConnectionContext newConnection(Configuration conf,
+      String nnAddress,
+      int index) throws IOException {
     RPC.setProtocolEngine(
         conf, ClientNamenodeProtocolPB.class, ProtobufRpcEngine.class);
-
-    final RetryPolicy defaultPolicy = RetryUtils.getDefaultRetryPolicy(
-        conf,
-        HdfsClientConfigKeys.Retry.POLICY_ENABLED_KEY,
-        HdfsClientConfigKeys.Retry.POLICY_ENABLED_DEFAULT,
-        HdfsClientConfigKeys.Retry.POLICY_SPEC_KEY,
-        HdfsClientConfigKeys.Retry.POLICY_SPEC_DEFAULT,
-        HdfsConstants.SAFEMODE_EXCEPTION_CLASS_NAME);
 
     SocketFactory factory = SocketFactory.getDefault();
     if (UserGroupInformation.isSecurityEnabled()) {
       SaslRpcServer.init(conf);
     }
-    InetSocketAddress socket = NetUtils.createSocketAddr(nnAddress);
     final long version = RPC.getProtocolVersion(ClientNamenodeProtocolPB.class);
+
+    FederationConnectionId connId = new FederationConnectionId(
+            baseConnectionId,
+            baseConnectionIdHashCode,
+            index);
+
     ClientNamenodeProtocolPB proxy = RPC.getProtocolProxy(
-        ClientNamenodeProtocolPB.class, version, socket, ugi, conf,
-        factory, RPC.getRpcTimeout(conf), defaultPolicy, null).getProxy();
+            ClientNamenodeProtocolPB.class, version, connId, conf, factory).getProxy();
     ClientProtocol client = new ClientNamenodeProtocolTranslatorPB(proxy);
+    InetSocketAddress socket = NetUtils.createSocketAddr(nnAddress);
     Text dtService = SecurityUtil.buildTokenService(socket);
 
     ProxyAndInfo<ClientProtocol> clientProxy =
         new ProxyAndInfo<ClientProtocol>(client, dtService, socket);
     ConnectionContext connection = new ConnectionContext(clientProxy);
     return connection;
+  }
+
+  private Client.ConnectionId createBaseConnectionId(Configuration conf,
+                                                     String nnAddress,
+                                                     UserGroupInformation ugi) {
+    final RetryPolicy defaultPolicy = RetryUtils.getDefaultRetryPolicy(
+            conf,
+            HdfsClientConfigKeys.Retry.POLICY_ENABLED_KEY,
+            HdfsClientConfigKeys.Retry.POLICY_ENABLED_DEFAULT,
+            HdfsClientConfigKeys.Retry.POLICY_SPEC_KEY,
+            HdfsClientConfigKeys.Retry.POLICY_SPEC_DEFAULT,
+            HdfsConstants.SAFEMODE_EXCEPTION_CLASS_NAME);
+
+    InetSocketAddress socket = NetUtils.createSocketAddr(nnAddress);
+    final int timeout = Client.getRpcTimeout(conf);
+    return new Client.ConnectionId(socket,
+            ClientNamenodeProtocolPB.class, ugi, timeout, defaultPolicy, conf);
   }
 }
