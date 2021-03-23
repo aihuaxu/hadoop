@@ -32,7 +32,7 @@ public class VolumeSpec {
   };
 
   public static final String[] VOLUMES_HOST_PATH = {
-          "/secrets-tmpfs/yarn",
+          "/secrets/compute/yarn",
           "/var/run/docker.sock",
           "/opt/uber/shared/yarn/cache/config",
           "/opt/uber/shared/yarn/cache/data",
