@@ -20,16 +20,16 @@ package org.apache.hadoop.hdfs.server.federation.router;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.DFSClient;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
-import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.hdfs.protocol.ClientProtocol;
+import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.hdfs.server.federation.MiniRouterDFSCluster.RouterContext;
 import org.apache.hadoop.hdfs.server.federation.RouterConfigBuilder;
 import org.apache.hadoop.hdfs.server.federation.StateStoreDFSCluster;
-import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.hdfs.server.namenode.NameNodeRpcServer;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.ipc.StandbyException;
 import org.apache.hadoop.ipc.metrics.RpcMetrics;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.After;
 import org.junit.Test;
 import org.slf4j.Logger;
@@ -37,8 +37,10 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.URI;
+import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -54,9 +56,12 @@ import static org.junit.Assert.*;
 public class TestRouterConnectionOverload {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(TestRouterConnectionOverload.class);
+          LoggerFactory.getLogger(TestRouterConnectionOverload.class);
 
   private StateStoreDFSCluster cluster;
+
+  Random rand = new Random();
+
 
   @After
   public void cleanup() {
@@ -66,28 +71,26 @@ public class TestRouterConnectionOverload {
     }
   }
 
-  private void setupCluster(boolean overloadControl) throws Exception {
+  private void setupCluster() throws Exception {
     // Build and start a federated cluster
     cluster = new StateStoreDFSCluster(false, 1);
     Configuration routerConf = new RouterConfigBuilder()
-        .stateStore()
-        .metrics()
-        .admin()
-        .rpc()
-        .build();
+            .stateStore()
+            .metrics()
+            .admin()
+            .rpc()
+            .build();
 
-    // Reduce the number of RPC clients threads to overload the Router easy
     routerConf.setInt(RBFConfigKeys.DFS_ROUTER_CLIENT_THREADS_SIZE, 4);
     routerConf.setInt(RBFConfigKeys.DFS_ROUTER_IPC_CONNECTION_SIZE, 2);
-    // Overload control
-    routerConf.setBoolean(
-        RBFConfigKeys.DFS_ROUTER_CLIENT_REJECT_OVERLOAD, overloadControl);
+    routerConf.set("hadoop.proxyuser.realUser.groups", "*");
+    routerConf.set("hadoop.proxyuser.realUser.hosts", "*");
 
     // No need for datanodes as we use renewLease() for testing
     cluster.setNumDatanodesPerNameservice(0);
 
     cluster.addRouterOverrides(routerConf);
-    cluster.startCluster();
+    cluster.startCluster(routerConf);
     cluster.startRouters();
     cluster.waitClusterUp();
   }
@@ -98,13 +101,13 @@ public class TestRouterConnectionOverload {
    */
   @Test
   public void testControlIpcConnections() throws Exception {
-    setupCluster(false);
+    setupCluster();
 
     List<Integer> numConnections = new ArrayList<>();
 
-    Thread metricThread = new Thread( () -> {
+    Thread metricThread = new Thread(() -> {
       NameNodeRpcServer nnRpcServer =
-              (NameNodeRpcServer)(cluster.getCluster().getNameNode(0).getRpcServer());
+              (NameNodeRpcServer) (cluster.getCluster().getNameNode(0).getRpcServer());
       RpcMetrics nnRpcMetrics =
               nnRpcServer.getClientRpcServer().getRpcMetrics();
 
@@ -124,16 +127,61 @@ public class TestRouterConnectionOverload {
     metricThread.interrupt();
 
     for (int numConnection : numConnections) {
-      assertTrue("More connections created:" + numConnection,numConnection <= 2);
+      assertTrue("More connections created:" + numConnection, numConnection <= 2);
     }
   }
 
-  private void makeRouterCall(int numOps)
+  @Test
+  public void testMultipleUsers() throws Exception {
+    setupCluster();
+
+    List<Integer> numConnections = new ArrayList<>();
+
+    Thread metricThread = new Thread(() -> {
+      NameNodeRpcServer nnRpcServer =
+              (NameNodeRpcServer) (cluster.getCluster().getNameNode(0).getRpcServer());
+      RpcMetrics nnRpcMetrics =
+              nnRpcServer.getClientRpcServer().getRpcMetrics();
+
+      while (true) {
+        try {
+          Thread.sleep(1000);
+          numConnections.add(nnRpcMetrics.numOpenConnections());
+        } catch (Exception e) {
+          // ignore
+        }
+      }
+    });
+
+    UserGroupInformation realUser = UserGroupInformation.createRemoteUser("realUser");
+    UserGroupInformation[] users = new UserGroupInformation[200];
+    for (int i = 0; i < users.length; i++) {
+      users[i] = UserGroupInformation.createProxyUserForTesting("user" + i, realUser, new String[]{"group1"});
+    }
+
+    metricThread.start();
+    for (int i = 0; i < 1000; i++) {
+      makeRouterCall(users, 200);
+    }
+
+    Thread.sleep(10000);
+    metricThread.interrupt();
+  }
+
+  /**
+   * Simulate single user call
+   */
+  private void makeRouterCall(int numOps) throws Exception {
+    UserGroupInformation ugi = UserGroupInformation.createUserForTesting("user", new String[]{"group1"});
+    makeRouterCall(new UserGroupInformation[] {ugi}, numOps);
+  }
+
+  private void makeRouterCall(UserGroupInformation[] users, int numOps)
       throws Exception {
     RouterContext routerContext = cluster.getRouters().get(0);
     URI address = routerContext.getFileSystemURI();
     Configuration conf = new HdfsConfiguration();
-    makeRouterCall(address, conf, numOps);
+    makeRouterCall(users, address, conf, numOps);
   }
 
   /**
@@ -143,7 +191,8 @@ public class TestRouterConnectionOverload {
    * @param numOps Number of operations to submit.
    * @throws Exception If it cannot perform the test.
    */
-  private void makeRouterCall(final URI address,
+  private void makeRouterCall(final UserGroupInformation[] users,
+                              final URI address,
                               final Configuration conf,
                               final int numOps)
           throws Exception {
@@ -155,11 +204,27 @@ public class TestRouterConnectionOverload {
       Future<?> future = exec.submit(new Runnable() {
         @Override
         public void run() {
-          DFSClient routerClient = null;
           try {
-            routerClient = new DFSClient(address, conf);
-            ClientProtocol routerProto = routerClient.getNamenode();
-            routerProto.getFileInfo("/");
+            UserGroupInformation user = users[rand.nextInt(users.length)];
+            user.doAs(new PrivilegedExceptionAction<HdfsFileStatus>() {
+              @Override
+              public HdfsFileStatus run() throws IOException {
+                DFSClient routerClient = null;
+                try {
+                  routerClient = new DFSClient(address, conf);
+                  ClientProtocol routerProto = routerClient.getNamenode();
+                  return routerProto.getFileInfo("/");
+                } finally {
+                  if (routerClient != null) {
+                    try {
+                      routerClient.close();
+                    } catch (IOException e) {
+                      LOG.error("Cannot close the client");
+                    }
+                  }
+                }
+              }
+            });
           } catch (RemoteException re) {
             IOException ioe = re.unwrapRemoteException();
             assertTrue("Wrong exception: " + ioe,
@@ -168,14 +233,8 @@ public class TestRouterConnectionOverload {
             overloadException.incrementAndGet();
           } catch (IOException e) {
             fail("Unexpected exception: " + e);
-          } finally {
-            if (routerClient != null) {
-              try {
-                routerClient.close();
-              } catch (IOException e) {
-                LOG.error("Cannot close the client");
-              }
-            }
+          } catch (InterruptedException e) {
+            // Do nothing
           }
         }
       });
