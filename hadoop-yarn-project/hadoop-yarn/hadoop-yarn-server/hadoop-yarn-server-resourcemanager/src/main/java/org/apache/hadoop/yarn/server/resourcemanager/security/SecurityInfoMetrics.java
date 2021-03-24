@@ -46,13 +46,15 @@ public class SecurityInfoMetrics {
     @Metric("# of RM DelegationTokenRenewer pendingEventQueue") MutableGaugeLong dtrNumPendingEventQueue;
 
     @Metric("DelegationTokenRenewerLoopTracker timeout check running time") MutableCounterLong dtrTimeoutCheckRunningTime;
-    @Metric("# of RM DelegationTokenRenewer futures completed") MutableGaugeLong dtrNumFutureCompleted;
-    @Metric("# of RM DelegationTokenRenewer futures not started") MutableGaugeLong dtrNumFutureNotStarted;
-    @Metric("# of RM DelegationTokenRenewer timeout") MutableGaugeLong dtrNumFutureTimeout;
-    @Metric("# of RM DelegationTokenRenewer timeout and need to retry") MutableGaugeLong dtrNumFutureTimeoutNeedRetry;
-    @Metric("# of RM DelegationTokenRenewer timeout and will not retry") MutableGaugeLong dtrNumFutureTimeoutWithoutRetry;
-    @Metric("# of RM DelegationTokenRenewer timeout exceeded max retries") MutableGaugeLong dtrNumFutureTimeoutExceedMaxRetries;
+    @Metric("# of RM DelegationTokenRenewer futures completed") MutableCounterLong dtrNumFutureCompleted;
+    @Metric("# of RM DelegationTokenRenewer futures not started") MutableCounterLong dtrNumFutureNotStarted;
+    @Metric("# of RM DelegationTokenRenewer timeout") MutableCounterLong dtrNumFutureTimeout;
+    @Metric("# of RM DelegationTokenRenewer timeout and need to retry") MutableCounterLong dtrNumFutureTimeoutNeedRetry;
+    @Metric("# of RM DelegationTokenRenewer timeout and will not retry") MutableCounterLong dtrNumFutureTimeoutWithoutRetry;
+    @Metric("# of RM DelegationTokenRenewer timeout exceeded max retries") MutableCounterLong dtrNumFutureTimeoutExceedMaxRetries;
     @Metric("# of RM DelegationTokenRenewer timeout check exceptions") MutableCounterLong dtrNumTimeoutCheckExceptions;
+
+    @Metric("DelegationTokenRenewerLoopTracker timeout check running time") MutableCounterLong dtrNumRejectApps;
 
     static final MetricsInfo RECORD_INFO = info("SecurityInfoMetrics",
             "Metrics for YARN RM Delegation Tokens");
@@ -108,31 +110,36 @@ public class SecurityInfoMetrics {
         dtrTimeoutCheckRunningTime.incr(runningTime);
     }
 
-    public synchronized void setDtrNumFutureCompleted(int num) {
-        dtrNumFutureCompleted.set(num);
+    public synchronized void incrDtrNumFutureCompleted(int num) {
+        dtrNumFutureCompleted.incr(num);
     }
 
-    public synchronized void setDtrNumFutureNotStarted(int num) {
-        dtrNumFutureNotStarted.set(num);
+    public synchronized void incrDtrNumFutureNotStarted(int num) {
+        dtrNumFutureNotStarted.incr(num);
     }
 
-    public synchronized void setDtrNumFutureTimeout(int num) {
-        dtrNumFutureTimeout.set(num);
+    public synchronized void incrDtrNumFutureTimeout(int num) {
+        dtrNumFutureTimeout.incr(num);
     }
 
-    public synchronized void setDtrNumFutureTimeoutWithoutRetry(int num) {
-        dtrNumFutureTimeoutWithoutRetry.set(num);
+    public synchronized void incrDtrNumFutureTimeoutWithoutRetry(int num) {
+        dtrNumFutureTimeoutWithoutRetry.incr(num);
     }
 
-    public synchronized void setDtrNumFutureTimeoutNeedRetry(int num) {
-        dtrNumFutureTimeoutNeedRetry.set(num);
+    public synchronized void incrDtrNumFutureTimeoutNeedRetry(int num) {
+        dtrNumFutureTimeoutNeedRetry.incr(num);
     }
 
-    public synchronized void setDtrNumFutureTimeoutExceedMaxRetries(int num) {
-        dtrNumFutureTimeoutExceedMaxRetries.set(num);
+    public synchronized void incrDtrNumFutureTimeoutExceedMaxRetries(int num) {
+        dtrNumFutureTimeoutExceedMaxRetries.incr(num);
     }
 
     public synchronized void incrementDtrNumTimeoutCheckExceptions() {
         dtrNumTimeoutCheckExceptions.incr();
     }
+
+    public synchronized void incrDtrNumRejectApps() {
+        dtrNumRejectApps.incr();
+    }
+
 }

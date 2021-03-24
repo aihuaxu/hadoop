@@ -1081,12 +1081,12 @@ public class DelegationTokenRenewer extends AbstractService {
             }
           }
           long timeoutCheckRunningTime = System.currentTimeMillis() - timeoutCheckStartTime;
-          securityInfoMetrics.setDtrNumFutureCompleted(numFutureCompleted);
-          securityInfoMetrics.setDtrNumFutureNotStarted(numFutureNotStarted);
-          securityInfoMetrics.setDtrNumFutureTimeout(numFutureTimeout);
-          securityInfoMetrics.setDtrNumFutureTimeoutNeedRetry(numFutureTimeoutNeedRetry);
-          securityInfoMetrics.setDtrNumFutureTimeoutExceedMaxRetries(numFutureTimeoutExceedMaxRetries);
-          securityInfoMetrics.setDtrNumFutureTimeoutWithoutRetry(numFutureTimeoutWithoutRetry);
+          securityInfoMetrics.incrDtrNumFutureCompleted(numFutureCompleted);
+          securityInfoMetrics.incrDtrNumFutureNotStarted(numFutureNotStarted);
+          securityInfoMetrics.incrDtrNumFutureTimeout(numFutureTimeout);
+          securityInfoMetrics.incrDtrNumFutureTimeoutNeedRetry(numFutureTimeoutNeedRetry);
+          securityInfoMetrics.incrDtrNumFutureTimeoutExceedMaxRetries(numFutureTimeoutExceedMaxRetries);
+          securityInfoMetrics.incrDtrNumFutureTimeoutWithoutRetry(numFutureTimeoutWithoutRetry);
           securityInfoMetrics.incrementDtrTimeoutCheckRunningTime(timeoutCheckRunningTime);
           LOG.info(String.format("Timeout check finished in %d millis, number of futures - total: %d,"
             + " completed: %s, not started: %d, timeout: %d, timeout but will retry: %d,"
@@ -1146,9 +1146,12 @@ public class DelegationTokenRenewer extends AbstractService {
       try {
         // Setup tokens for renewal
         DelegationTokenRenewer.this.handleAppSubmitEvent(event);
+        LOG.info(
+          "Starting the application after delegation token renewed successfully, evt=" + event);
         rmContext.getDispatcher().getEventHandler()
             .handle(new RMAppEvent(event.getApplicationId(), RMAppEventType.START));
       } catch (Throwable t) {
+        securityInfoMetrics.incrDtrNumRejectApps();
         LOG.warn(
             "Rejecting the application because failed to add it to the delegation token renewer, evt=" + event, t);
         // Sending APP_REJECTED is fine, since we assume that the
