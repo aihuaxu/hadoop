@@ -695,7 +695,12 @@ public class DelegationTokenRenewer extends AbstractService {
               }
             });
     } catch (InterruptedException e) {
-      LOG.info("Failed to renew token [" + dttr + "], exception: " + e.getMessage());
+      // Clear current thread's interrupted status,
+      // in case the interruption happened in org.apache.hadoop.ipc.Client.getRpcResponse
+      // which will set the thread status to interrupted,
+      // and that will cause AsyncDispatcher fail to handle APP_REJECTED event
+      Thread.currentThread().interrupted();
+      LOG.info("Thread interrupted is cleared, failed to renew token [" + dttr + "], exception: " + e.getMessage());
       throw new IOException(e);
     }
     LOG.info("Renewed token= [" + dttr + "]");
@@ -980,12 +985,24 @@ public class DelegationTokenRenewer extends AbstractService {
           }
         }
 
-        DelegationTokenRenewerAppRecoverEvent event =
+        DelegationTokenRenewerEvent retryEvent;
+        if (evt instanceof DelegationTokenRenewerAppRecoverEvent) {
+          retryEvent =
             new DelegationTokenRenewerAppRecoverEvent(
-                evt.getApplicationId(), evt.getCredentials(),
-                evt.shouldCancelAtEnd(), evt.getUser(), evt.getTokenConf());
-        event.setAttempt(evt.getAttempt());
-        processDelegationTokenRenewerEvent(event);
+              evt.getApplicationId(), evt.getCredentials(),
+              evt.shouldCancelAtEnd(), evt.getUser(), evt.getTokenConf());
+        } else if (evt instanceof DelegationTokenRenewerAppSubmitEvent) {
+          retryEvent =
+            new DelegationTokenRenewerAppSubmitEvent(
+              evt.getApplicationId(), evt.getCredentials(),
+              evt.shouldCancelAtEnd(), evt.getUser(), evt.getTokenConf());
+        } else {
+          // Unsupported event
+          LOG.warn("Unsupported event type for token renew retry, evt = " + evt);
+          return;
+        }
+        retryEvent.setAttempt(evt.getAttempt());
+        processDelegationTokenRenewerEvent(retryEvent);
       }
     };
   }
@@ -1053,9 +1070,12 @@ public class DelegationTokenRenewer extends AbstractService {
                 LOG.debug("Token renew timeout, evt = " + evt);
                 numFutureTimeout++;
                 if (future != null && !future.isDone() && !future.isCancelled()) {
+                  if (evt.getAttempt() < tokenRenewerThreadRetryMaxAttempts) {
+                    evt.setIfNeedRetry(true);
+                  }
                   future.cancel(true);
                   iterator.remove();
-                  if (evt.getAttempt() < tokenRenewerThreadRetryMaxAttempts) {
+                  if (evt.getIfNeedRetry()) {
                     numFutureTimeoutNeedRetry++;
                     LOG.debug("Renew timeout but will retry, evt = " + evt
                       + ", attempted: " + evt.getAttempt()
@@ -1151,15 +1171,21 @@ public class DelegationTokenRenewer extends AbstractService {
         rmContext.getDispatcher().getEventHandler()
             .handle(new RMAppEvent(event.getApplicationId(), RMAppEventType.START));
       } catch (Throwable t) {
-        securityInfoMetrics.incrDtrNumRejectApps();
-        LOG.warn(
-            "Rejecting the application because failed to add it to the delegation token renewer, evt=" + event, t);
-        // Sending APP_REJECTED is fine, since we assume that the
-        // RMApp is in NEW state and thus we havne't yet informed the
-        // Scheduler about the existence of the application
-        rmContext.getDispatcher().getEventHandler().handle(
+        if (!event.getIfNeedRetry()) {
+          securityInfoMetrics.incrDtrNumRejectApps();
+          LOG.warn(
+            "Rejecting the application because failed to add it to the delegation token renewer, evt="
+              + event, t);
+          // Sending APP_REJECTED is fine, since we assume that the
+          // RMApp is in NEW state and thus we havne't yet informed the
+          // Scheduler about the existence of the application
+          rmContext.getDispatcher().getEventHandler().handle(
             new RMAppEvent(event.getApplicationId(),
-                RMAppEventType.APP_REJECTED, t.getMessage()));
+              RMAppEventType.APP_REJECTED, t.getMessage()));
+        } else {
+          LOG.info(
+            "Application submit failed to renew token but will retry, evt=" + event, t);
+        }
       }
     }
   }
@@ -1253,6 +1279,7 @@ public class DelegationTokenRenewer extends AbstractService {
     //DelegationTokenRenewerPoolTracker will only wait for the running futures till timeout
     //For those not started futures, the pool tracker will skip checking
     private volatile long renewStartTime = 0;
+    private volatile boolean ifNeedRetry = false;
 
     public DelegationTokenRenewerEvent(ApplicationId appId,
         DelegationTokenRenewerEventType type) {
@@ -1282,6 +1309,14 @@ public class DelegationTokenRenewer extends AbstractService {
 
     public void setRenewStartTime(long renewStartTime) {
       this.renewStartTime = renewStartTime;
+    }
+
+    public boolean getIfNeedRetry() {
+      return ifNeedRetry;
+    }
+
+    public void setIfNeedRetry(boolean ifNeedRetry) {
+      this.ifNeedRetry = ifNeedRetry;
     }
   }
 
