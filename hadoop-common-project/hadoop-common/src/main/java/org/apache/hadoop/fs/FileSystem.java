@@ -541,6 +541,8 @@ public abstract class FileSystem extends Configured implements Closeable {
                                        final List<Token<?>> tokens)
                                            throws IOException {
     final String serviceName = getCanonicalServiceName();
+    LOG.info("XXX: Get delegation token for" + serviceName);
+
     // Collect token of the this filesystem and then of its embedded children
     if (serviceName != null) { // fs has token, grab it
       final Text service = new Text(serviceName);

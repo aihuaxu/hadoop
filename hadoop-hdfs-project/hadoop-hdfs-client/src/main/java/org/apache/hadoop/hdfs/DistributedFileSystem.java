@@ -95,6 +95,8 @@ import org.apache.hadoop.crypto.key.KeyProviderDelegationTokenExtension;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import org.apache.htrace.commons.logging.Log;
+import org.apache.htrace.commons.logging.LogFactory;
 
 /****************************************************************
  * Implementation of the abstract FileSystem for the DFS system.
@@ -105,6 +107,8 @@ import com.google.common.base.Preconditions;
 @InterfaceAudience.LimitedPrivate({ "MapReduce", "HBase" })
 @InterfaceStability.Unstable
 public class DistributedFileSystem extends FileSystem {
+  public static final Log LOG = LogFactory.getLog(FileSystem.class);
+
   private Path workingDir;
   private URI uri;
 
@@ -2665,6 +2669,7 @@ public class DistributedFileSystem extends FileSystem {
   public FileSystem[] getChildFileSystems() {
     if (!resolvePath) return null;
 
+    LOG.info("XXX: Getting child file system neon-prod-dca1");
     try {
       DistributedFileSystem dfs = new DistributedFileSystem();
       dfs.initialize(new URI("hdfs://ns-neon-prod-dca1"), getConf());
