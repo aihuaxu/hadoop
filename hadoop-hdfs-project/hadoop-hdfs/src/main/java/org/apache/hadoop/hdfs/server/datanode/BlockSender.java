@@ -181,6 +181,7 @@ class BlockSender implements java.io.Closeable {
   // would risk sending too much unnecessary data. 512 (1 disk sector)
   // is likely to result in minimal extra IO.
   private static final long CHUNK_SIZE = 512;
+
   /**
    * Constructor
    * 
@@ -483,7 +484,7 @@ class BlockSender implements java.io.Closeable {
       ris = null;
     }
   }
-  
+
   private static Replica getReplica(ExtendedBlock block, DataNode datanode)
       throws ReplicaNotFoundException {
     Replica replica = datanode.data.getReplica(block.getBlockPoolId(),
@@ -557,6 +558,16 @@ class BlockSender implements java.io.Closeable {
    */
   private int sendPacket(ByteBuffer pkt, int maxChunks, OutputStream out,
       boolean transferTo, DataTransferThrottler throttler) throws IOException {
+
+    if (datanode.getDelayDataNodeForTest()) {
+      LOG.info("Delay the DataNode for reading. Delay each packet for "
+              + datanode.getDelayTimeInMsPerPacket() + " ms.");
+      try {
+        Thread.sleep(datanode.getDelayTimeInMsPerPacket().get());
+      } catch (InterruptedException ie) {
+        LOG.info("Read delay got interrupted");
+      }
+    }
     int dataLen = (int) Math.min(endOffset - offset,
                              (chunkSize * (long) maxChunks));
     

@@ -415,6 +415,18 @@ public interface HdfsClientConfigKeys {
     int     THREADPOOL_SIZE_DEFAULT = 0;
   }
 
+  /** dfs.client.fast_switch.read configuration properties */
+  interface FastSwitchRead {
+    String PREFIX = HdfsClientConfigKeys.PREFIX + "fast_switch.read.";
+
+    String  ENABLED = PREFIX + "enabled";
+    boolean ENABLED_DEFAULT = false;
+    String  THRESHOLD_MILLIS_KEY = PREFIX + "threshold.millis";
+    long    THRESHOLD_MILLIS_DEFAULT = 10000;
+    String  THREADPOOL_SIZE_KEY = PREFIX + "threadpool.size";
+    int     THREADPOOL_SIZE_DEFAULT = 3;
+  }
+
   /** dfs.http.client configuration properties */
   interface HttpClient {
     String  PREFIX = "dfs.http.client.";
