@@ -158,6 +158,7 @@ import org.apache.hadoop.hdfs.server.datanode.CachingStrategy;
 import org.apache.hadoop.hdfs.server.namenode.SafeModeException;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeStorageReport;
 import org.apache.hadoop.hdfs.util.IOUtilsClient;
+import org.apache.hadoop.hdfs.util.MetricsPublisher;
 import org.apache.hadoop.io.EnumSetWritable;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.Text;
@@ -211,6 +212,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
 
   private final Configuration conf;
   private final Tracer tracer;
+  private final MetricsPublisher metricsPublisher;
   private final DfsClientConf dfsClientConf;
   final ClientProtocol namenode;
   /* The service used for delegation tokens */
@@ -376,6 +378,8 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
     this.saslClient = new SaslDataTransferClient(
         conf, DataTransferSaslUtil.getSaslPropertiesResolver(conf),
         TrustedChannelResolver.getInstance(conf), nnFallbackToSimpleAuth);
+    metricsPublisher = MetricsPublisher.getInstance(
+        dfsClientConf.getMetricsSamplePercent(), dfsClientConf.getMetricsReporterAddr());
   }
 
   /**
@@ -2954,6 +2958,10 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
 
   Tracer getTracer() {
     return tracer;
+  }
+
+  MetricsPublisher getMetricsPublisher() {
+    return metricsPublisher;
   }
 
   /**

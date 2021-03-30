@@ -196,6 +196,15 @@ public interface HdfsClientConfigKeys {
   String DFS_NAMENODE_RESOLVE_PATH_ENABLED_NAMESERVICES = "dfs.namenode.resolve-path.enabled.nameservices";
   String DFS_NAMENODE_RESOLVE_PATH_ENABLED_NAMESERVICES_DEFAULT = "ns-router";
 
+  String DFS_CLIENT_METRICS_SAMPLE_PERCENTAGE_KEY =
+      "dfs.client.metrics.sample.percentage";
+  int DFS_CLIENT_METRICS_SAMPLE_PERCENTAGE_DEFAULT = 10;
+
+  String DFS_CLIENT_METRICS_REPORTER_ADDR_KEY =
+      "dfs.client.metrics.reporter.addr";
+  String DFS_CLIENT_METRICS_REPORTER_ADDR_DEFAULT =
+      "localhost:9052";
+
   /**
    * These are deprecated config keys to client code.
    */

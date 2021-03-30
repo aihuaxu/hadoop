@@ -63,6 +63,7 @@ import org.apache.hadoop.hdfs.shortcircuit.ShortCircuitReplicaInfo;
 import org.apache.hadoop.hdfs.shortcircuit.ShortCircuitShm.Slot;
 import org.apache.hadoop.hdfs.shortcircuit.ShortCircuitShm.SlotId;
 import org.apache.hadoop.hdfs.util.IOUtilsClient;
+import org.apache.hadoop.hdfs.util.MetricsPublisher;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.net.unix.DomainSocket;
 import org.apache.hadoop.security.AccessControlException;
@@ -194,6 +195,11 @@ public class BlockReaderFactory implements ShortCircuitReplicaCreator {
   private Tracer tracer;
 
   /**
+   * The MetricsPublisher to use.
+   */
+  private MetricsPublisher metricsPublisher;
+
+  /**
    * Information about the domain socket path we should use to connect to the
    * local peer-- or null if we haven't examined the local domain socket.
    */
@@ -299,6 +305,11 @@ public class BlockReaderFactory implements ShortCircuitReplicaCreator {
 
   public BlockReaderFactory setTracer(Tracer tracer) {
     this.tracer = tracer;
+    return this;
+  }
+
+  public BlockReaderFactory setMetricsPublisher(MetricsPublisher metricsPublisher) {
+    this.metricsPublisher = metricsPublisher;
     return this;
   }
 
@@ -852,7 +863,7 @@ public class BlockReaderFactory implements ShortCircuitReplicaCreator {
       return BlockReaderRemote2.newBlockReader(
           fileName, block, token, startOffset, length,
           verifyChecksum, clientName, peer, datanode,
-          clientContext.getPeerCache(), cachingStrategy, tracer);
+          clientContext.getPeerCache(), cachingStrategy, tracer, metricsPublisher);
     }
   }
 

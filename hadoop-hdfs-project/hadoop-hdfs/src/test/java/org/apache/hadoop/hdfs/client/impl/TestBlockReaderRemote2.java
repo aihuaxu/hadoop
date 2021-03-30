@@ -18,10 +18,41 @@
 package org.apache.hadoop.hdfs.client.impl;
 
 import org.apache.hadoop.hdfs.HdfsConfiguration;
+import org.apache.hadoop.hdfs.net.Peer;
+import org.apache.hadoop.hdfs.util.MetricsPublisher;
+import org.junit.Test;
+import org.mockito.Mockito;
+
+import java.io.IOException;
+import java.util.Random;
+import static org.mockito.Mockito.*;
 
 public class TestBlockReaderRemote2 extends TestBlockReaderBase {
   HdfsConfiguration createConf() {
     HdfsConfiguration conf = new HdfsConfiguration();
     return conf;
+  }
+
+  @Test(timeout=60000)
+  public void testMetrics() throws IOException {
+    BlockReaderRemote2 remote2 = (BlockReaderRemote2)reader;
+    MetricsPublisher mockPublisher = mock(MetricsPublisher.class);
+    remote2.metricsPublisher = mockPublisher;
+    when(mockPublisher.shallIEmit()).thenReturn(true);
+
+    Random random = new Random();
+    byte [] buf = new byte[1024];
+    int bytesRead = 0;
+    while (bytesRead < blockData.length) {
+      bytesRead += reader.read(buf, 0,
+          Math.min(buf.length, random.nextInt(100)));
+    }
+    reader.close();
+    verify(mockPublisher, times(1 )).shallIEmit();
+    verify(mockPublisher, times(2 )).emit(
+        eq(MetricsPublisher.MetricType.GAUGE),
+        Mockito.<String>any(),
+        Mockito.<String>any(),
+        Mockito.anyLong());
   }
 }

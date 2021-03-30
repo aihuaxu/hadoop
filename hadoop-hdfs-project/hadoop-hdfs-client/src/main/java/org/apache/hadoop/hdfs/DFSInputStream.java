@@ -76,6 +76,7 @@ import org.apache.hadoop.hdfs.security.token.block.InvalidBlockTokenException;
 import org.apache.hadoop.hdfs.server.datanode.CachingStrategy;
 import org.apache.hadoop.hdfs.server.datanode.ReplicaNotFoundException;
 import org.apache.hadoop.hdfs.shortcircuit.ClientMmap;
+import org.apache.hadoop.hdfs.util.MetricsPublisher;
 import org.apache.hadoop.io.ByteBufferPool;
 import org.apache.hadoop.ipc.Client;
 import org.apache.hadoop.ipc.RPC;
@@ -171,6 +172,8 @@ public class DFSInputStream extends FSInputStream
    * whether we this is a memory-mapped buffer or not.
    */
   private IdentityHashStore<ByteBuffer, Object> extendedReadBuffers;
+
+  private static final String NUM_IOEXCEPTIONS = "hdfs_client_num_IOExceptions";
 
   private synchronized IdentityHashStore<ByteBuffer, Object>
         getExtendedReadBuffers() {
@@ -766,6 +769,7 @@ public class DFSInputStream extends FSInputStream
         setUserGroupInformation(dfsClient.ugi).
         setConfiguration(dfsClient.getConfiguration()).
         setTracer(dfsClient.getTracer()).
+        setMetricsPublisher(dfsClient.getMetricsPublisher()).
         build();
   }
 
@@ -1097,6 +1101,8 @@ public class DFSInputStream extends FSInputStream
               + currentNode, e);
         }
         ioe = e;
+        dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.COUNTER,
+            currentNode.getPeerHostName(), NUM_IOEXCEPTIONS, 1);
       }
       boolean sourceFound;
       if (retryCurrentNode) {
