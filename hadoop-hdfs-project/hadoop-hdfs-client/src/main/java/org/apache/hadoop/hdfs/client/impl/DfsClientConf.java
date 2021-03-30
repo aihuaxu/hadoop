@@ -80,6 +80,7 @@ import static org.apache.hadoop.hdfs.client.HdfsClientConfigKeys.DFS_SHORT_CIRCU
 import static org.apache.hadoop.hdfs.client.HdfsClientConfigKeys.DFS_SHORT_CIRCUIT_SHARED_MEMORY_WATCHER_INTERRUPT_CHECK_MS_DEFAULT;
 import static org.apache.hadoop.hdfs.client.HdfsClientConfigKeys.Failover;
 import static org.apache.hadoop.hdfs.client.HdfsClientConfigKeys.HedgedRead;
+import static org.apache.hadoop.hdfs.client.HdfsClientConfigKeys.FastSwitchRead;
 import static org.apache.hadoop.hdfs.client.HdfsClientConfigKeys.Mmap;
 import static org.apache.hadoop.hdfs.client.HdfsClientConfigKeys.Read;
 import static org.apache.hadoop.hdfs.client.HdfsClientConfigKeys.Retry;
@@ -138,6 +139,11 @@ public class DfsClientConf {
 
   private final long hedgedReadThresholdMillis;
   private final int hedgedReadThreadpoolSize;
+
+  private final boolean fastSwitchEnabled;
+  private final long fastSwitchThreshold;
+  private final int fastSwitchThreadpoolSize;
+
   private final List<Class<? extends ReplicaAccessorBuilder>>
       replicaAccessorBuilderClasses;
 
@@ -264,6 +270,16 @@ public class DfsClientConf {
     hedgedReadThreadpoolSize = conf.getInt(
         HdfsClientConfigKeys.HedgedRead.THREADPOOL_SIZE_KEY,
         HdfsClientConfigKeys.HedgedRead.THREADPOOL_SIZE_DEFAULT);
+
+    fastSwitchEnabled = conf.getBoolean(
+        FastSwitchRead.ENABLED,
+        FastSwitchRead.ENABLED_DEFAULT);
+    fastSwitchThreadpoolSize = conf.getInt(
+        FastSwitchRead.THREADPOOL_SIZE_KEY,
+        FastSwitchRead.THREADPOOL_SIZE_DEFAULT);
+    fastSwitchThreshold = conf.getLong(
+        FastSwitchRead.THRESHOLD_MILLIS_KEY,
+        FastSwitchRead.THRESHOLD_MILLIS_DEFAULT);
 
     replicaAccessorBuilderClasses = loadReplicaAccessorBuilderClasses(conf);
   }
@@ -600,6 +616,18 @@ public class DfsClientConf {
    */
   public int getHedgedReadThreadpoolSize() {
     return hedgedReadThreadpoolSize;
+  }
+
+  public boolean isFastSwitchReadEnabled() {
+    return fastSwitchEnabled;
+  }
+
+  public int getFastSwitchThreadpoolSize() {
+    return fastSwitchThreadpoolSize;
+  }
+
+  public long getFastSwitchThreshold() {
+    return fastSwitchThreshold;
   }
 
   /**

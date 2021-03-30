@@ -19,12 +19,14 @@ package org.apache.hadoop.hdfs;
 
 import java.io.EOFException;
 import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -40,6 +42,8 @@ import java.util.concurrent.CompletionService;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorCompletionService;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
@@ -48,7 +52,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import com.google.common.base.Preconditions;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.ByteBufferReadable;
 import org.apache.hadoop.fs.ByteBufferUtil;
 import org.apache.hadoop.fs.CanSetDropBehind;
@@ -60,7 +63,6 @@ import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.fs.HasEnhancedByteBufferAccess;
 import org.apache.hadoop.fs.ReadOption;
 import org.apache.hadoop.fs.StorageType;
-import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
 import org.apache.hadoop.hdfs.client.impl.BlockReaderFactory;
 import org.apache.hadoop.hdfs.client.impl.DfsClientConf;
 import org.apache.hadoop.hdfs.protocol.ClientDatanodeProtocol;
@@ -132,6 +134,34 @@ public class DFSInputStream extends FSInputStream
   // Note: Never acquire a lock on <this> with this lock held to avoid deadlocks
   //       (it's OK to acquire this lock when the lock on <this> is held)
   protected final Object infoLock = new Object();
+
+  private final boolean useFastSwitch;
+  private ExecutorService bufferReaderExecutor;
+  // TODO: slownodes should have a expiration time.
+  private Set<DatanodeInfo> slownodes = new HashSet<>();
+  // Should we switch for current block.
+  private boolean shouldSwitch = false;
+  protected int switchCount;
+
+  protected Set<BlockReader> abandonedReaders =
+      Collections.newSetFromMap(new ConcurrentHashMap<BlockReader, Boolean>());
+
+  /**
+   * Make sure all the old readers are closed.
+   * Most of the time it should be already closed in doRead callable when interrupted.
+   */
+  private void cleanAbandonedReaders() {
+    if (!abandonedReaders.isEmpty()) {
+      for (BlockReader r : abandonedReaders) {
+        try {
+          r.close();
+          abandonedReaders.remove(r);
+        } catch (IOException e) {
+          DFSClient.LOG.warn("Failed to close old reader.");
+        }
+      }
+    }
+  }
 
   /**
    * Track the ByteBuffers that we have handed out to readers.
@@ -271,6 +301,17 @@ public class DFSInputStream extends FSInputStream
     }
     this.locatedBlocks = locatedBlocks;
     openInfo(false);
+
+    // Initialize fast switch read
+    if (dfsClient.getConf().isFastSwitchReadEnabled()) {
+      useFastSwitch = true;
+      shouldSwitch = true;
+      bufferReaderExecutor =
+          Executors.newFixedThreadPool(
+              dfsClient.getConf().getFastSwitchThreadpoolSize());
+    } else {
+      useFastSwitch = false;
+    }
   }
 
   /**
@@ -648,7 +689,14 @@ public class DFSInputStream extends FSInputStream
 
       long offsetIntoBlock = target - targetBlock.getStartOffset();
 
-      DNAddrPair retval = chooseDataNode(targetBlock, null);
+      DNAddrPair retval;
+
+      if (slownodes != null && !slownodes.isEmpty()) {
+        retval = chooseDataNode(targetBlock, slownodes);
+      } else {
+        retval = chooseDataNode(targetBlock, null);
+      }
+
       chosenNode = retval.info;
       InetSocketAddress targetAddr = retval.addr;
       StorageType storageType = retval.storageType;
@@ -743,7 +791,11 @@ public class DFSInputStream extends FSInputStream
           "unreleased ByteBuffers allocated by read().  " +
           "Please release " + builder.toString() + ".");
     }
+    if (bufferReaderExecutor != null) {
+      bufferReaderExecutor.shutdown();
+    }
     closeCurrentBlockReaders();
+    cleanAbandonedReaders();
     super.close();
   }
 
@@ -857,6 +909,157 @@ public class DFSInputStream extends FSInputStream
     }
   }
 
+  Callable<ReadResult> doRead(final ReaderStrategy reader, final int off, final int len) {
+    return new Callable<ReadResult>() {
+      @Override
+      public ReadResult call() {
+        BlockReader currentReader = blockReader;
+        try {
+          int nread = reader.doRead(currentReader, off, len);
+          return new ReadResult(nread, null, blockReader);
+        } catch (InterruptedIOException iie) {
+          try {
+            currentReader.close();
+          } catch (IOException e) {
+            DFSClient.LOG.warn("Failed to close blockreader after reader interrupted.");
+          }
+        } catch (IOException e) {
+          return new ReadResult(-1, e, blockReader);
+        }
+        return null;
+      }
+    };
+  }
+
+  static class ReadResult {
+    int nread;
+    Exception exception;
+    BlockReader currentBlockReader;
+
+    ReadResult(int nread, IOException exception, BlockReader currentBlockReader) {
+      this.nread = nread;
+      this.exception = exception;
+      this.currentBlockReader = currentBlockReader;
+    }
+  }
+
+  private String getSlowNodesNames() {
+    StringBuilder sb = new StringBuilder();
+    for (DatanodeInfo slownode : slownodes) {
+      sb.append(slownode.getName());
+      sb.append(",");
+    }
+    return sb.toString();
+  }
+
+  private synchronized int readBufferFastSwitch(ReaderStrategy reader, int off, int len,
+      Map<ExtendedBlock, Set<DatanodeInfo>> corruptedBlockMap)
+      throws IOException {
+    IOException ioe;
+
+    boolean retryCurrentNode = true;
+    // Current reader future
+    Future<ReadResult> currentFuture = null;
+    // TODO: We probably should not creating a completion service so many time.
+    //       Maybe moving it outside.
+    CompletionService<ReadResult> executorCompletionService = null;
+
+    boolean sourceFound;
+
+    while (true) {
+      try {
+        if (currentFuture == null) {
+          executorCompletionService = new ExecutorCompletionService<>(bufferReaderExecutor);
+          Callable<ReadResult> readAction = doRead(reader, off, len);
+          currentFuture = executorCompletionService.submit(readAction);
+        }
+        Future<ReadResult> finishedFuture = executorCompletionService.poll(
+            dfsClient.getConf().getFastSwitchThreshold(), TimeUnit.MILLISECONDS);
+        // Ignore result of previous futures. They were likely finished before cancellation.
+        if (finishedFuture != null && finishedFuture != currentFuture) {
+          continue;
+        }
+        ReadResult result;
+        // TODO: Consider other conditions to switch.
+        if (finishedFuture == null) {
+          if (shouldSwitch) {
+            // Try Switch
+            DFSClient.LOG.info("Try to switch blockreader. Current slow datanode: " + currentNode.getName());
+            slownodes.add(currentNode);
+            // Check if any nodes available considering slownodes.
+            boolean hasCandidate =
+                getBestNodeDNAddrPair(currentLocatedBlock, slownodes) != null;
+            if (hasCandidate) {
+              // Cancel previous future and save the blockreader
+              // so we can monitor later if any blockreader not closed properly.
+              BlockReader oldReader = blockReader;
+              // Mark blockReader as null so seekTo() won't attempt to close it.
+              blockReader = null;
+              seekToNewSource(pos);
+              currentFuture.cancel(true);
+              abandonedReaders.add(oldReader);
+              currentFuture = null;
+              switchCount++;
+            } else {
+              // All available nodes are either slow or dead.
+              // We consider it is due to client slow or timeout value too low.
+              // Give up on any further switch for this block and empty slownodes list.
+              DFSClient.LOG.info("Too many slow reads, give up further read switch." +
+                  " Slownode List: [" + getSlowNodesNames() + "].");
+              slownodes.clear();
+              shouldSwitch = false;
+            }
+          }
+        } else {
+          result = finishedFuture.get();
+          if (result.exception == null && result.nread >= 0) {
+            return result.nread;
+          } else {
+            // handle exceptions, same as readBuffer
+            if (result.exception instanceof ChecksumException) {
+              ChecksumException ce = (ChecksumException) result.exception;
+              DFSClient.LOG.warn("Found Checksum error for "
+                  + getCurrentBlock() + " from " + currentNode
+                  + " at " + ce.getPos());
+              ioe = ce;
+              retryCurrentNode = false;
+              // we want to remember which block replicas we have tried
+              addIntoCorruptedBlockMap(getCurrentBlock(), currentNode,
+                  corruptedBlockMap);
+            } else {
+              IOException e = (IOException) result.exception;
+              if (!retryCurrentNode) {
+                DFSClient.LOG.warn("Exception while reading from "
+                    + getCurrentBlock() + " of " + src + " from "
+                    + currentNode, e);
+              }
+              ioe = e;
+            }
+            if (retryCurrentNode) {
+              /* possibly retry the same node so that transient errors don't
+               * result in application level failures (e.g. Datanode could have
+               * closed the connection because the client is idle for too long).
+               */
+              sourceFound = seekToBlockSource(pos);
+            } else {
+              addToDeadNodes(currentNode);
+              sourceFound = seekToNewSource(pos);
+            }
+            if (!sourceFound) {
+              throw ioe;
+            }
+            retryCurrentNode = false;
+            // Submit a new future for retry next round, with current state
+            currentFuture = null;
+          }
+        }
+      } catch (ExecutionException | InterruptedException e) {
+        DFSClient.LOG.warn("Reader thread exits unexpectedly." +
+            " When reading datanode: " + currentNode);
+      }
+    }
+  }
+
   /* This is a used by regular read() and handles ChecksumExceptions.
    * name readBuffer() is chosen to imply similarity to readBuffer() in
    * ChecksumFileSystem
@@ -928,6 +1131,10 @@ public class DFSInputStream extends FSInputStream
           // error on the same block. See HDFS-3067
           if (pos > blockEnd || currentNode == null) {
             currentNode = blockSeekTo(pos);
+            // If block changed, clean up previous state.
+            if (useFastSwitch) {
+              shouldSwitch = true;
+            }
           }
           int realLen = (int) Math.min(len, (blockEnd - pos + 1L));
           synchronized(infoLock) {
@@ -936,7 +1143,13 @@ public class DFSInputStream extends FSInputStream
                   locatedBlocks.getFileLength() - pos);
             }
           }
-          int result = readBuffer(strategy, off, realLen, corruptedBlockMap);
+
+          int result;
+          if (useFastSwitch) {
+            result = readBufferFastSwitch(strategy, off, realLen, corruptedBlockMap);
+          } else {
+            result = readBuffer(strategy, off, realLen, corruptedBlockMap);
+          }
 
           if (result >= 0) {
             pos += result;
@@ -1015,7 +1228,8 @@ public class DFSInputStream extends FSInputStream
   }
 
   private DNAddrPair chooseDataNode(LocatedBlock block,
-      Collection<DatanodeInfo> ignoredNodes) throws IOException {
+      Collection<DatanodeInfo> ignoredNodes)
+      throws IOException {
     while (true) {
       DNAddrPair result = getBestNodeDNAddrPair(block, ignoredNodes);
       if (result != null) {
