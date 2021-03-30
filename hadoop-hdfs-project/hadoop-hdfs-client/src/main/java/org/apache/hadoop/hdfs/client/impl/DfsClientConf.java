@@ -143,6 +143,9 @@ public class DfsClientConf {
 
   private final boolean dataTransferTcpNoDelay;
 
+  private final int metricsSamplePercent;
+  private final String metricsReporterAddr;
+
   public DfsClientConf(Configuration conf) {
     // The hdfsTimeout is currently the same as the ipc timeout
     hdfsTimeout = Client.getRpcTimeout(conf);
@@ -266,6 +269,14 @@ public class DfsClientConf {
         HdfsClientConfigKeys.HedgedRead.THREADPOOL_SIZE_DEFAULT);
 
     replicaAccessorBuilderClasses = loadReplicaAccessorBuilderClasses(conf);
+
+    metricsSamplePercent = conf.getInt(
+        HdfsClientConfigKeys.DFS_CLIENT_METRICS_SAMPLE_PERCENTAGE_KEY,
+        HdfsClientConfigKeys.DFS_CLIENT_METRICS_SAMPLE_PERCENTAGE_DEFAULT);
+
+    metricsReporterAddr = conf.get(
+        HdfsClientConfigKeys.DFS_CLIENT_METRICS_REPORTER_ADDR_KEY,
+        HdfsClientConfigKeys.DFS_CLIENT_METRICS_REPORTER_ADDR_DEFAULT);
   }
 
   @SuppressWarnings("unchecked")
@@ -600,6 +611,20 @@ public class DfsClientConf {
    */
   public int getHedgedReadThreadpoolSize() {
     return hedgedReadThreadpoolSize;
+  }
+
+  /**
+   * @return the metricsSamplePercent
+   */
+  public int getMetricsSamplePercent() {
+    return metricsSamplePercent;
+  }
+
+  /**
+   * @return Metrics reporter addr, like "localhost:9052"
+   */
+  public String getMetricsReporterAddr() {
+    return metricsReporterAddr;
   }
 
   /**
