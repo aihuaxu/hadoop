@@ -33,9 +33,9 @@ import org.junit.Before;
 import org.junit.Test;
 
 abstract public class TestBlockReaderBase {
-  private BlockReaderTestUtil util;
-  private byte[] blockData;
-  private BlockReader reader;
+  protected BlockReaderTestUtil util;
+  protected byte[] blockData;
+  protected BlockReader reader;
 
   /**
    * if override this, make sure return array length is less than
