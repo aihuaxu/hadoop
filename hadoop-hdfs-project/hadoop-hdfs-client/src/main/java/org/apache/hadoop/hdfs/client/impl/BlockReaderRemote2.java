@@ -27,6 +27,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.ReadableByteChannel;
 import java.util.EnumSet;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.fs.ReadOption;
@@ -47,6 +48,7 @@ import org.apache.hadoop.hdfs.protocolPB.PBHelperClient;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier;
 import org.apache.hadoop.hdfs.server.datanode.CachingStrategy;
 import org.apache.hadoop.hdfs.shortcircuit.ClientMmap;
+import org.apache.hadoop.hdfs.util.MetricsPublisher;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.DataChecksum;
 import org.apache.htrace.core.TraceScope;
@@ -89,7 +91,7 @@ public class BlockReaderRemote2 implements BlockReader {
   static final Logger LOG = LoggerFactory.getLogger(BlockReaderRemote2.class);
   static final int TCP_WINDOW_SIZE = 128 * 1024; // 128 KB;
 
-  final private Peer peer;
+  private final Peer peer;
   final private DatanodeID datanodeID;
   final private PeerCache peerCache;
   final private long blockId;
@@ -123,7 +125,19 @@ public class BlockReaderRemote2 implements BlockReader {
 
   private final Tracer tracer;
 
+  @VisibleForTesting
+  MetricsPublisher metricsPublisher;
+
   private final int networkDistance;
+
+  /**
+   * Metrics
+   */
+  private long totalBytesRead;
+  private long totalTimeRead; // in nano seconds
+  private long maxTimePackageRead; // in nano seconds
+  private static final String MAX_PKG_LATENCY = "hdfs_client_dn_max_pkg_latency";
+  private static final String AVG_THROUGHPUT = "hdfs_client_dn_avg_throughput";
 
   @VisibleForTesting
   public Peer getPeer() {
@@ -184,11 +198,14 @@ public class BlockReaderRemote2 implements BlockReader {
 
   private void readNextPacket() throws IOException {
     //Read packet headers.
+    long timeRead = System.nanoTime();
     packetReceiver.receiveNextPacket(in);
+    timeRead = System.nanoTime() - timeRead;
 
     PacketHeader curHeader = packetReceiver.getHeader();
     curDataSlice = packetReceiver.getDataSlice();
     assert curDataSlice.capacity() == curHeader.getDataLen();
+    updateMetrics(curDataSlice.capacity(), timeRead);
 
     LOG.trace("DFSClient readNextPacket got header {}", curHeader);
 
@@ -276,10 +293,10 @@ public class BlockReaderRemote2 implements BlockReader {
   }
 
   protected BlockReaderRemote2(String file, long blockId,
-      DataChecksum checksum, boolean verifyChecksum,
-      long startOffset, long firstChunkOffset, long bytesToRead, Peer peer,
-      DatanodeID datanodeID, PeerCache peerCache, Tracer tracer,
-      int networkDistance) {
+                               DataChecksum checksum, boolean verifyChecksum,
+                               long startOffset, long firstChunkOffset, long bytesToRead, Peer peer,
+                               DatanodeID datanodeID, PeerCache peerCache, Tracer tracer,
+                               MetricsPublisher metricsPublisher, int networkDistance) {
     // Path is used only for printing block and file information in debug
     this.peer = peer;
     this.datanodeID = datanodeID;
@@ -299,12 +316,22 @@ public class BlockReaderRemote2 implements BlockReader {
     bytesPerChecksum = this.checksum.getBytesPerChecksum();
     checksumSize = this.checksum.getChecksumSize();
     this.tracer = tracer;
+    this.metricsPublisher = metricsPublisher;
     this.networkDistance = networkDistance;
   }
 
 
   @Override
   public synchronized void close() throws IOException {
+    if (totalTimeRead != 0 && metricsPublisher.shallIEmit()) {
+      String dnHost = datanodeID.getHostName();
+      metricsPublisher.emit(MetricsPublisher.MetricType.GAUGE, dnHost,
+          MAX_PKG_LATENCY, maxTimePackageRead);
+      metricsPublisher.emit(MetricsPublisher.MetricType.GAUGE, dnHost,
+          AVG_THROUGHPUT,
+          TimeUnit.SECONDS.toNanos(totalBytesRead) / totalTimeRead);
+    }
+
     packetReceiver.close();
     startOffset = -1;
     checksum = null;
@@ -396,6 +423,7 @@ public class BlockReaderRemote2 implements BlockReader {
       PeerCache peerCache,
       CachingStrategy cachingStrategy,
       Tracer tracer,
+      MetricsPublisher metricsPublisher,
       int networkDistance) throws IOException {
     // in and out will be closed when sock is closed (by the caller)
     final DataOutputStream out = new DataOutputStream(new BufferedOutputStream(
@@ -429,7 +457,7 @@ public class BlockReaderRemote2 implements BlockReader {
 
     return new BlockReaderRemote2(file, block.getBlockId(), checksum,
         verifyChecksum, startOffset, firstChunkOffset, len, peer, datanodeID,
-        peerCache, tracer, networkDistance);
+        peerCache, tracer, metricsPublisher, networkDistance);
   }
 
   static void checkSuccess(
@@ -465,5 +493,11 @@ public class BlockReaderRemote2 implements BlockReader {
   @Override
   public int getNetworkDistance() {
     return networkDistance;
+  }
+
+  private void updateMetrics(long bytesRead, long timeRead) {
+    totalBytesRead += bytesRead;
+    totalTimeRead += timeRead;
+    maxTimePackageRead = Math.max(maxTimePackageRead, timeRead);
   }
 }
