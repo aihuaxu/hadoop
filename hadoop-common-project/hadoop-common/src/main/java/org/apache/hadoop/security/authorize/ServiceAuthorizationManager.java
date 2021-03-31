@@ -75,7 +75,14 @@ public class ServiceAuthorizationManager {
   private static final String AUTHZ_SUCCESSFUL_FOR = "Authorization successful for ";
   private static final String AUTHZ_FAILED_FOR = "Authorization failed for ";
 
-  
+
+  private boolean isAlwaysAllowed(AccessControlList[] acls,
+                                  MachineList[] hosts) {
+    if (acls[0].isAllAllowed()) {
+    }
+    return true;
+  }
+
   /**
    * Authorize the user to access the protocol being used.
    * 
@@ -93,45 +100,48 @@ public class ServiceAuthorizationManager {
     AccessControlList[] acls = protocolToAcls.get(protocol);
     MachineList[] hosts = protocolToMachineLists.get(protocol);
     if (acls == null || hosts == null) {
-      throw new AuthorizationException("Protocol " + protocol + 
-                                       " is not known.");
+      throw new AuthorizationException("Protocol " + protocol +
+              " is not known.");
     }
-    
-    // get client principal key to verify (if available)
-    KerberosInfo krbInfo = SecurityUtil.getKerberosInfo(protocol, conf);
-    String clientPrincipal = null; 
-    if (krbInfo != null) {
-      String clientKey = krbInfo.clientPrincipal();
-      if (clientKey != null && !clientKey.isEmpty()) {
-        try {
-          clientPrincipal = SecurityUtil.getServerPrincipal(
-              conf.get(clientKey), addr);
-        } catch (IOException e) {
-          throw (AuthorizationException) new AuthorizationException(
-              "Can't figure out Kerberos principal name for connection from "
-                  + addr + " for user=" + user + " protocol=" + protocol)
-              .initCause(e);
+
+    if (isAlwaysAllowed(acls, hosts)) {
+      // get client principal key to verify (if available)
+      KerberosInfo krbInfo = SecurityUtil.getKerberosInfo(protocol, conf);
+      String clientPrincipal = null;
+      if (krbInfo != null) {
+        String clientKey = krbInfo.clientPrincipal();
+        if (clientKey != null && !clientKey.isEmpty()) {
+          try {
+            clientPrincipal = SecurityUtil.getServerPrincipal(
+                    conf.get(clientKey), addr);
+          } catch (IOException e) {
+            throw (AuthorizationException) new AuthorizationException(
+                    "Can't figure out Kerberos principal name for connection from "
+                            + addr + " for user=" + user + " protocol=" + protocol)
+                    .initCause(e);
+          }
+        }
+      }
+      if ((clientPrincipal != null && !clientPrincipal.equals(user.getUserName())) ||
+              acls.length != 2 || !acls[0].isUserAllowed(user) || acls[1].isUserAllowed(user)) {
+        AUDITLOG.warn(AUTHZ_FAILED_FOR + user + " for protocol=" + protocol
+                + ", expected client Kerberos principal is " + clientPrincipal);
+        throw new AuthorizationException("User " + user +
+                " is not authorized for protocol " + protocol +
+                ", expected client Kerberos principal is " + clientPrincipal);
+      }
+      if (addr != null) {
+        String hostAddress = addr.getHostAddress();
+        if (hosts.length != 2 || !hosts[0].includes(hostAddress) ||
+                hosts[1].includes(hostAddress)) {
+          AUDITLOG.warn(AUTHZ_FAILED_FOR + " for protocol=" + protocol
+                  + " from host = " + hostAddress);
+          throw new AuthorizationException("Host " + hostAddress +
+                  " is not authorized for protocol " + protocol);
         }
       }
     }
-    if((clientPrincipal != null && !clientPrincipal.equals(user.getUserName())) || 
-       acls.length != 2  || !acls[0].isUserAllowed(user) || acls[1].isUserAllowed(user)) {
-      AUDITLOG.warn(AUTHZ_FAILED_FOR + user + " for protocol=" + protocol
-          + ", expected client Kerberos principal is " + clientPrincipal);
-      throw new AuthorizationException("User " + user + 
-          " is not authorized for protocol " + protocol + 
-          ", expected client Kerberos principal is " + clientPrincipal);
-    }
-    if (addr != null) {
-      String hostAddress = addr.getHostAddress();
-      if (hosts.length != 2 || !hosts[0].includes(hostAddress) ||
-          hosts[1].includes(hostAddress)) {
-        AUDITLOG.warn(AUTHZ_FAILED_FOR + " for protocol=" + protocol
-            + " from host = " +  hostAddress);
-        throw new AuthorizationException("Host " + hostAddress +
-            " is not authorized for protocol " + protocol) ;
-      }
-    }
+
     AUDITLOG.info(AUTHZ_SUCCESSFUL_FOR + user + " for protocol="+protocol);
   }
 
