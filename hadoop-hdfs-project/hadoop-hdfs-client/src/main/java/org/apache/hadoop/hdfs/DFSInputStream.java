@@ -175,6 +175,10 @@ public class DFSInputStream extends FSInputStream
   private IdentityHashStore<ByteBuffer, Object> extendedReadBuffers;
 
   private static final String NUM_IOEXCEPTIONS = "hdfs_client_num_IOExceptions";
+  private static final String FAST_SWITCH_SLOW_READ_COUNT = "hdfs_client_fast_switch_slowread_count";
+  private static final String FAST_SWITCH_SWITCH_COUNT = "hdfs_client_fast_switch_switch_count";
+  private static final String FAST_SWITCH_TOO_MANY_SLOWNESS_COUNT = "hdfs_client_fast_switch_too_many_slowness_count";
+
 
   private synchronized IdentityHashStore<ByteBuffer, Object>
         getExtendedReadBuffers() {
@@ -1006,7 +1010,11 @@ public class DFSInputStream extends FSInputStream
         ReadResult result;
         // TODO: Consider other conditions to switch.
         if (finishedFuture == null) {
+          dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.COUNTER,
+              currentNode.getPeerHostName(), FAST_SWITCH_SLOW_READ_COUNT, 1);
           if (shouldSwitch) {
+            dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.COUNTER,
+                currentNode.getPeerHostName(), FAST_SWITCH_SWITCH_COUNT, 1);
             // Try Switch
             DFSClient.LOG.info("Try to switch blockreader. Current slow datanode: " + currentNode.getName());
             slownodes.add(currentNode);
@@ -1028,6 +1036,8 @@ public class DFSInputStream extends FSInputStream
               // All available nodes are either slow or dead.
               // We consider it is due to client slow or timeout value too low.
               // Give up on any further switch for this block and empty slownodes list.
+              dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.COUNTER,
+                  currentNode.getPeerHostName(), FAST_SWITCH_TOO_MANY_SLOWNESS_COUNT, 1);
               DFSClient.LOG.info("Too many slow reads, give up further read switch." +
                   " Slownode List: [" + getSlowNodesNames() + "].");
               slownodes.clear();
