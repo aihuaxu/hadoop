@@ -75,6 +75,8 @@ public class ConnectionPool {
   private final String namenodeAddress;
   /** User for this connections. */
   private final UserGroupInformation ugi;
+  /** Name service id */
+  private final String nsId;
 
   /** Pool of connections. We mimic a COW array. */
   private volatile List<ConnectionContext> connections = new ArrayList<>();
@@ -99,7 +101,8 @@ public class ConnectionPool {
   private final Client.ConnectionId baseConnectionId;
   private final int baseConnectionIdHashCode;
 
-  protected ConnectionPool(Configuration config, String address,
+  protected ConnectionPool(Configuration config, String nsId,
+                           String address,
       UserGroupInformation user, int minPoolSize, int maxPoolSize)
           throws IOException {
 
@@ -107,6 +110,7 @@ public class ConnectionPool {
 
     // Connection pool target
     this.ugi = user;
+    this.nsId = nsId;
     this.namenodeAddress = address;
     this.connectionPoolId =
         new ConnectionPoolId(this.ugi, this.namenodeAddress);
@@ -115,8 +119,7 @@ public class ConnectionPool {
     this.minSize = minPoolSize;
     this.maxSize = maxPoolSize;
 
-    numIpcConnections = config.getInt(RBFConfigKeys.DFS_ROUTER_IPC_CONNECTION_SIZE,
-            RBFConfigKeys.DFS_ROUTER_IPC_CONNECTION_SIZE_DEFAULT);
+    numIpcConnections = resolveNumIpcConnections(config);
 
     baseConnectionId = createBaseConnectionId(config, address, user);
     baseConnectionIdHashCode = baseConnectionId.hashCode();
@@ -155,6 +158,28 @@ public class ConnectionPool {
    */
   protected ConnectionPoolId getConnectionPoolId() {
     return this.connectionPoolId;
+  }
+
+  /**
+   * Resolve the configuration for number of ipc connections for the pool in the
+   * following order: user setting for a cluster > cluster setting > global setting
+   * @param conf configuration
+   * @return  Number of IPC connections for the pool
+   */
+  protected int resolveNumIpcConnections(Configuration conf) {
+    int globalNumIpcConnections =
+            conf.getInt(RBFConfigKeys.DFS_ROUTER_IPC_CONNECTION_SIZE,
+                    RBFConfigKeys.DFS_ROUTER_IPC_CONNECTION_SIZE_DEFAULT);
+
+    String clusterSpecificKey = RBFConfigKeys.DFS_ROUTER_IPC_CONNECTION_SIZE +
+            "." + nsId;
+
+    String userSpecificKey = clusterSpecificKey + "." + ugi.getShortUserName();
+
+    int numIpcConnections = conf.getInt(userSpecificKey,
+            conf.getInt(clusterSpecificKey, globalNumIpcConnections));
+
+    return numIpcConnections;
   }
 
   /**

@@ -59,8 +59,9 @@ public class TestRouterConnectionOverload {
           LoggerFactory.getLogger(TestRouterConnectionOverload.class);
 
   private StateStoreDFSCluster cluster;
+  private static final String DEFAULT_USER = "user";
 
-  Random rand = new Random();
+  private Random rand = new Random();
 
 
   @After
@@ -71,9 +72,7 @@ public class TestRouterConnectionOverload {
     }
   }
 
-  private void setupCluster() throws Exception {
-    // Build and start a federated cluster
-    cluster = new StateStoreDFSCluster(false, 1);
+  private Configuration createConf() {
     Configuration routerConf = new RouterConfigBuilder()
             .stateStore()
             .metrics()
@@ -82,15 +81,21 @@ public class TestRouterConnectionOverload {
             .build();
 
     routerConf.setInt(RBFConfigKeys.DFS_ROUTER_CLIENT_THREADS_SIZE, 4);
-    routerConf.setInt(RBFConfigKeys.DFS_ROUTER_IPC_CONNECTION_SIZE, 2);
     routerConf.set("hadoop.proxyuser.realUser.groups", "*");
     routerConf.set("hadoop.proxyuser.realUser.hosts", "*");
+
+    return routerConf;
+  }
+
+  private void setupCluster(Configuration conf) throws Exception {
+    // Build and start a federated cluster
+    cluster = new StateStoreDFSCluster(false, 1);
 
     // No need for datanodes as we use renewLease() for testing
     cluster.setNumDatanodesPerNameservice(0);
 
-    cluster.addRouterOverrides(routerConf);
-    cluster.startCluster(routerConf);
+    cluster.addRouterOverrides(conf);
+    cluster.startCluster(conf);
     cluster.startRouters();
     cluster.waitClusterUp();
   }
@@ -101,7 +106,31 @@ public class TestRouterConnectionOverload {
    */
   @Test
   public void testControlIpcConnections() throws Exception {
-    setupCluster();
+    Configuration conf = createConf();
+    conf.setInt(RBFConfigKeys.DFS_ROUTER_IPC_CONNECTION_SIZE, 5);
+    validateNumConnection(conf, 5);
+  }
+
+  @Test
+  public void testControlIpcConnectionsWithClusterSetting() throws Exception {
+    Configuration conf = createConf();
+    conf.setInt(RBFConfigKeys.DFS_ROUTER_IPC_CONNECTION_SIZE, 5);
+    conf.setInt(RBFConfigKeys.DFS_ROUTER_IPC_CONNECTION_SIZE + ".ns0", 2);
+    validateNumConnection(conf, 2);
+  }
+
+  @Test
+  public void testControlIpcConnectionsWithUserSetting() throws Exception {
+    Configuration conf = createConf();
+    conf.setInt(RBFConfigKeys.DFS_ROUTER_IPC_CONNECTION_SIZE, 100);
+    conf.setInt(RBFConfigKeys.DFS_ROUTER_IPC_CONNECTION_SIZE + ".ns0", 200);
+    conf.setInt(RBFConfigKeys.DFS_ROUTER_IPC_CONNECTION_SIZE + ".ns0." + DEFAULT_USER, 2);
+    validateNumConnection(conf, 2);
+  }
+
+  private void validateNumConnection(Configuration conf, int expectedNumException)
+          throws Exception {
+    setupCluster(conf);
 
     List<Integer> numConnections = new ArrayList<>();
 
@@ -127,13 +156,16 @@ public class TestRouterConnectionOverload {
     metricThread.interrupt();
 
     for (int numConnection : numConnections) {
-      assertTrue("More connections created:" + numConnection, numConnection <= 2);
+      assertTrue("More connections created:" + numConnection,
+              numConnection <= expectedNumException);
     }
   }
 
   @Test
   public void testMultipleUsers() throws Exception {
-    setupCluster();
+    Configuration conf = createConf();
+    conf.setInt(RBFConfigKeys.DFS_ROUTER_IPC_CONNECTION_SIZE, 2);
+    setupCluster(conf);
 
     List<Integer> numConnections = new ArrayList<>();
 
@@ -172,7 +204,7 @@ public class TestRouterConnectionOverload {
    * Simulate single user call
    */
   private void makeRouterCall(int numOps) throws Exception {
-    UserGroupInformation ugi = UserGroupInformation.createUserForTesting("user", new String[]{"group1"});
+    UserGroupInformation ugi = UserGroupInformation.createUserForTesting(DEFAULT_USER, new String[]{"group1"});
     makeRouterCall(new UserGroupInformation[] {ugi}, numOps);
   }
 

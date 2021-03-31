@@ -133,9 +133,7 @@ public class RBFConfigKeys extends CommonConfigurationKeysPublic {
 
   public static final String DFS_ROUTER_IPC_CONNECTION_SIZE =
           FEDERATION_ROUTER_PREFIX + "ipc.connection.size";
-  public static final int DFS_ROUTER_IPC_CONNECTION_SIZE_DEFAULT =
-          64;
-
+  public static final int DFS_ROUTER_IPC_CONNECTION_SIZE_DEFAULT = 64;
 
   // HDFS Router State Store connection
   public static final String FEDERATION_FILE_RESOLVER_CLIENT_CLASS =

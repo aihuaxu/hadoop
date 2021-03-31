@@ -45,6 +45,7 @@ public class TestConnectionManager {
   private static final UserGroupInformation TEST_USER3 =
       UserGroupInformation.createUserForTesting("user3", TEST_GROUP);
   private static final String TEST_NN_ADDRESS = "nn1:8080";
+  private static final String TEST_NS = "ns";
 
   @Before
   public void setup() throws Exception {
@@ -67,12 +68,12 @@ public class TestConnectionManager {
     Map<ConnectionPoolId, ConnectionPool> poolMap = connManager.getPools();
 
     ConnectionPool pool1 = new ConnectionPool(
-        conf, TEST_NN_ADDRESS, TEST_USER1, 0, 10);
+        conf, TEST_NS, TEST_NN_ADDRESS, TEST_USER1, 0, 10);
     addConnectionsToPool(pool1, 10, 4);
     poolMap.put(new ConnectionPoolId(TEST_USER1, TEST_NN_ADDRESS), pool1);
 
     ConnectionPool pool2 = new ConnectionPool(
-        conf, TEST_NN_ADDRESS, TEST_USER2, 0, 10);
+        conf, TEST_NS, TEST_NN_ADDRESS, TEST_USER2, 0, 10);
     addConnectionsToPool(pool2, 10, 10);
     poolMap.put(new ConnectionPoolId(TEST_USER2, TEST_NN_ADDRESS), pool2);
 
@@ -93,7 +94,7 @@ public class TestConnectionManager {
 
     // Make sure the number of connections doesn't go below minSize
     ConnectionPool pool3 = new ConnectionPool(
-        conf, TEST_NN_ADDRESS, TEST_USER3, 2, 10);
+        conf, TEST_NS, TEST_NN_ADDRESS, TEST_USER3, 2, 10);
     addConnectionsToPool(pool3, 10, 0);
     poolMap.put(new ConnectionPoolId(TEST_USER2, TEST_NN_ADDRESS), pool3);
     connManager.cleanup(pool3);
@@ -112,7 +113,7 @@ public class TestConnectionManager {
     int activeConns = 5;
 
     ConnectionPool pool = new ConnectionPool(
-        conf, TEST_NN_ADDRESS, TEST_USER1, 0, 10);
+        conf, TEST_NS, TEST_NN_ADDRESS, TEST_USER1, 0, 10);
     addConnectionsToPool(pool, totalConns, activeConns);
     poolMap.put(new ConnectionPoolId(TEST_USER1, TEST_NN_ADDRESS), pool);
 
