@@ -587,7 +587,8 @@ class BlockReceiver implements Closeable {
           datanode.metrics.incrPacketsSlowWriteToMirror();
           if (LOG.isWarnEnabled()) {
             LOG.warn("Slow BlockReceiver write packet to mirror took " + duration
-                + "ms (threshold=" + datanodeSlowLogThresholdMs + "ms)");
+                + "ms (threshold=" + datanodeSlowLogThresholdMs
+                + "ms), mirrorAddr: " + mirrorAddr);
           }
         }
       } catch (IOException e) {
