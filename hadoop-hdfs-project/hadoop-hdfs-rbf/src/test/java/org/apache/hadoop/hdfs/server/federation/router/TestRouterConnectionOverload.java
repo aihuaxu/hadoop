@@ -25,6 +25,8 @@ import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.hdfs.server.federation.MiniRouterDFSCluster.RouterContext;
 import org.apache.hadoop.hdfs.server.federation.RouterConfigBuilder;
 import org.apache.hadoop.hdfs.server.federation.StateStoreDFSCluster;
+import org.apache.hadoop.hdfs.server.federation.metrics.FederationMetrics;
+import org.apache.hadoop.hdfs.server.federation.metrics.FederationRPCMetrics;
 import org.apache.hadoop.hdfs.server.namenode.NameNodeRpcServer;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.ipc.StandbyException;
@@ -128,11 +130,19 @@ public class TestRouterConnectionOverload {
     validateNumConnection(conf, 2);
   }
 
+  @Test
+  public void testPerformance() throws Exception {
+    Configuration conf = createConf();
+    conf.setInt(RBFConfigKeys.DFS_ROUTER_IPC_CONNECTION_SIZE, 20);
+    validateNumConnection(conf, 20);
+  }
+
   private void validateNumConnection(Configuration conf, int expectedNumException)
           throws Exception {
     setupCluster(conf);
 
     List<Integer> numConnections = new ArrayList<>();
+    List<Double> proxyAvgs = new ArrayList<>();
 
     Thread metricThread = new Thread(() -> {
       NameNodeRpcServer nnRpcServer =
@@ -140,10 +150,13 @@ public class TestRouterConnectionOverload {
       RpcMetrics nnRpcMetrics =
               nnRpcServer.getClientRpcServer().getRpcMetrics();
 
+      FederationRPCMetrics routerMetrics = cluster.getRouters().get(0).getRouter().getRpcServer().getRPCMetrics();
+
       while (true) {
         try {
           Thread.sleep(1000);
           numConnections.add(nnRpcMetrics.numOpenConnections());
+          proxyAvgs.add(routerMetrics.getProxyAvg());
         } catch (Exception e) {
           // ignore
         }
@@ -152,12 +165,16 @@ public class TestRouterConnectionOverload {
 
     metricThread.start();
     makeRouterCall(200);
-    Thread.sleep(10000);
     metricThread.interrupt();
 
     for (int numConnection : numConnections) {
+      LOG.info("XXX:connection is " + numConnection);
       assertTrue("More connections created:" + numConnection,
               numConnection <= expectedNumException);
+    }
+
+    for (double proxyAvg : proxyAvgs) {
+      LOG.info("XXX:proxy time is " + proxyAvg);
     }
   }
 
@@ -230,7 +247,7 @@ public class TestRouterConnectionOverload {
           throws Exception {
 
     final AtomicInteger overloadException = new AtomicInteger();
-    ExecutorService exec = Executors.newFixedThreadPool(numOps);
+    ExecutorService exec = Executors.newFixedThreadPool(100);
     List<Future<?>> futures = new ArrayList<>();
     for (int i = 0; i < numOps; i++) {
       Future<?> future = exec.submit(new Runnable() {

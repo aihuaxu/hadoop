@@ -19,11 +19,7 @@ package org.apache.hadoop.hdfs.server.federation.router;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -91,15 +87,13 @@ public class ConnectionPool {
   /** The last time a connection was active. */
   private volatile long lastActiveTime = 0;
 
-  /** Increasing number to differentiate different connections. */
-  private AtomicInteger index = new AtomicInteger(0);
-
   /** Number of ipc connections this pool can create */
   private final int numIpcConnections;
 
   /** Create one base connectionId and calculate hashCode to reuse */
   private final Client.ConnectionId baseConnectionId;
   private final int baseConnectionIdHashCode;
+  private final static Random rand = new Random();
 
   protected ConnectionPool(Configuration config, String nsId,
                            String address,
@@ -191,21 +185,10 @@ public class ConnectionPool {
 
     this.lastActiveTime = Time.now();
 
-    // Get a connection from the pool following round-robin
-    ConnectionContext conn = null;
+    // Get a connection from the pool randomly
     List<ConnectionContext> tmpConnections = this.connections;
     int size = tmpConnections.size();
-    int threadIndex = this.clientIndex.getAndIncrement() & 0x7FFFFFFF;
-    for (int i=0; i<size; i++) {
-      int index = (threadIndex + i) % size;
-      conn = tmpConnections.get(index);
-      if (conn != null && conn.isUsable()) {
-        return conn;
-      }
-    }
-
-    // We return a connection even if it's active
-    return conn;
+    return tmpConnections.get(rand.nextInt(size));
   }
 
   /**
@@ -375,7 +358,7 @@ public class ConnectionPool {
   public ConnectionContext newConnection() throws IOException {
     return newConnection(this.conf,
             this.namenodeAddress,
-            this.index.getAndUpdate(x -> {return (x+1) % numIpcConnections;} ));
+            rand.nextInt(numIpcConnections));
   }
 
   /**

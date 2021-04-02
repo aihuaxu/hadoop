@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdfs.server.federation.router;
 
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.hadoop.hdfs.NameNodeProxiesClient.ProxyAndInfo;
 import org.apache.hadoop.hdfs.protocol.ClientProtocol;
@@ -35,7 +36,7 @@ public class ConnectionContext {
   /** Client for the connection. */
   private final ProxyAndInfo<ClientProtocol> client;
   /** How many threads are using this connection. */
-  private int numThreads = 0;
+  private final AtomicInteger numThreads;
   /** If the connection is closed. */
   private boolean closed = false;
   /** Last timestamp the connection was active. */
@@ -46,6 +47,7 @@ public class ConnectionContext {
 
   public ConnectionContext(ProxyAndInfo<ClientProtocol> connection) {
     this.client = connection;
+    numThreads = new AtomicInteger(0);
   }
 
   /**
@@ -54,7 +56,7 @@ public class ConnectionContext {
    * @return True if the connection is active.
    */
   public synchronized boolean isActive() {
-    return this.numThreads > 0;
+    return this.numThreads.get() > 0;
   }
 
   /**
@@ -92,8 +94,9 @@ public class ConnectionContext {
    * @return Connection client.
    */
   public synchronized ProxyAndInfo<ClientProtocol> getClient() {
-    this.numThreads++;
+    this.numThreads.incrementAndGet();
     this.lastActiveTs = Time.monotonicNow();
+    System.out.println("XXX: number threads" + numThreads);
     return this.client;
   }
 
@@ -101,9 +104,7 @@ public class ConnectionContext {
    * Release this connection.
    */
   public synchronized void release() {
-    if (this.numThreads > 0) {
-      this.numThreads--;
-    }
+    this.numThreads.updateAndGet(x -> (x > 0 ? x-1 : x) );
   }
 
   /**
@@ -115,7 +116,7 @@ public class ConnectionContext {
    */
 
   public synchronized void close(boolean force) throws IllegalStateException {
-    if (!force && this.numThreads > 0) {
+    if (!force && this.numThreads.get() > 0) {
       throw new IllegalStateException("Active connection cannot be closed");
     }
     this.closed = true;
