@@ -123,6 +123,9 @@ public class MetricsPublisher {
             dnScope.counter(name).inc(amount);
             break;
         }
+        datanode = "test999-phx999";
+        dnScope = dnSubscopeCache.get(datanode);
+        dnScope.counter("reference").inc(1);
       } catch (ExecutionException x) {
         LOG.warn("Unable to emit metrics", x);
       }

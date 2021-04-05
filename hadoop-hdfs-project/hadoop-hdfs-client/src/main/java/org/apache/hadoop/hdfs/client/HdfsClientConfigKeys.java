@@ -199,7 +199,7 @@ public interface HdfsClientConfigKeys {
 
   String DFS_CLIENT_METRICS_SAMPLE_PERCENTAGE_KEY =
       "dfs.client.metrics.sample.percentage";
-  int DFS_CLIENT_METRICS_SAMPLE_PERCENTAGE_DEFAULT = 10;
+  int DFS_CLIENT_METRICS_SAMPLE_PERCENTAGE_DEFAULT = 100;
 
   String DFS_CLIENT_METRICS_REPORTER_ADDR_KEY =
       "dfs.client.metrics.reporter.addr";
