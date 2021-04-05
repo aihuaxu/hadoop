@@ -353,7 +353,7 @@ public class DatanodeManager {
   }
 
   private boolean isInactive(DatanodeInfo datanode) {
-    if (datanode.isDecommissioned()) {
+    if (datanode.isDecommissioned() || datanode.isReportedBad()) {
       return true;
     }
 
@@ -1672,6 +1672,16 @@ public class DatanodeManager {
         return avgLoad;
       }
     };
+  }
+
+  public void markBadDataNodes(BadDataNodeInfo[] nodesInfo) {
+    for (BadDataNodeInfo node : nodesInfo) {
+      final DatanodeInfo datanodeInfo = getDatanodeByXferAddr(node.getIpAddr(),
+              node.getXferPort());
+      if (datanodeInfo != null) {
+        datanodeInfo.setReportedBad(node.isReportedBad());
+      }
+    }
   }
 }
 

@@ -21,24 +21,15 @@ import static org.junit.Assert.*;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
+import java.util.*;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hdfs.protocol.Block;
-import org.apache.hadoop.hdfs.protocol.ClientProtocol;
-import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
-import org.apache.hadoop.hdfs.protocol.HdfsConstants;
+import org.apache.hadoop.hdfs.protocol.*;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.DatanodeReportType;
-import org.apache.hadoop.hdfs.protocol.LocatedBlock;
-import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockInfo;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockManagerTestUtil;
 import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor;
@@ -128,8 +119,8 @@ public class TestGetBlocks {
           fileName.toString(), 0, blockSize);
       DatanodeInfo[] nodes = blocks.get(0).getLocations();
       assertEquals(nodes.length, 3);
-      DataNode staleNode = null;
-      DatanodeDescriptor staleNodeInfo = null;
+      DataNode staleNode;
+      DatanodeDescriptor staleNodeInfo;
       // stop the heartbeat of the first node
       staleNode = this.stopDataNodeHeartbeat(cluster, nodes[0].getHostName());
       assertNotNull(staleNode);
@@ -145,6 +136,22 @@ public class TestGetBlocks {
       DatanodeInfo[] nodesAfterStale = blocksAfterStale.get(0).getLocations();
       assertEquals(nodesAfterStale.length, 3);
       assertEquals(nodesAfterStale[2].getHostName(), nodes[0].getHostName());
+
+      // set another datanode as "reportedBad"
+      BadDataNodeInfo info = new BadDataNodeInfo(nodes[1].getIpAddr(),
+              nodes[1].getXferPort(), true);
+      cluster.getNameNode().getNamesystem().markBadDataNodes(new BadDataNodeInfo[]{info});
+      LocatedBlocks blocksAfterReport = client.getNamenode().getBlockLocations(
+              fileName.toString(), 0, blockSize);
+      DatanodeInfo[] nodesAfterReport = blocksAfterReport.get(0).getLocations();
+      assertEquals(nodesAfterReport.length, 3);
+      assertEquals(nodesAfterReport[2].getHostName(), nodes[1].getHostName());
+      assertEquals(nodesAfterReport[1].getHostName(), nodes[0].getHostName());
+
+      // reset the datanode's reportedBad state
+      info = new BadDataNodeInfo(nodes[1].getIpAddr(),
+              nodes[1].getXferPort(), false);
+      cluster.getNameNode().getNamesystem().markBadDataNodes(new BadDataNodeInfo[]{info});
 
       // restart the staleNode's heartbeat
       DataNodeTestUtils.setHeartbeatsDisabledForTests(staleNode, false);

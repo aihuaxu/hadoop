@@ -185,6 +185,7 @@ import org.apache.hadoop.hdfs.HAUtil;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.UnknownCryptoProtocolVersionException;
 import org.apache.hadoop.hdfs.protocol.AlreadyBeingCreatedException;
+import org.apache.hadoop.hdfs.protocol.BadDataNodeInfo;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.CacheDirectiveEntry;
 import org.apache.hadoop.hdfs.protocol.CacheDirectiveInfo;
@@ -4371,6 +4372,30 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     checkOperation(OperationCategory.UNCHECKED);
     checkSuperuserPrivilege();
     getBlockManager().getDatanodeManager().refreshNodes(new HdfsConfiguration());
+  }
+
+  /**
+   * This method provides a temporary solution handling possible slow/bad
+   * DataNodes. These DataNodes potentially have hardware issues (e.g., slow or
+   * bad hard disks) and will be decommissioned in the future. We use this
+   * method to mark these DataNodes as "bad" ones and de-prioritize them for
+   * reading.
+   *
+   * Note this information is only hold in NameNode memory and will not be
+   * included in editlogs. We expect an external tool run by admin to keep
+   * reporting the bad DataNode list to all the NameNodes in the cluster.
+   */
+  @VisibleForTesting
+  public void markBadDataNodes(BadDataNodeInfo[] nodesInfo) throws IOException {
+    checkOperation(OperationCategory.UNCHECKED);
+    checkSuperuserPrivilege();
+    writeLock();
+    try {
+      getBlockManager().getDatanodeManager().markBadDataNodes(nodesInfo);
+    } finally {
+      writeUnlock("markBadDataNodes");
+    }
+    LOG.info("Got bad DataNodes reports: " + Arrays.asList(nodesInfo));
   }
 
   void setBalancerBandwidth(long bandwidth) throws IOException {

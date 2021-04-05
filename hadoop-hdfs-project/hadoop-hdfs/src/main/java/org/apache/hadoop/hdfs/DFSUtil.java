@@ -138,11 +138,18 @@ public class DFSUtil {
     new Comparator<DatanodeInfo>() {
       @Override
       public int compare(DatanodeInfo a, DatanodeInfo b) {
-        return a.isDecommissioned() == b.isDecommissioned() ? 0 : 
-          a.isDecommissioned() ? 1 : -1;
+        if (a.isDecommissioned() && b.isDecommissioned()) {
+          return 0;
+        }
+        if (a.isDecommissioned() == b.isDecommissioned()) {
+          // neither a nor b is decommissioned, compare based on their
+          // "reportedBad" mark
+          return a.isReportedBad() == b.isReportedBad() ?
+                  0 : (a.isReportedBad() ? 1 : -1);
+        }
+        return a.isDecommissioned() ? 1 : -1;
       }
     };
-
 
   /**
    * Comparator for sorting DataNodeInfo[] based on decommissioned/stale states.
@@ -167,11 +174,11 @@ public class DFSUtil {
     @Override
     public int compare(DatanodeInfo a, DatanodeInfo b) {
       // Decommissioned nodes will still be moved to the end of the list
-      if (a.isDecommissioned()) {
-        return b.isDecommissioned() ? 0 : 1;
-      } else if (b.isDecommissioned()) {
-        return -1;
+      int decom = DECOM_COMPARATOR.compare(a, b);
+      if (decom != 0 || a.isDecommissioned() || a.isReportedBad()) {
+        return decom;
       }
+
       // Stale nodes will be moved behind the normal nodes
       boolean aStale = a.isStale(staleInterval);
       boolean bStale = b.isStale(staleInterval);
