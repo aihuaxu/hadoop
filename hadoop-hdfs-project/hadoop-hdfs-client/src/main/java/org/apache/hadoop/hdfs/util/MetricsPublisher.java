@@ -28,6 +28,9 @@ public class MetricsPublisher {
 
   private final int metricsSamplePercent;
   private Scope scope;
+
+  private long lastMetricLogTime;
+
   /**
    * HDFS client emits metrics with tag "datanode". As there are thousands
    * of datanodes and tagging the scope actually creates a new scope which
@@ -74,14 +77,23 @@ public class MetricsPublisher {
         .build(new CacheLoader<String, Scope>() {
           @Override
           public Scope load(String datanode) {
-            Map<String, String> map = new HashMap<>();
-            map.put(DATANODE_TAG, datanode);
-            return scope.tagged(map);
+            try {
+              Map<String, String> map = new HashMap<>();
+              map.put(DATANODE_TAG, datanode);
+              return scope.tagged(map);
+            } catch (Exception e) {
+              LOG.error("failed to create subscope", e);
+              return null;
+            }
           }
         });
   }
 
   public boolean shallIEmit() {
+    if(scope == null) {
+      LOG.error("Scope is null");
+    }
+
     return scope != null
         && ThreadLocalRandom.current().nextInt(100) < metricsSamplePercent;
   }
@@ -91,8 +103,17 @@ public class MetricsPublisher {
    */
   public void emit(MetricType metricType, String datanode,
                             String name, long amount) {
+    if(scope == null) {
+      LOG.error("Scope is null");
+    }
+
     if (scope != null && datanode != null && datanode.length() != 0) {
       try {
+        if (System.currentTimeMillis() - lastMetricLogTime > 60 * 1000) { // 60 seconds
+          LOG.info("emitting metrics...");
+          lastMetricLogTime = System.currentTimeMillis();
+        }
+
         Scope dnScope = dnSubscopeCache.get(datanode);
         switch (metricType) {
           case GAUGE:
