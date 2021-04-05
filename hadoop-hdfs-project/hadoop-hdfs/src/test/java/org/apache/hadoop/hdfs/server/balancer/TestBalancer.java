@@ -2033,7 +2033,8 @@ public class TestBalancer {
       maxUsage = Math.max(maxUsage, datanodeReport[i].getDfsUsed());
     }
 
-    assertEquals(200, balancerResult.bytesAlreadyMoved);
+    assertTrue(balancerResult.bytesAlreadyMoved == 200
+        || balancerResult.bytesAlreadyMoved == 250);
     // 100% and 95% used nodes will be balanced, so top used will be 900
     assertEquals(900, maxUsage);
   }
