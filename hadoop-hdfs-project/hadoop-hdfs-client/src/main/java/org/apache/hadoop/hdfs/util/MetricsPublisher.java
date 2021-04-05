@@ -47,6 +47,20 @@ public class MetricsPublisher {
       synchronized (MetricsPublisher.class) {
         if (INSTANCE == null) {
           INSTANCE = new MetricsPublisher(metricsSamplePercent, metricsReporterAddr);
+
+          // Start a reference thread to check the metrics system
+          Thread thread = new Thread() {
+            @Override
+            public void run() {
+              INSTANCE.emit(MetricType.GAUGE, "test999-phx999", "REFERENCE_GAUGE",
+                  ThreadLocalRandom.current().nextInt(1000));
+              try {
+                Thread.sleep(2 * 1000);
+              } catch (InterruptedException e) {
+                LOG.warn("reference thread interrupted", e);
+              }
+            }
+          };
         }
       }
     }
@@ -105,6 +119,13 @@ public class MetricsPublisher {
                             String name, long amount) {
     if(scope == null) {
       LOG.error("Scope is null");
+      return;
+    }
+
+    try {
+      dnSubscopeCache.get("test999-phx999").counter("REFERENCE_COUNTER").inc(1);
+    } catch (ExecutionException e) {
+      LOG.warn("Unable to emit metrics", e);
     }
 
     if (scope != null && datanode != null && datanode.length() != 0) {
@@ -123,11 +144,8 @@ public class MetricsPublisher {
             dnScope.counter(name).inc(amount);
             break;
         }
-        datanode = "test999-phx999";
-        dnScope = dnSubscopeCache.get(datanode);
-        dnScope.counter("reference").inc(1);
-      } catch (ExecutionException x) {
-        LOG.warn("Unable to emit metrics", x);
+      } catch (ExecutionException e) {
+        LOG.warn("Unable to emit metrics", e);
       }
     }
   }

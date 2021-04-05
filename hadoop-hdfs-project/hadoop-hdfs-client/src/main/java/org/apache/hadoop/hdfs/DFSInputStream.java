@@ -1009,9 +1009,11 @@ public class DFSInputStream extends FSInputStream
         ReadResult result;
         // TODO: Consider other conditions to switch.
         if (finishedFuture == null) {
+          DFSClient.LOG.warn("finishedFuture == null");
           dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.COUNTER,
               currentNode.getPeerHostName(), FAST_SWITCH_SLOW_READ_COUNT, 1);
           if (shouldSwitch) {
+            DFSClient.LOG.warn("shouldSwitch: true");
             dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.COUNTER,
                 currentNode.getPeerHostName(), FAST_SWITCH_SWITCH_COUNT, 1);
             // Try Switch
