@@ -19,4 +19,4 @@ set -e               # exit on error
 
 MAVEN_OPTS="-Xms256m -Xmx1536m" mvn clean install -DskipTests -T 32
 cd hadoop-hdfs-project
-MAVEN_OPTS="-Xms256m -Xmx1536m" mvn clean test -fn -Pparallel-tests
+MAVEN_OPTS="-Xms256m -Xmx1536m" mvn clean test -fn -Pparallel-tests -pl :hadoop-hdfs-rbf
