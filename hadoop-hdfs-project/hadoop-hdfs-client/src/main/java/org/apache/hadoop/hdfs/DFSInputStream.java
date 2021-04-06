@@ -137,6 +137,7 @@ public class DFSInputStream extends FSInputStream
 
   private final boolean useFastSwitch;
   private ExecutorService bufferReaderExecutor;
+  private CompletionService<ReadResult> executorCompletionService;
   // TODO: slownodes should have a expiration time.
   private Set<DatanodeInfo> slownodes = new HashSet<>();
   // Should we switch for current block.
@@ -306,9 +307,11 @@ public class DFSInputStream extends FSInputStream
     if (dfsClient.getConf().isFastSwitchReadEnabled()) {
       useFastSwitch = true;
       shouldSwitch = true;
+      // TODO: Consider if we should use something else rather than FixedThreadPool.
       bufferReaderExecutor =
           Executors.newFixedThreadPool(
               dfsClient.getConf().getFastSwitchThreadpoolSize());
+      executorCompletionService = new ExecutorCompletionService<>(bufferReaderExecutor);
     } else {
       useFastSwitch = false;
     }
@@ -960,22 +963,19 @@ public class DFSInputStream extends FSInputStream
     boolean retryCurrentNode = true;
     // Current reader future
     Future<ReadResult> currentFuture = null;
-    // TODO: We probably should not creating a completion service so many time.
-    //       Maybe moving it outside.
-    CompletionService<ReadResult> executorCompletionService = null;
 
     boolean sourceFound;
 
     while (true) {
       try {
         if (currentFuture == null) {
-          executorCompletionService = new ExecutorCompletionService<>(bufferReaderExecutor);
           Callable<ReadResult> readAction = doRead(reader, off, len);
           currentFuture = executorCompletionService.submit(readAction);
         }
         Future<ReadResult> finishedFuture = executorCompletionService.poll(
             dfsClient.getConf().getFastSwitchThreshold(), TimeUnit.MILLISECONDS);
-        // Ignore result of previous futures. They were likely finished before cancellation.
+        // Make sure we are reading from correct future.
+        // They were likely finished before cancellation.
         if (finishedFuture != null && finishedFuture != currentFuture) {
           continue;
         }
