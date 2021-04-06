@@ -58,19 +58,14 @@ public class MetricsPublisher {
     } catch (Exception e) {
       LOG.error("Unable to initialize m3 client.", e);
     }
+    if (scope == null) { // in case creation failed silently
+      LOG.error("Unable to initialize m3 client.");
+      return;
+    }
+
     dnSubscopeCache = CacheBuilder.newBuilder()
         .maximumSize(5000)
         .expireAfterAccess(5, TimeUnit.MINUTES)
-        .removalListener(new RemovalListener<String, Scope>() {
-          @Override
-          public void onRemoval(RemovalNotification<String, Scope> ntc) {
-            try {
-              ntc.getValue().close();
-            } catch (ScopeCloseException e) {
-              LOG.warn("failed to close scope", e);
-            }
-          }
-        })
         .build(new CacheLoader<String, Scope>() {
           @Override
           public Scope load(String datanode) {
@@ -91,7 +86,12 @@ public class MetricsPublisher {
    */
   public void emit(MetricType metricType, String datanode,
                             String name, long amount) {
-    if (scope != null && datanode != null && datanode.length() != 0) {
+    if (datanode == null || datanode.length() == 0) {
+      LOG.warn("emit is called with empty datanode.");
+      return;
+    }
+
+    if (scope != null) {
       try {
         Scope dnScope = dnSubscopeCache.get(datanode);
         switch (metricType) {
