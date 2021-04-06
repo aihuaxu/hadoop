@@ -31,6 +31,7 @@ import org.apache.hadoop.fs.CreateFlag;
 import org.apache.hadoop.fs.FsServerDefaults;
 import org.apache.hadoop.fs.Options.Rename;
 import org.apache.hadoop.fs.QuotaUsage;
+import org.apache.hadoop.hdfs.protocol.BadDataNodeInfo;
 import org.apache.hadoop.hdfs.protocol.BlockStoragePolicy;
 import org.apache.hadoop.hdfs.protocol.CacheDirectiveEntry;
 import org.apache.hadoop.hdfs.protocol.CacheDirectiveInfo;
@@ -150,6 +151,8 @@ import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.ListCo
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.ListCorruptFileBlocksResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.ListOpenFilesRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.ListOpenFilesResponseProto;
+import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.MarkBadDataNodesRequestProto;
+import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.MarkBadDataNodesResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.MetaSaveRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.MetaSaveResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.MkdirsRequestProto;
@@ -269,6 +272,8 @@ public class ClientNamenodeProtocolServerSideTranslatorPB implements
   static final UnsetStoragePolicyResponseProto
       VOID_UNSET_STORAGE_POLICY_RESPONSE =
       UnsetStoragePolicyResponseProto.newBuilder().build();
+  static final MarkBadDataNodesResponseProto VOID_MARK_BAD_DATANODES_RESPONSE =
+          MarkBadDataNodesResponseProto.newBuilder().build();
 
   private static final CreateResponseProto VOID_CREATE_RESPONSE = 
   CreateResponseProto.newBuilder().build();
@@ -1621,6 +1626,18 @@ public class ClientNamenodeProtocolServerSideTranslatorPB implements
       GetRemoteLocationResponseProto.Builder builder = GetRemoteLocationResponseProto.newBuilder();
       builder.addAllResolvedPaths(resolvedPathStrs);
       return builder.build();
+    } catch (IOException e) {
+      throw new ServiceException(e);
+    }
+  }
+
+  @Override
+  public MarkBadDataNodesResponseProto markBadDataNodes(RpcController controller,
+          MarkBadDataNodesRequestProto request) throws ServiceException {
+    try {
+      BadDataNodeInfo[] nodesInfo = PBHelperClient.convertBadDataNodeInfoArray(request);
+      server.markBadDataNodes(nodesInfo);
+      return VOID_MARK_BAD_DATANODES_RESPONSE;
     } catch (IOException e) {
       throw new ServiceException(e);
     }

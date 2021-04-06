@@ -1563,4 +1563,19 @@ public interface ClientProtocol {
    */
   @Idempotent
   List<Path> getRemoteLocation(String src) throws IOException;
+
+  /**
+   * This API provides a solution handling possible slow/bad DataNodes.
+   * These DataNodes potentially have hardware issues (e.g., slow or bad hard
+   * disks) and will be decommissioned in the future. Admin uses this API to
+   * mark these DataNodes as "bad" ones so that NameNode can de-prioritize them
+   * for reading. This API can also be called to reset DataNode states as
+   * "back to normal".
+   *
+   * Note this information is only hold in NameNode memory and will not be
+   * persisted in EditLogs. We expect an external tool run by admin to keep
+   * updating the bad DataNode list in all the NameNodes.
+   */
+  @Idempotent
+  void markBadDataNodes(BadDataNodeInfo[] nodesInfo) throws IOException;
 }

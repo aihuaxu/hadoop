@@ -4375,15 +4375,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
   }
 
   /**
-   * This method provides a temporary solution handling possible slow/bad
-   * DataNodes. These DataNodes potentially have hardware issues (e.g., slow or
-   * bad hard disks) and will be decommissioned in the future. We use this
-   * method to mark these DataNodes as "bad" ones and de-prioritize them for
-   * reading.
-   *
-   * Note this information is only hold in NameNode memory and will not be
-   * included in editlogs. We expect an external tool run by admin to keep
-   * reporting the bad DataNode list to all the NameNodes in the cluster.
+   * @see ClientProtocol#markBadDataNodes(BadDataNodeInfo[]) 
    */
   @VisibleForTesting
   public void markBadDataNodes(BadDataNodeInfo[] nodesInfo) throws IOException {
@@ -4395,7 +4387,7 @@ public class FSNamesystem implements Namesystem, FSNamesystemMBean,
     } finally {
       writeUnlock("markBadDataNodes");
     }
-    LOG.info("Got bad DataNodes reports: " + Arrays.asList(nodesInfo));
+    LOG.info("Got bad datanode reports containing " + nodesInfo.length + " nodes.");
   }
 
   void setBalancerBandwidth(long bandwidth) throws IOException {

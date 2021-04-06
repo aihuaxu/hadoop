@@ -46,6 +46,6 @@ public class BadDataNodeInfo {
   @Override
   public String toString() {
     return ipAddr + ":" + xferPort + ":" +
-            (reportedBad ? "set to bad" : "reset to normal");
+            (reportedBad ? "bad" : "normal");
   }
 }

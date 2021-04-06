@@ -116,6 +116,12 @@ message DatanodeStorageProto {
   optional StorageTypeProto storageType = 3 [default = DISK];
 }
 
+message BadDataNodeInfoProto {
+  optional string ipAddr = 1;
+  optional uint32 xferPort = 2;
+  optional bool reportedBad = 3;
+}
+
 message StorageReportProto {
   required string storageUuid = 1 [ deprecated = true ];
   optional bool failed = 2 [ default = false ];

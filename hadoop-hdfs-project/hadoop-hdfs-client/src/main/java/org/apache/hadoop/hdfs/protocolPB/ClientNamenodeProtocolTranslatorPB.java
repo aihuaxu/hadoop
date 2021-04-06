@@ -49,6 +49,7 @@ import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.AddBlockFlag;
 import org.apache.hadoop.hdfs.inotify.EventBatchList;
 import org.apache.hadoop.hdfs.protocol.BlockStoragePolicy;
+import org.apache.hadoop.hdfs.protocol.BadDataNodeInfo;
 import org.apache.hadoop.hdfs.protocol.CacheDirectiveEntry;
 import org.apache.hadoop.hdfs.protocol.CacheDirectiveInfo;
 import org.apache.hadoop.hdfs.protocol.CachePoolEntry;
@@ -140,6 +141,8 @@ import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.ListCa
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.ListCorruptFileBlocksRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.ListOpenFilesRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.ListOpenFilesResponseProto;
+import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.MarkBadDataNodesRequestProto;
+import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.MarkBadDataNodesResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.MetaSaveRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.MkdirsRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.ModifyCacheDirectiveRequestProto;
@@ -177,6 +180,7 @@ import org.apache.hadoop.hdfs.protocol.proto.EncryptionZonesProtos.CreateEncrypt
 import org.apache.hadoop.hdfs.protocol.proto.EncryptionZonesProtos.EncryptionZoneProto;
 import org.apache.hadoop.hdfs.protocol.proto.EncryptionZonesProtos.GetEZForPathRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.EncryptionZonesProtos.ListEncryptionZonesRequestProto;
+import org.apache.hadoop.hdfs.protocol.proto.HdfsProtos.BadDataNodeInfoProto;
 import org.apache.hadoop.hdfs.protocol.proto.XAttrProtos.GetXAttrsRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.XAttrProtos.ListXAttrsRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.XAttrProtos.RemoveXAttrRequestProto;
@@ -1643,6 +1647,26 @@ public class ClientNamenodeProtocolTranslatorPB implements
       GetRemoteLocationResponseProto resp = rpcProxy.getRemoteLocation(null, req);
       if (resp.getResolvedPathsCount() == 0) throw new RuntimeException("No result path found");
       return PBHelperClient.convertResolvedPathStrs(resp.getResolvedPathsList());
+    } catch (ServiceException e) {
+      throw ProtobufHelper.getRemoteException(e);
+    }
+  }
+
+  @Override
+  public void markBadDataNodes(BadDataNodeInfo[] nodesInfo) throws IOException {
+    MarkBadDataNodesRequestProto.Builder builder =
+            MarkBadDataNodesRequestProto.newBuilder();
+    for (BadDataNodeInfo node : nodesInfo) {
+      BadDataNodeInfoProto nodeProto = BadDataNodeInfoProto.newBuilder()
+              .setIpAddr(node.getIpAddr())
+              .setXferPort(node.getXferPort())
+              .setReportedBad(node.isReportedBad())
+              .build();
+      builder.addNodes(nodeProto);
+    }
+    MarkBadDataNodesRequestProto request = builder.build();
+    try {
+      rpcProxy.markBadDataNodes(null, request);
     } catch (ServiceException e) {
       throw ProtobufHelper.getRemoteException(e);
     }

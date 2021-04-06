@@ -105,6 +105,7 @@ import org.apache.hadoop.hdfs.client.impl.DfsClientConf;
 import org.apache.hadoop.hdfs.client.impl.LeaseRenewer;
 import org.apache.hadoop.hdfs.net.Peer;
 import org.apache.hadoop.hdfs.protocol.AclException;
+import org.apache.hadoop.hdfs.protocol.BadDataNodeInfo;
 import org.apache.hadoop.hdfs.protocol.BlockStoragePolicy;
 import org.apache.hadoop.hdfs.protocol.CacheDirectiveEntry;
 import org.apache.hadoop.hdfs.protocol.CacheDirectiveInfo;
@@ -2247,6 +2248,15 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
   void saveNamespace() throws IOException {
     try (TraceScope ignored = tracer.newScope("saveNamespace")) {
       namenode.saveNamespace();
+    } catch (RemoteException re) {
+      throw re.unwrapRemoteException(AccessControlException.class);
+    }
+  }
+
+  void markBadDataNodes(BadDataNodeInfo[] nodesInfo) throws IOException {
+    checkOpen();
+    try (TraceScope ignored = tracer.newScope("markBadDataNodes")) {
+      namenode.markBadDataNodes(nodesInfo);
     } catch (RemoteException re) {
       throw re.unwrapRemoteException(AccessControlException.class);
     }

@@ -782,6 +782,13 @@ message GetRemoteLocationResponseProto {
   repeated string resolvedPaths = 1;
 }
 
+message MarkBadDataNodesRequestProto {
+  repeated BadDataNodeInfoProto nodes = 1;
+}
+
+message MarkBadDataNodesResponseProto {
+}
+
 service ClientNamenodeProtocol {
   rpc getBlockLocations(GetBlockLocationsRequestProto)
       returns(GetBlockLocationsResponseProto);
@@ -940,4 +947,6 @@ service ClientNamenodeProtocol {
       returns(BlackListUserResponseProto);
   rpc getRemoteLocation(GetRemoteLocationRequestProto)
       returns(GetRemoteLocationResponseProto);
+  rpc markBadDataNodes(MarkBadDataNodesRequestProto)
+      returns(MarkBadDataNodesResponseProto);
 }

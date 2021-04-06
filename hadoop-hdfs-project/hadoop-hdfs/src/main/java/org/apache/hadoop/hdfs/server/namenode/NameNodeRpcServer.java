@@ -84,6 +84,7 @@ import org.apache.hadoop.hdfs.inotify.EventBatch;
 import org.apache.hadoop.hdfs.inotify.EventBatchList;
 import org.apache.hadoop.hdfs.protocol.AclException;
 import org.apache.hadoop.hdfs.protocol.AlreadyBeingCreatedException;
+import org.apache.hadoop.hdfs.protocol.BadDataNodeInfo;
 import org.apache.hadoop.hdfs.protocol.BlockListAsLongs;
 import org.apache.hadoop.hdfs.protocol.BlockStoragePolicy;
 import org.apache.hadoop.hdfs.protocol.CacheDirectiveEntry;
@@ -2226,5 +2227,11 @@ public class NameNodeRpcServer implements NamenodeProtocols {
   @Override // ClientProtocol
   public List<Path> getRemoteLocation(String src) throws IOException {
     throw new NotImplementedException("getRemoteLocation is not implemented in Namenode RPC server. It's intended to be sent to HDFS router");
+  }
+
+  @Override // ClientProtocol
+  public void markBadDataNodes(BadDataNodeInfo[] nodesInfo) throws IOException {
+    checkNNStartup();
+    namesystem.markBadDataNodes(nodesInfo);
   }
 }

@@ -1680,6 +1680,11 @@ public class DatanodeManager {
               node.getXferPort());
       if (datanodeInfo != null) {
         datanodeInfo.setReportedBad(node.isReportedBad());
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Updated datanode reportedBad state: " + node);
+        }
+      } else {
+        LOG.warn("Could not find datanode for bad datanode report " + node);
       }
     }
   }
