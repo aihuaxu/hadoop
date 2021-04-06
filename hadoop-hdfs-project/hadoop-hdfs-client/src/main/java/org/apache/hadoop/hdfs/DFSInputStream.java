@@ -143,7 +143,7 @@ public class DFSInputStream extends FSInputStream
    */
   private IdentityHashStore<ByteBuffer, Object> extendedReadBuffers;
 
-  private static final String NUM_IOEXCEPTIONS = "hdfs_client_num_IOExceptions";
+  private static final String NUM_IOEXCEPTIONS = "client.dn.num_ioexceptions";
 
   private synchronized IdentityHashStore<ByteBuffer, Object>
         getExtendedReadBuffers() {
@@ -918,7 +918,7 @@ public class DFSInputStream extends FSInputStream
         }
         ioe = e;
         dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.COUNTER,
-            currentNode.getPeerHostName(), NUM_IOEXCEPTIONS, 1);
+            currentNode.getHostName(), NUM_IOEXCEPTIONS, 1);
       }
       boolean sourceFound;
       if (retryCurrentNode) {

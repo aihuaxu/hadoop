@@ -91,7 +91,7 @@ public class BlockReaderRemote2 implements BlockReader {
   static final Logger LOG = LoggerFactory.getLogger(BlockReaderRemote2.class);
   static final int TCP_WINDOW_SIZE = 128 * 1024; // 128 KB;
 
-  private final Peer peer;
+  final private Peer peer;
   final private DatanodeID datanodeID;
   final private PeerCache peerCache;
   final private long blockId;
@@ -136,8 +136,8 @@ public class BlockReaderRemote2 implements BlockReader {
   private long totalBytesRead;
   private long totalTimeRead; // in nano seconds
   private long maxTimePackageRead; // in nano seconds
-  private static final String MAX_PKG_LATENCY = "hdfs_client_dn_max_pkg_latency";
-  private static final String AVG_THROUGHPUT = "hdfs_client_dn_avg_throughput";
+  private static final String MAX_PKG_LATENCY = "client.dn.max_pkg_latency";
+  private static final String AVG_THROUGHPUT = "client.dn.read_throughput";
 
   @VisibleForTesting
   public Peer getPeer() {
@@ -323,7 +323,8 @@ public class BlockReaderRemote2 implements BlockReader {
 
   @Override
   public synchronized void close() throws IOException {
-    if (totalTimeRead != 0 && metricsPublisher.shallIEmit()) {
+    if (metricsPublisher != null && totalTimeRead != 0
+        && metricsPublisher.shallIEmit()) {
       String dnHost = datanodeID.getHostName();
       metricsPublisher.emit(MetricsPublisher.MetricType.GAUGE, dnHost,
           MAX_PKG_LATENCY, maxTimePackageRead);
