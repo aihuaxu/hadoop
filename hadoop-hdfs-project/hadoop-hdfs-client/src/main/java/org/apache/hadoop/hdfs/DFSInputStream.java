@@ -87,6 +87,7 @@ import org.apache.hadoop.security.token.SecretManager.InvalidToken;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.IdentityHashStore;
 import org.apache.hadoop.util.StopWatch;
+import org.apache.hadoop.util.Time;
 import org.apache.htrace.core.SpanId;
 import org.apache.htrace.core.TraceScope;
 import org.apache.htrace.core.Tracer;
@@ -174,6 +175,8 @@ public class DFSInputStream extends FSInputStream
   private IdentityHashStore<ByteBuffer, Object> extendedReadBuffers;
 
   private static final String NUM_IOEXCEPTIONS = "client.dn.num_ioexceptions";
+  private static final String SLOW_BUFFER_READ = "client.slow_buffer_read";
+  private static final String NUM_SLOW_BUFFER_READ = "client.num_slow_buffer_read";
 
   private synchronized IdentityHashStore<ByteBuffer, Object>
         getExtendedReadBuffers() {
@@ -1151,10 +1154,18 @@ public class DFSInputStream extends FSInputStream
           }
 
           int result;
+          long tick = Time.monotonicNow();
           if (useFastSwitch) {
             result = readBufferFastSwitch(strategy, off, realLen, corruptedBlockMap);
           } else {
             result = readBuffer(strategy, off, realLen, corruptedBlockMap);
+          }
+          long span = Time.monotonicNow() - tick;
+          if (span > dfsClient.getConf().getMetricsReadBufferEmitThrh()) {
+            dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.COUNTER,
+                NUM_SLOW_BUFFER_READ, 1);
+            dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.GAUGE,
+                SLOW_BUFFER_READ, span);
           }
 
           if (result >= 0) {
