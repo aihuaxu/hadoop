@@ -174,9 +174,9 @@ public class DFSInputStream extends FSInputStream
    */
   private IdentityHashStore<ByteBuffer, Object> extendedReadBuffers;
 
-  private static final String NUM_IOEXCEPTIONS = "client.dn.num_ioexceptions";
-  private static final String SLOW_BUFFER_READ = "client.slow_buffer_read";
-  private static final String NUM_SLOW_BUFFER_READ = "client.num_slow_buffer_read";
+  private static final String READ_NUM_EXCEPTIONS = "client.read.num_exceptions";
+  private static final String SLOW_READ_TIME = "client.slow_read_time";
+  private static final String NUM_SLOW_READ = "client.num_slow_read";
 
   private synchronized IdentityHashStore<ByteBuffer, Object>
         getExtendedReadBuffers() {
@@ -1105,7 +1105,7 @@ public class DFSInputStream extends FSInputStream
         }
         ioe = e;
         dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.COUNTER,
-            currentNode.getHostName(), NUM_IOEXCEPTIONS, 1);
+            currentNode.getHostName(), READ_NUM_EXCEPTIONS, 1);
       }
       boolean sourceFound;
       if (retryCurrentNode) {
@@ -1161,11 +1161,11 @@ public class DFSInputStream extends FSInputStream
             result = readBuffer(strategy, off, realLen, corruptedBlockMap);
           }
           long span = Time.monotonicNow() - tick;
-          if (span > dfsClient.getConf().getMetricsReadBufferEmitThrh()) {
+          if (span > dfsClient.getConf().getMetricsReadEmitThreshold()) {
             dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.COUNTER,
-                NUM_SLOW_BUFFER_READ, 1);
+                NUM_SLOW_READ, 1);
             dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.GAUGE,
-                SLOW_BUFFER_READ, span);
+                SLOW_READ_TIME, span);
           }
 
           if (result >= 0) {

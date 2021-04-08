@@ -27,7 +27,6 @@ import java.nio.ByteBuffer;
 import java.nio.channels.ReadableByteChannel;
 import java.util.EnumSet;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.fs.ReadOption;
@@ -139,10 +138,10 @@ public class BlockReaderRemote2 implements BlockReader {
   /**
    * Metrics
    */
-  private long totalTimeRead; // in nano seconds
-  private long maxTimePackageRead; // in nano seconds
-  private static final String MAX_PKG_LATENCY = "client.dn.max_pkg_latency";
-  private static final String BLOCK_READ_TIME = "client.dn.block_read_time";
+  private long totalTime; // in nano seconds
+  private long maxPacketTime; // in nano seconds
+  private static final String MAX_PACKET_TIME = "client.blkreader.max_packet_time";
+  private static final String TOTAL_TIME = "client.blkreader.total_time";
 
   @VisibleForTesting
   public Peer getPeer() {
@@ -328,13 +327,13 @@ public class BlockReaderRemote2 implements BlockReader {
 
   @Override
   public synchronized void close() throws IOException {
-    if (metricsPublisher != null && totalTimeRead != 0
+    if (metricsPublisher != null && totalTime > 0
         && metricsPublisher.shallIEmit()) {
       String dnHost = datanodeID.getHostName();
       metricsPublisher.emit(MetricsPublisher.MetricType.GAUGE, dnHost,
-          MAX_PKG_LATENCY, maxTimePackageRead);
+          MAX_PACKET_TIME, maxPacketTime);
       metricsPublisher.emit(MetricsPublisher.MetricType.GAUGE, dnHost,
-          BLOCK_READ_TIME, totalTimeRead);
+          TOTAL_TIME, totalTime);
     }
 
     packetReceiver.close();
@@ -498,8 +497,8 @@ public class BlockReaderRemote2 implements BlockReader {
     return null;
   }
 
-  private void updateMetrics(long bytesRead, long timeRead) {
-    totalTimeRead += timeRead;
-    maxTimePackageRead = Math.max(maxTimePackageRead, timeRead);
+  private void updateMetrics(long timeRead) {
+    totalTime += timeRead;
+    maxPacketTime = Math.max(maxPacketTime, timeRead);
   }
 }
