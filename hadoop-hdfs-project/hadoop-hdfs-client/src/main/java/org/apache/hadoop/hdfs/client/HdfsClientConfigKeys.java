@@ -205,9 +205,9 @@ public interface HdfsClientConfigKeys {
   String DFS_CLIENT_METRICS_REPORTER_ADDR_DEFAULT =
       "localhost:9052";
 
-  String DFS_CLIENT_METRICS_EMIT_READ_BUFFER_TIME_THRESHOLD_KEY =
-      "dfs.client.metrics.emit.read-buffer-time.threshold.ms";
-  int DFS_CLIENT_METRICS_EMIT_READ_BUFFER_TIME_THRESHOLD_DEFAULT = 1000;
+  String DFS_CLIENT_METRICS_EMIT_READ_TIME_THRESHOLD_KEY =
+      "dfs.client.metrics.emit.read-time.threshold.ms";
+  int DFS_CLIENT_METRICS_EMIT_READ_TIME_THRESHOLD_DEFAULT = 1000;
 
   /**
    * These are deprecated config keys to client code.

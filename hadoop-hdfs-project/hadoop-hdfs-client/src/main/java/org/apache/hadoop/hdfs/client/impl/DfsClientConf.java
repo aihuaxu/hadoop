@@ -145,7 +145,7 @@ public class DfsClientConf {
 
   private final int metricsSamplePercent;
   private final String metricsReporterAddr;
-  private final int metricsReadBufferEmitThrh;
+  private final int metricsReadEmitThreshold;
 
 
   public DfsClientConf(Configuration conf) {
@@ -280,9 +280,9 @@ public class DfsClientConf {
         HdfsClientConfigKeys.DFS_CLIENT_METRICS_REPORTER_ADDR_KEY,
         HdfsClientConfigKeys.DFS_CLIENT_METRICS_REPORTER_ADDR_DEFAULT);
 
-    metricsReadBufferEmitThrh = conf.getInt(
-        HdfsClientConfigKeys.DFS_CLIENT_METRICS_EMIT_READ_BUFFER_TIME_THRESHOLD_KEY,
-        HdfsClientConfigKeys.DFS_CLIENT_METRICS_EMIT_READ_BUFFER_TIME_THRESHOLD_DEFAULT
+    metricsReadEmitThreshold = conf.getInt(
+        HdfsClientConfigKeys.DFS_CLIENT_METRICS_EMIT_READ_TIME_THRESHOLD_KEY,
+        HdfsClientConfigKeys.DFS_CLIENT_METRICS_EMIT_READ_TIME_THRESHOLD_DEFAULT
     );
   }
 
@@ -635,10 +635,10 @@ public class DfsClientConf {
   }
 
   /**
-   * @return the metricsReadBufferEmitThrh
+   * @return the metricsReadEmitThreshold
    */
-  public int getMetricsReadBufferEmitThrh() {
-    return metricsReadBufferEmitThrh;
+  public int getMetricsReadEmitThreshold() {
+    return metricsReadEmitThreshold;
   }
 
   /**
