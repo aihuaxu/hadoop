@@ -145,6 +145,8 @@ public class DfsClientConf {
 
   private final int metricsSamplePercent;
   private final String metricsReporterAddr;
+  private final int metricsReadBufferEmitThrh;
+
 
   public DfsClientConf(Configuration conf) {
     // The hdfsTimeout is currently the same as the ipc timeout
@@ -277,6 +279,11 @@ public class DfsClientConf {
     metricsReporterAddr = conf.get(
         HdfsClientConfigKeys.DFS_CLIENT_METRICS_REPORTER_ADDR_KEY,
         HdfsClientConfigKeys.DFS_CLIENT_METRICS_REPORTER_ADDR_DEFAULT);
+
+    metricsReadBufferEmitThrh = conf.getInt(
+        HdfsClientConfigKeys.DFS_CLIENT_METRICS_EMIT_READ_BUFFER_TIME_THRESHOLD_KEY,
+        HdfsClientConfigKeys.DFS_CLIENT_METRICS_EMIT_READ_BUFFER_TIME_THRESHOLD_DEFAULT
+    );
   }
 
   @SuppressWarnings("unchecked")
@@ -625,6 +632,13 @@ public class DfsClientConf {
    */
   public String getMetricsReporterAddr() {
     return metricsReporterAddr;
+  }
+
+  /**
+   * @return the metricsReadBufferEmitThrh
+   */
+  public int getMetricsReadBufferEmitThrh() {
+    return metricsReadBufferEmitThrh;
   }
 
   /**

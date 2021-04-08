@@ -51,6 +51,7 @@ import org.apache.hadoop.hdfs.shortcircuit.ClientMmap;
 import org.apache.hadoop.hdfs.util.MetricsPublisher;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.DataChecksum;
+import org.apache.hadoop.util.Time;
 import org.apache.htrace.core.TraceScope;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -133,11 +134,10 @@ public class BlockReaderRemote2 implements BlockReader {
   /**
    * Metrics
    */
-  private long totalBytesRead;
   private long totalTimeRead; // in nano seconds
   private long maxTimePackageRead; // in nano seconds
   private static final String MAX_PKG_LATENCY = "client.dn.max_pkg_latency";
-  private static final String AVG_THROUGHPUT = "client.dn.read_throughput";
+  private static final String BLOCK_READ_TIME = "client.dn.block_read_time";
 
   @VisibleForTesting
   public Peer getPeer() {
@@ -198,14 +198,13 @@ public class BlockReaderRemote2 implements BlockReader {
 
   private void readNextPacket() throws IOException {
     //Read packet headers.
-    long timeRead = System.nanoTime();
+    long nanoTick = Time.monotonicNowNanos();
     packetReceiver.receiveNextPacket(in);
-    timeRead = System.nanoTime() - timeRead;
+    updateMetrics(Time.monotonicNowNanos() - nanoTick);
 
     PacketHeader curHeader = packetReceiver.getHeader();
     curDataSlice = packetReceiver.getDataSlice();
     assert curDataSlice.capacity() == curHeader.getDataLen();
-    updateMetrics(curDataSlice.capacity(), timeRead);
 
     LOG.trace("DFSClient readNextPacket got header {}", curHeader);
 
@@ -329,8 +328,7 @@ public class BlockReaderRemote2 implements BlockReader {
       metricsPublisher.emit(MetricsPublisher.MetricType.GAUGE, dnHost,
           MAX_PKG_LATENCY, maxTimePackageRead);
       metricsPublisher.emit(MetricsPublisher.MetricType.GAUGE, dnHost,
-          AVG_THROUGHPUT,
-          TimeUnit.SECONDS.toNanos(totalBytesRead) / totalTimeRead);
+          BLOCK_READ_TIME, totalTimeRead);
     }
 
     packetReceiver.close();
@@ -496,8 +494,7 @@ public class BlockReaderRemote2 implements BlockReader {
     return networkDistance;
   }
 
-  private void updateMetrics(long bytesRead, long timeRead) {
-    totalBytesRead += bytesRead;
+  private void updateMetrics(long timeRead) {
     totalTimeRead += timeRead;
     maxTimePackageRead = Math.max(maxTimePackageRead, timeRead);
   }
