@@ -54,7 +54,7 @@ public class MetricsPublisher {
     this.metricsSamplePercent = metricsSamplePercent;
 
     try {
-      scope = createM3Client(metricsReporterAddr);
+      scope = createM3Client(metricsReporterAddr, false);
     } catch (Exception e) {
       LOG.error("Unable to initialize m3 client.", e);
     }
@@ -108,12 +108,26 @@ public class MetricsPublisher {
     }
   }
 
+  public void emit(MetricType metricType, String name, long amount) {
+    if (scope != null) {
+      switch (metricType) {
+        case GAUGE:
+          scope.gauge(name).update(amount);
+          break;
+        case COUNTER:
+          scope.counter(name).inc(amount);
+          break;
+      }
+    }
+  }
+
+
   public enum MetricType {
     GAUGE,
     COUNTER
   }
 
-  private static Scope createM3Client(String metricsReporterAddr) {
+  private static Scope createM3Client(String metricsReporterAddr, boolean includeHost) {
     ImmutableMap.Builder<String, String> tagsBuilder = new ImmutableMap.Builder<>();
     tagsBuilder.put(M3Reporter.SERVICE_TAG, SERVICE_NAME);
 
@@ -130,7 +144,7 @@ public class MetricsPublisher {
         new M3Reporter.Builder(new InetSocketAddress(hostname, port))
             // must set to false. otherwise total cardinality would be greater
             // than 100K which would cause an m3 ban
-            .includeHost(false)
+            .includeHost(includeHost)
             .commonTags(tagsBuilder.build())
             .build();
 
