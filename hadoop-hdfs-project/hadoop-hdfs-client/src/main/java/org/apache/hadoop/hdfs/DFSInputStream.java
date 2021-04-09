@@ -146,6 +146,8 @@ public class DFSInputStream extends FSInputStream
   private static final String READ_NUM_EXCEPTIONS = "client.read.num_exceptions";
   private static final String SLOW_READ_TIME = "client.slow_read_time";
   private static final String NUM_SLOW_READ = "client.num_slow_read";
+  private static final String SLOW_PREAD_TIME = "client.slow_pread_time";
+  private static final String NUM_SLOW_PREAD = "client.num_slow_pread";
 
   private synchronized IdentityHashStore<ByteBuffer, Object>
         getExtendedReadBuffers() {
@@ -945,16 +947,7 @@ public class DFSInputStream extends FSInputStream
                   locatedBlocks.getFileLength() - pos);
             }
           }
-          long tick = Time.monotonicNow();
           int result = readBuffer(strategy, off, realLen, corruptedBlockMap);
-          long span = Time.monotonicNow() - tick;
-          if (span > dfsClient.getConf().getMetricsReadEmitThreshold()) {
-            dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.COUNTER,
-                NUM_SLOW_READ, 1);
-            dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.GAUGE,
-                SLOW_READ_TIME, span);
-          }
-
           if (result >= 0) {
             pos += result;
           } else {
@@ -997,20 +990,28 @@ public class DFSInputStream extends FSInputStream
     if (len == 0) {
       return 0;
     }
+    long startTick = Time.monotonicNow();
     ReaderStrategy byteArrayReader = new ByteArrayStrategy(buf);
+    int bytes;
     try (TraceScope ignored =
              dfsClient.newPathTraceScope("DFSInputStream#byteArrayRead", src)) {
-      return readWithStrategy(byteArrayReader, off, len);
+      bytes = readWithStrategy(byteArrayReader, off, len);
     }
+    emitReadMetrics(startTick);
+    return bytes;
   }
 
   @Override
   public synchronized int read(final ByteBuffer buf) throws IOException {
     ReaderStrategy byteBufferReader = new ByteBufferStrategy(buf);
+    int bytes;
+    long startTick = Time.monotonicNow();
     try (TraceScope ignored =
              dfsClient.newPathTraceScope("DFSInputStream#byteBufferRead", src)){
-      return readWithStrategy(byteBufferReader, 0, buf.remaining());
+      bytes = readWithStrategy(byteBufferReader, 0, buf.remaining());
     }
+    emitReadMetrics(startTick);
+    return bytes;
   }
 
 
@@ -1509,6 +1510,7 @@ public class DFSInputStream extends FSInputStream
     if ((position < 0) || (position >= filelen)) {
       return -1;
     }
+    long startTick = Time.monotonicNow();
     int realLen = length;
     if ((position + length) > filelen) {
       realLen = (int)(filelen - position);
@@ -1545,6 +1547,7 @@ public class DFSInputStream extends FSInputStream
     if (dfsClient.stats != null) {
       dfsClient.stats.incrementBytesRead(realLen);
     }
+    emitPreadMetrics(startTick);
     return realLen;
   }
 
@@ -1933,5 +1936,25 @@ public class DFSInputStream extends FSInputStream
   @Override
   public synchronized void unbuffer() {
     closeCurrentBlockReaders();
+  }
+
+  private void emitReadMetrics(long startTick) {
+    long span = Time.monotonicNow() - startTick;
+    if (span > dfsClient.getConf().getMetricsReadEmitThreshold()) {
+      dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.COUNTER,
+          NUM_SLOW_READ, 1);
+      dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.GAUGE,
+          SLOW_READ_TIME, span);
+    }
+  }
+
+  private void emitPreadMetrics(long startTick) {
+    long span = Time.monotonicNow() - startTick;
+    if (span > dfsClient.getConf().getMetricsReadEmitThreshold()) {
+      dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.COUNTER,
+          NUM_SLOW_PREAD, 1);
+      dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.GAUGE,
+          SLOW_PREAD_TIME, span);
+    }
   }
 }
