@@ -1605,6 +1605,7 @@ public class PBHelperClient {
     case LIVE: return DatanodeReportTypeProto.LIVE;
     case DEAD: return DatanodeReportTypeProto.DEAD;
     case DECOMMISSIONING: return DatanodeReportTypeProto.DECOMMISSIONING;
+    case MARKEDBAD: return DatanodeReportTypeProto.MARKEDBAD;
     default:
       throw new IllegalArgumentException("Unexpected data type report:" + t);
     }
@@ -1974,6 +1975,7 @@ public class PBHelperClient {
     case LIVE: return DatanodeReportType.LIVE;
     case DEAD: return DatanodeReportType.DEAD;
     case DECOMMISSIONING: return DatanodeReportType.DECOMMISSIONING;
+    case MARKEDBAD: return DatanodeReportType.MARKEDBAD;
     default:
       throw new IllegalArgumentException("Unexpected data type report:" + t);
     }
@@ -2571,7 +2573,7 @@ public class PBHelperClient {
     int i = 0;
     for (BadDataNodeInfoProto proto : request.getNodesList()) {
       nodesInfo[i++] = new BadDataNodeInfo(proto.getIpAddr(),
-              proto.getXferPort(), proto.getReportedBad());
+              proto.getXferPort(), proto.getMarkedBad());
     }
     return nodesInfo;
   }

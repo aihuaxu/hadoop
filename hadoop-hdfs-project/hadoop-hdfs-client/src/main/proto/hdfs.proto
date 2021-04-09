@@ -119,7 +119,7 @@ message DatanodeStorageProto {
 message BadDataNodeInfoProto {
   optional string ipAddr = 1;
   optional uint32 xferPort = 2;
-  optional bool reportedBad = 3;
+  optional bool markedBad = 3;
 }
 
 message StorageReportProto {

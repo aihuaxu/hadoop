@@ -60,7 +60,7 @@ public class TestDFSAdminWithHA {
     for (int i = 0; i < repeat; ++i) {
       expected += string;
     }
-    String errOutput = new String(out.toByteArray(), Charsets.UTF_8);
+    String errOutput = new String(err.toByteArray(), Charsets.UTF_8);
     String output = new String(out.toByteArray(), Charsets.UTF_8);
 
     if (!errOutput.matches(expected) && !output.matches(expected)) {
@@ -176,7 +176,7 @@ public class TestDFSAdminWithHA {
               .toArray(DatanodeDescriptor.EMPTY_ARRAY);
       Assert.assertEquals(2, datanodes.length);
       for (DatanodeInfo node : datanodes) {
-        Assert.assertFalse(node.isReportedBad());
+        Assert.assertFalse(node.isMarkedBad());
       }
     }
 
@@ -199,6 +199,16 @@ public class TestDFSAdminWithHA {
               new boolean[]{true, true});
     }
 
+    // list bad datanodes
+    ret = admin.run(new String[]{"-listBadDataNodes"});
+    Assert.assertEquals(0, ret);
+    String output = new String(out.toByteArray(), Charsets.UTF_8);
+    oldOut.println(output);
+    Assert.assertTrue(output.contains("DataNodes marked as bad (2) in "
+            + cluster.getDfsCluster().getNameNode(0).getNameNodeAddress()));
+    Assert.assertTrue(output.contains("DataNodes marked as bad (2) in "
+            + cluster.getDfsCluster().getNameNode(1).getNameNodeAddress()));
+
     // reset both datanodes to normal
     ret = admin.run(new String[]{"-markBadDataNodes", "-normalNodes",
             addr0 + "," + addr1});
@@ -209,6 +219,16 @@ public class TestDFSAdminWithHA {
       TestDFSAdmin.checkDataNode(datanodeManager, datanodes,
               new boolean[]{false, false});
     }
+
+    // list bad datanodes
+    ret = admin.run(new String[]{"-listBadDataNodes"});
+    Assert.assertEquals(0, ret);
+    output = new String(out.toByteArray(), Charsets.UTF_8);
+    oldOut.println(output);
+    Assert.assertTrue(output.contains("DataNodes marked as bad (0) in "
+            + cluster.getDfsCluster().getNameNode(0).getNameNodeAddress()));
+    Assert.assertTrue(output.contains("DataNodes marked as bad (0) in "
+            + cluster.getDfsCluster().getNameNode(1).getNameNodeAddress()));
   }
 
   @Test (timeout = 30000)

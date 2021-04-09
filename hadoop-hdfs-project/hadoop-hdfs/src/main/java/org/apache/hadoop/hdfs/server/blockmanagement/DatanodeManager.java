@@ -353,7 +353,7 @@ public class DatanodeManager {
   }
 
   private boolean isInactive(DatanodeInfo datanode) {
-    if (datanode.isDecommissioned() || datanode.isReportedBad()) {
+    if (datanode.isDecommissioned() || datanode.isMarkedBad()) {
       return true;
     }
 
@@ -1272,6 +1272,9 @@ public class DatanodeManager {
     final boolean listDecommissioningNodes =
         type == DatanodeReportType.ALL ||
         type == DatanodeReportType.DECOMMISSIONING;
+    final boolean listMarkedBadNodes =
+        type == DatanodeReportType.ALL ||
+        type == DatanodeReportType.MARKEDBAD;
 
     ArrayList<DatanodeDescriptor> nodes;
     final HostSet foundNodes = new HostSet();
@@ -1283,10 +1286,12 @@ public class DatanodeManager {
       for (DatanodeDescriptor dn : datanodeMap.values()) {
         final boolean isDead = isDatanodeDead(dn);
         final boolean isDecommissioning = dn.isDecommissionInProgress();
+        final boolean isMarkedBad = dn.isMarkedBad();
 
         if (((listLiveNodes && !isDead) ||
             (listDeadNodes && isDead) ||
-            (listDecommissioningNodes && isDecommissioning)) &&
+            (listDecommissioningNodes && isDecommissioning) ||
+            (listMarkedBadNodes && isMarkedBad)) &&
             hostConfigManager.isIncluded(dn)) {
           nodes.add(dn);
         }
@@ -1679,7 +1684,7 @@ public class DatanodeManager {
       final DatanodeInfo datanodeInfo = getDatanodeByXferAddr(node.getIpAddr(),
               node.getXferPort());
       if (datanodeInfo != null) {
-        datanodeInfo.setReportedBad(node.isReportedBad());
+        datanodeInfo.setMarkedBad(node.isMarkedBad());
         if (LOG.isDebugEnabled()) {
           LOG.debug("Updated datanode reportedBad state: " + node);
         }

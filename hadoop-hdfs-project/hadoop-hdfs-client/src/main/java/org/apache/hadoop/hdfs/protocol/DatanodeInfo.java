@@ -90,7 +90,7 @@ public class DatanodeInfo extends DatanodeID implements Node {
    * trigger block recovery. We will only de-prioritize the datanode for r/w,
    * until it gets decommissioned or unmarked by the admin.
    */
-  private boolean reportedBad = false;
+  private boolean markedBad = false;
 
   public DatanodeInfo(DatanodeInfo from) {
     super(from);
@@ -107,7 +107,7 @@ public class DatanodeInfo extends DatanodeID implements Node {
     this.location = from.getNetworkLocation();
     this.adminState = from.getAdminState();
     this.upgradeDomain = from.getUpgradeDomain();
-    this.reportedBad = from.isReportedBad();
+    this.markedBad = from.isMarkedBad();
   }
 
   public DatanodeInfo(DatanodeID nodeID) {
@@ -123,7 +123,7 @@ public class DatanodeInfo extends DatanodeID implements Node {
     this.lastUpdateMonotonic = 0L;
     this.xceiverCount = 0;
     this.adminState = null;
-    this.reportedBad = false;
+    this.markedBad = false;
   }
 
   public DatanodeInfo(DatanodeID nodeID, String location) {
@@ -437,6 +437,7 @@ public class DatanodeInfo extends DatanodeID implements Node {
         .append(percent2String(cacheRemainingPercent)).append("\n");
     buffer.append("Xceivers: ").append(getXceiverCount()).append("\n");
     buffer.append("Last contact: ").append(new Date(lastUpdate)).append("\n");
+    buffer.append("Marked as Bad: ").append(isMarkedBad()).append("\n");
     return buffer.toString();
   }
 
@@ -549,12 +550,12 @@ public class DatanodeInfo extends DatanodeID implements Node {
   /**
    * @return whether the datanode has been reported as a potential bad datanode
    */
-  public boolean isReportedBad() {
-    return reportedBad;
+  public boolean isMarkedBad() {
+    return markedBad;
   }
 
-  public void setReportedBad(boolean reportedBad) {
-    this.reportedBad = reportedBad;
+  public void setMarkedBad(boolean markedBad) {
+    this.markedBad = markedBad;
   }
 
   /**

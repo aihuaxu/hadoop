@@ -420,6 +420,56 @@ public class DFSAdmin extends FsShell {
   }
 
   /**
+   * List all the datanodes that are marked as "Bad"
+   */
+  private static class ListBadDataNodesCommand {
+    private static final String NAME = "listBadDataNodes";
+    private static final String USAGE = "-" + NAME;
+    private static final String DESCRIPTION = USAGE + ": " +
+            "List all the DataNodes that are marked as \"bad\".\n";
+
+    static boolean matches(String cmd) {
+      return ("-" + NAME).equals(cmd);
+    }
+
+    static int run(DistributedFileSystem dfs) throws IOException {
+      listBadNodes(dfs);
+      return 0;
+    }
+
+    private static void listBadNodes(DistributedFileSystem dfs) throws IOException {
+      URI dfsUri = dfs.getUri();
+      Configuration conf = dfs.getConf();
+      final boolean isHaEnabled = HAUtilClient.isLogicalUri(conf, dfsUri);
+      if (isHaEnabled) {
+        String nsId = dfsUri.getHost();
+        List<ProxyAndInfo<ClientProtocol>> proxies =
+                HAUtil.getProxiesForAllNameNodesInNameservice(conf, nsId,
+                        ClientProtocol.class);
+        for (ProxyAndInfo<ClientProtocol> proxy : proxies) {
+          DatanodeInfo[] bad = proxy.getProxy()
+                  .getDatanodeReport(DatanodeReportType.MARKEDBAD);
+          printBadNodes(bad, proxy.getAddress().toString());
+        }
+      } else {
+        DatanodeInfo[] bad = dfs.getDataNodeStats(DatanodeReportType.MARKEDBAD);
+        printBadNodes(bad, dfs.getUri().getAuthority());
+      }
+    }
+
+    private static void printBadNodes(DatanodeInfo[] bad, String nnInfo) {
+      System.out.println("DataNodes marked as bad (" + bad.length + ") in "
+              + nnInfo + ":\n");
+      if (bad.length > 0) {
+        for (DatanodeInfo dn : bad) {
+          System.out.println(dn.getDatanodeReport());
+          System.out.println();
+        }
+      }
+    }
+  }
+
+  /**
    * Support MarkBadDataNodes command
    */
   private static class MarkBadDataNodesCommand {
@@ -573,6 +623,7 @@ public class DFSAdmin extends FsShell {
     "\t[-setDelayDataNodeForTest <datanode_host:ipc_port> <true/false> <delayTimeInMsPerPacket>]\n" +
     "\t[-listOpenFiles]\n" +
     "\t[" + MarkBadDataNodesCommand.USAGE +"]\n" +
+    "\t[" + ListBadDataNodesCommand.USAGE +"]\n" +
     "\t[-help [cmd]]\n";
 
   /**
@@ -1434,6 +1485,8 @@ public class DFSAdmin extends FsShell {
       System.out.println(listOpenFiles);
     } else if (MarkBadDataNodesCommand.matches("-" + cmd)) {
       System.out.println(MarkBadDataNodesCommand.DESCRIPTION);
+    } else if (ListBadDataNodesCommand.matches("-" + cmd)) {
+      System.out.println(ListBadDataNodesCommand.DESCRIPTION);
     } else if ("help".equals(cmd)) {
       System.out.println(help);
     } else {
@@ -1472,6 +1525,7 @@ public class DFSAdmin extends FsShell {
       System.out.println(setDelayDataNodeForTest);
       System.out.println(listOpenFiles);
       System.out.println(MarkBadDataNodesCommand.DESCRIPTION);
+      System.out.println(ListBadDataNodesCommand.DESCRIPTION);
       System.out.println(help);
       System.out.println();
       ToolRunner.printGenericCommandUsage(System.out);
@@ -2038,6 +2092,9 @@ public class DFSAdmin extends FsShell {
     } else if (MarkBadDataNodesCommand.matches(cmd)) {
       System.err.println("Usage: hdfs dfsadmin"
               + " [" + MarkBadDataNodesCommand.USAGE + "]");
+    } else if (ListBadDataNodesCommand.matches(cmd)) {
+      System.err.println("Usage: hdfs dfsadmin"
+              + " [" + ListBadDataNodesCommand.USAGE + "]");
     } else {
       System.err.println("Usage: hdfs dfsadmin");
       System.err.println("Note: Administrative commands can only be run as the HDFS superuser.");
@@ -2206,6 +2263,11 @@ public class DFSAdmin extends FsShell {
         printUsage(cmd);
         return exitCode;
       }
+    } else if (ListBadDataNodesCommand.matches(cmd)) {
+      if (argv.length != 1) {
+        printUsage(cmd);
+        return exitCode;
+      }
     }
 
     // initialize DFSAdmin
@@ -2293,6 +2355,8 @@ public class DFSAdmin extends FsShell {
         exitCode = blackListUser(argv, i);
       } else if (MarkBadDataNodesCommand.matches(cmd)) {
         exitCode = MarkBadDataNodesCommand.run(getDFS(), argv, i);
+      } else if (ListBadDataNodesCommand.matches(cmd)) {
+        exitCode = ListBadDataNodesCommand.run(getDFS());
       } else if ("-help".equals(cmd)) {
         if (i < argv.length) {
           printHelp(argv[i]);

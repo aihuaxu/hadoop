@@ -142,7 +142,6 @@ import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.ListCo
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.ListOpenFilesRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.ListOpenFilesResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.MarkBadDataNodesRequestProto;
-import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.MarkBadDataNodesResponseProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.MetaSaveRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.MkdirsRequestProto;
 import org.apache.hadoop.hdfs.protocol.proto.ClientNamenodeProtocolProtos.ModifyCacheDirectiveRequestProto;
@@ -1660,7 +1659,7 @@ public class ClientNamenodeProtocolTranslatorPB implements
       BadDataNodeInfoProto nodeProto = BadDataNodeInfoProto.newBuilder()
               .setIpAddr(node.getIpAddr())
               .setXferPort(node.getXferPort())
-              .setReportedBad(node.isReportedBad())
+              .setMarkedBad(node.isMarkedBad())
               .build();
       builder.addNodes(nodeProto);
     }

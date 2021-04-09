@@ -56,7 +56,7 @@ public class TestMarkBadDataNodes {
     Set<DatanodeDescriptor> datanodes = datanodeManager.getDatanodes();
     DatanodeInfo toMark = null;
     for (DatanodeInfo node : datanodes) {
-      Assert.assertFalse(node.isReportedBad());
+      Assert.assertFalse(node.isMarkedBad());
       if (toMark == null) {
         toMark = node;
       }
@@ -69,7 +69,7 @@ public class TestMarkBadDataNodes {
     cluster.getFileSystem().markBadDataNodes(new BadDataNodeInfo[]{badNode});
     DatanodeInfo marked = datanodeManager.getDatanodeByXferAddr(
             toMark.getIpAddr(), toMark.getXferPort());
-    Assert.assertTrue(marked.isReportedBad());
+    Assert.assertTrue(marked.isMarkedBad());
 
     // write a file and get its block locations.
     // make sure the bad one is in the end
@@ -89,7 +89,7 @@ public class TestMarkBadDataNodes {
     cluster.getFileSystem().markBadDataNodes(new BadDataNodeInfo[]{normalNode});
     datanodes = datanodeManager.getDatanodes();
     for (DatanodeInfo node : datanodes) {
-      Assert.assertFalse(node.isReportedBad());
+      Assert.assertFalse(node.isMarkedBad());
     }
   }
 }

@@ -338,6 +338,7 @@ public class TestPBHelper {
       assertEquals(dn1.getLastUpdate(), dn2.getLastUpdate());
       assertEquals(dn1.getLevel(), dn2.getLevel());
       assertEquals(dn1.getNetworkLocation(), dn2.getNetworkLocation());
+      assertEquals(dn1.isMarkedBad(), dn2.isMarkedBad());
   }
   
   @Test

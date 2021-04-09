@@ -62,7 +62,7 @@ public class TestDataNodeComparators {
       datanodeInfo.setLastUpdateMonotonic(Time.monotonicNow());
     }
     if (reportedBad) {
-      datanodeInfo.setReportedBad(true);
+      datanodeInfo.setMarkedBad(true);
     }
     return datanodeInfo;
   }
@@ -79,10 +79,10 @@ public class TestDataNodeComparators {
         return false;
       }
       if (!current.isDecommissioned() && !next.isDecommissioned() &&
-              current.isReportedBad() && !next.isReportedBad()) {
+              current.isMarkedBad() && !next.isMarkedBad()) {
         return false;
       }
-      if (checkStale && !next.isDecommissioned() && !next.isReportedBad()) {
+      if (checkStale && !next.isDecommissioned() && !next.isMarkedBad()) {
         if (current.isStale(staleInterval) && !next.isStale(staleInterval)) {
           return false;
         }

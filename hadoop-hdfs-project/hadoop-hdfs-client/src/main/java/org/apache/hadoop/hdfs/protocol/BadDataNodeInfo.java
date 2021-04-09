@@ -23,12 +23,12 @@ package org.apache.hadoop.hdfs.protocol;
 public class BadDataNodeInfo {
   private final String ipAddr;
   private final int xferPort;
-  private final boolean reportedBad;
+  private final boolean markedBad;
 
-  public BadDataNodeInfo(String ipAddr, int xferPort, boolean reportedBad) {
+  public BadDataNodeInfo(String ipAddr, int xferPort, boolean markedBad) {
     this.ipAddr = ipAddr;
     this.xferPort = xferPort;
-    this.reportedBad = reportedBad;
+    this.markedBad = markedBad;
   }
 
   public String getIpAddr() {
@@ -39,13 +39,13 @@ public class BadDataNodeInfo {
     return xferPort;
   }
 
-  public boolean isReportedBad() {
-    return reportedBad;
+  public boolean isMarkedBad() {
+    return markedBad;
   }
 
   @Override
   public String toString() {
     return ipAddr + ":" + xferPort + ":" +
-            (reportedBad ? "bad" : "normal");
+            (markedBad ? "bad" : "normal");
   }
 }

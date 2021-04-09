@@ -144,8 +144,8 @@ public class DFSUtil {
         if (a.isDecommissioned() == b.isDecommissioned()) {
           // neither a nor b is decommissioned, compare based on their
           // "reportedBad" mark
-          return a.isReportedBad() == b.isReportedBad() ?
-                  0 : (a.isReportedBad() ? 1 : -1);
+          return a.isMarkedBad() == b.isMarkedBad() ?
+                  0 : (a.isMarkedBad() ? 1 : -1);
         }
         return a.isDecommissioned() ? 1 : -1;
       }
@@ -175,7 +175,7 @@ public class DFSUtil {
     public int compare(DatanodeInfo a, DatanodeInfo b) {
       // Decommissioned nodes will still be moved to the end of the list
       int decom = DECOM_COMPARATOR.compare(a, b);
-      if (decom != 0 || a.isDecommissioned() || a.isReportedBad()) {
+      if (decom != 0 || a.isDecommissioned() || a.isMarkedBad()) {
         return decom;
       }
 

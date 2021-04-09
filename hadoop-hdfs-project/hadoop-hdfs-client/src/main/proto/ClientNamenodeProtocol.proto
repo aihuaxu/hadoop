@@ -342,6 +342,7 @@ enum DatanodeReportTypeProto {  // type of the datanode report
   LIVE = 2;
   DEAD = 3;
   DECOMMISSIONING = 4;
+  MARKEDBAD = 5;
 }
 
 message GetDatanodeReportRequestProto {

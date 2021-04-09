@@ -20,6 +20,7 @@ package org.apache.hadoop.hdfs.tools;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IPC_CLIENT_CONNECT_MAX_RETRIES_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_DATA_DIR_KEY;
 
+import com.google.common.base.Charsets;
 import com.google.common.base.Supplier;
 import com.google.common.collect.Lists;
 import org.apache.commons.lang.text.StrBuilder;
@@ -175,9 +176,10 @@ public class TestDFSAdmin {
             .toArray(DatanodeDescriptor.EMPTY_ARRAY);
     Assert.assertEquals(2, datanodes.length);
     for (DatanodeInfo node : datanodes) {
-      Assert.assertFalse(node.isReportedBad());
+      Assert.assertFalse(node.isMarkedBad());
     }
 
+    redirectStream();
     final DFSAdmin dfsAdmin = new DFSAdmin(conf);
     final String addr0 = String.format("%s:%d", datanodes[0].getIpAddr(),
             datanodes[0].getXferPort());
@@ -190,17 +192,26 @@ public class TestDFSAdmin {
     Assert.assertEquals(0, ret);
     checkDataNode(datanodeManager, datanodes, new boolean[]{true, true});
 
+    // list bad datanodes, should report 2 bad nodes
+    checkListBadDataNodes(dfsAdmin, 2);
+
     // reset datanode[0] back to normal
     ret = ToolRunner.run(dfsAdmin,
             new String[]{"-markBadDataNodes", "-normalNodes", addr0});
     Assert.assertEquals(0, ret);
     checkDataNode(datanodeManager, datanodes, new boolean[]{false, true});
 
+    // list bad datanodes, should report 1 bad node
+    checkListBadDataNodes(dfsAdmin, 1);
+
     // reset both datanodes to normal
     ret = ToolRunner.run(dfsAdmin,
             new String[]{"-markBadDataNodes", "-normalNodes", addr0 + "," + addr1});
     Assert.assertEquals(0, ret);
     checkDataNode(datanodeManager, datanodes, new boolean[]{false, false});
+
+    // list bad datanodes, should report 0 bad node
+    checkListBadDataNodes(dfsAdmin, 0);
 
     // read the bad node list from the file
     File nodeFile = new File(testDir, "nodes");
@@ -213,20 +224,37 @@ public class TestDFSAdmin {
     Assert.assertEquals(0, ret);
     checkDataNode(datanodeManager, datanodes, new boolean[]{true, true});
 
+    // list bad datanodes, should report 2 bad node
+    checkListBadDataNodes(dfsAdmin, 2);
+
     // read the normal node list from the file
     ret = ToolRunner.run(dfsAdmin,
             new String[]{"-markBadDataNodes", "-normalNodesFile",
                     nodeFile.getAbsolutePath()});
     Assert.assertEquals(0, ret);
     checkDataNode(datanodeManager, datanodes, new boolean[]{false, false});
+
+    // list bad datanodes, should report 0 bad node
+    checkListBadDataNodes(dfsAdmin, 0);
+  }
+
+  private void checkListBadDataNodes(DFSAdmin dfsAdmin, int num) throws Exception {
+    int ret = ToolRunner.run(dfsAdmin, new String[]{"-listBadDataNodes"});
+    Assert.assertEquals(0, ret);
+    String output = new String(out.toByteArray(), Charsets.UTF_8);
+    OLD_OUT.println(output);
+    String expected = "DataNodes marked as bad (" + num + ") in "
+            + cluster.getFileSystem().getUri().getAuthority();
+    OLD_OUT.println(expected);
+    Assert.assertTrue(output.contains(expected));
   }
 
   static void checkDataNode(DatanodeManager datanodeManager,
           DatanodeID[] datanodes, boolean[] states) {
     Assert.assertEquals(states[0], datanodeManager.getDatanodeByXferAddr(
-            datanodes[0].getIpAddr(), datanodes[0].getXferPort()).isReportedBad());
+            datanodes[0].getIpAddr(), datanodes[0].getXferPort()).isMarkedBad());
     Assert.assertEquals(states[1], datanodeManager.getDatanodeByXferAddr(
-            datanodes[1].getIpAddr(), datanodes[1].getXferPort()).isReportedBad());
+            datanodes[1].getIpAddr(), datanodes[1].getXferPort()).isMarkedBad());
   }
 
   @Test(timeout = 30000)
