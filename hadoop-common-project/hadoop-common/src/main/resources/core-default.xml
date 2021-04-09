@@ -2466,13 +2466,4 @@
       with the input domain name of the services by querying the underlying DNS.
     </description>
   </property>
-
-  <property>
-    <name>hadoop.http.metrics.enabled</name>
-    <value>true</value>
-    <description>
-      If true, set Jetty's StatisticsHandler to HTTP server to collect
-      HTTP layer metrics and register them to Hadoop metrics system.
-    </description>
-  </property>
 </configuration>

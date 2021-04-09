@@ -45,7 +45,6 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletRequestWrapper;
 import javax.servlet.http.HttpServletResponse;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -55,7 +54,6 @@ import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.ConfServlet;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
-import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.security.AuthenticationFilterInitializer;
 import org.apache.hadoop.security.authentication.util.SignerSecretProvider;
 import org.apache.hadoop.security.ssl.SslSelectChannelConnectorSecure;
@@ -80,7 +78,6 @@ import org.mortbay.jetty.handler.ContextHandler;
 import org.mortbay.jetty.handler.ContextHandlerCollection;
 import org.mortbay.jetty.handler.HandlerCollection;
 import org.mortbay.jetty.handler.RequestLogHandler;
-import org.mortbay.jetty.handler.StatisticsHandler;
 import org.mortbay.jetty.nio.SelectChannelConnector;
 import org.mortbay.jetty.security.SslSelectChannelConnector;
 import org.mortbay.jetty.servlet.AbstractSessionManager;
@@ -141,19 +138,17 @@ public final class HttpServer2 implements FilterContainer {
   static final String STATE_DESCRIPTION_ALIVE = " - alive";
   static final String STATE_DESCRIPTION_NOT_LIVE = " - not live";
   private final SignerSecretProvider secretProvider;
-  private final XFrameOption xFrameOption;
-  private final boolean xFrameOptionIsEnabled;
+  private XFrameOption xFrameOption;
+  private boolean xFrameOptionIsEnabled;
   private static final String X_FRAME_VALUE = "xFrameOption";
   private static final String X_FRAME_ENABLED = "X_FRAME_ENABLED";
 
-  private StatisticsHandler statsHandler;
-  private HttpServer2Metrics metrics;
 
   /**
    * Class to construct instances of HTTP server with specific options.
    */
   public static class Builder {
-    private final ArrayList<URI> endpoints = Lists.newArrayList();
+    private ArrayList<URI> endpoints = Lists.newArrayList();
     private String name;
     private Configuration conf;
     private String[] pathSpecs;
@@ -427,29 +422,24 @@ public final class HttpServer2 implements FilterContainer {
       asm.setSecureCookies(true);
     }
 
-    HandlerCollection handlers = new HandlerCollection();
     ContextHandlerCollection contexts = new ContextHandlerCollection();
-    handlers.addHandler(contexts);
     RequestLog requestLog = HttpRequestLog.getRequestLog(name);
 
     if (requestLog != null) {
       RequestLogHandler requestLogHandler = new RequestLogHandler();
       requestLogHandler.setRequestLog(requestLog);
-      handlers.addHandler(requestLogHandler);
+      HandlerCollection handlers = new HandlerCollection();
+      handlers.setHandlers(new Handler[] {contexts, requestLogHandler});
+      webServer.setHandler(handlers);
+    } else {
+      webServer.setHandler(contexts);
     }
-    handlers.addHandler(webAppContext);
 
     final String appDir = getWebAppsPath(name);
-    addDefaultApps(contexts, appDir, conf);
 
-    if (conf.getBoolean(CommonConfigurationKeysPublic.HADOOP_HTTP_METRICS_ENABLED,
-            CommonConfigurationKeysPublic.HADOOP_HTTP_METRICS_ENABLED_DEFAULT)) {
-      statsHandler = new StatisticsHandler();
-      statsHandler.setHandler(handlers);
-      webServer.setHandler(statsHandler);
-    } else {
-      webServer.setHandler(handlers);
-    }
+    webServer.addHandler(webAppContext);
+
+    addDefaultApps(contexts, appDir, conf);
 
     Map<String, String> xFrameParams = new HashMap<>();
     xFrameParams.put(X_FRAME_ENABLED,
@@ -944,17 +934,6 @@ public final class HttpServer2 implements FilterContainer {
       try {
         openListeners();
         webServer.start();
-
-        if (statsHandler != null) {
-          // Create metrics source for each HttpServer2 instance.
-          // Use port number to make the metrics source name unique.
-          int port = -1;
-          for (Connector connector : listeners) {
-            port = connector.getLocalPort();
-            break;
-          }
-          metrics = HttpServer2Metrics.create(statsHandler, port);
-        }
       } catch (IOException ex) {
         LOG.info("HttpServer.start() threw a non Bind IOException", ex);
         throw ex;
@@ -964,16 +943,11 @@ public final class HttpServer2 implements FilterContainer {
       }
       // Make sure there is no handler failures.
       Handler[] handlers = webServer.getHandlers();
-      if (handlers != null) {
-        for (Handler handler : handlers) {
-          if (handler.isFailed()) {
-            throw new IOException(
-                    "Problem in starting http server. Server handlers failed");
-          }
+      for (Handler handler : handlers) {
+        if (handler.isFailed()) {
+          throw new IOException(
+              "Problem in starting http server. Server handlers failed");
         }
-      } else if (webServer.getHandler().isFailed()) {
-        throw new IOException(
-                "Problem in starting http server. Server handlers failed");
       }
       // Make sure there are no errors initializing the context.
       Throwable unavailableException = webAppContext.getUnavailableException();
@@ -1064,9 +1038,6 @@ public final class HttpServer2 implements FilterContainer {
 
     try {
       webServer.stop();
-      if (metrics != null) {
-        metrics.remove();
-      }
     } catch (Exception e) {
       LOG.error("Error while stopping web server for webapp "
           + webAppContext.getDisplayName(), e);
@@ -1431,10 +1402,5 @@ public final class HttpServer2 implements FilterContainer {
       }
       throw new IllegalArgumentException("Unexpected value in xFrameOption.");
     }
-  }
-
-  @VisibleForTesting
-  HttpServer2Metrics getMetrics() {
-    return metrics;
   }
 }
