@@ -29,8 +29,13 @@ import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.HAUtil;
+import org.apache.hadoop.hdfs.protocol.DatanodeID;
+import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.qjournal.MiniQJMHACluster;
+import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor;
+import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeManager;
 import org.junit.After;
+import org.junit.Assert;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -89,15 +94,16 @@ public class TestDFSAdminWithHA {
   }
 
   private void setUpHaCluster(boolean security) throws Exception {
-    setUpHaCluster(security, 0);
+    setUpHaCluster(security, 0, 0);
   }
 
-  private void setUpHaCluster(boolean security, int numObservers) throws Exception {
+  private void setUpHaCluster(boolean security, int numObservers,
+          int numDataNodes) throws Exception {
     conf = new Configuration();
     conf.setBoolean(CommonConfigurationKeys.HADOOP_SECURITY_AUTHORIZATION,
         security);
     cluster = new MiniQJMHACluster.Builder(conf).setNumObservers(numObservers)
-        .build();
+            .setNumDataNodes(numDataNodes).build();
     String[] addresses = new String[2 + numObservers];
     for (int i = 0; i < addresses.length; ++i) {
       addresses[i] = cluster.getDfsCluster().getNameNode(i).getHostAndPort();
@@ -158,6 +164,53 @@ public class TestDFSAdminWithHA {
     assertOutputMatches(message + newLine, 2);
   }
 
+  @Test(timeout = 60000)
+  public void testMarkBadDataNodes() throws Exception {
+    // set up an HA cluster with 2 DataNodes
+    setUpHaCluster(false, 0, 2);
+
+    for (int i = 0; i < 2; i++) {
+      DatanodeManager datanodeManager = cluster.getDfsCluster().getNameNode(i)
+              .getNamesystem().getBlockManager().getDatanodeManager();
+      DatanodeDescriptor[] datanodes = datanodeManager.getDatanodes()
+              .toArray(DatanodeDescriptor.EMPTY_ARRAY);
+      Assert.assertEquals(2, datanodes.length);
+      for (DatanodeInfo node : datanodes) {
+        Assert.assertFalse(node.isReportedBad());
+      }
+    }
+
+    final DatanodeID[] datanodes = new DatanodeID[2];
+    datanodes[0] = cluster.getDfsCluster().getDataNodes().get(0).getDatanodeId();
+    datanodes[1] = cluster.getDfsCluster().getDataNodes().get(1).getDatanodeId();
+    final String addr0 = String.format("%s:%d", datanodes[0].getIpAddr(),
+            datanodes[0].getXferPort());
+    final String addr1 = String.format("%s:%d", datanodes[1].getIpAddr(),
+            datanodes[1].getXferPort());
+
+    // mark both datanodes as bad
+    int ret = admin.run(new String[]{"-markBadDataNodes", "-badNodes",
+            addr0 + "," + addr1});
+    Assert.assertEquals(0, ret);
+    for (int i = 0; i < 2; i++) {
+      DatanodeManager datanodeManager = cluster.getDfsCluster().getNameNode(i)
+              .getNamesystem().getBlockManager().getDatanodeManager();
+      TestDFSAdmin.checkDataNode(datanodeManager, datanodes,
+              new boolean[]{true, true});
+    }
+
+    // reset both datanodes to normal
+    ret = admin.run(new String[]{"-markBadDataNodes", "-normalNodes",
+            addr0 + "," + addr1});
+    Assert.assertEquals(0, ret);
+    for (int i = 0; i < 2; i++) {
+      DatanodeManager datanodeManager = cluster.getDfsCluster().getNameNode(i)
+              .getNamesystem().getBlockManager().getDatanodeManager();
+      TestDFSAdmin.checkDataNode(datanodeManager, datanodes,
+              new boolean[]{false, false});
+    }
+  }
+
   @Test (timeout = 30000)
   public void testSaveNamespace() throws Exception {
     setUpHaCluster(false);
@@ -204,7 +257,7 @@ public class TestDFSAdminWithHA {
 
   @Test (timeout = 30000)
   public void testRefreshNodesWithObserver() throws Exception {
-    setUpHaCluster(false, 2);
+    setUpHaCluster(false, 2, 0);
     int exitCode = admin.run(new String[] {"-refreshNodes"});
     assertEquals(err.toString().trim(), 0, exitCode);
     String message = "Refresh nodes successful for.*";

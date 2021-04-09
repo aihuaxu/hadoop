@@ -36,10 +36,14 @@ import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DFSTestUtil;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
+import org.apache.hadoop.hdfs.protocol.DatanodeID;
+import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants.DatanodeReportType;
 import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 import org.apache.hadoop.hdfs.server.blockmanagement.BlockManagerTestUtil;
+import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeDescriptor;
+import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeManager;
 import org.apache.hadoop.hdfs.server.common.Storage;
 import org.apache.hadoop.hdfs.server.datanode.DataNode;
 import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
@@ -49,11 +53,14 @@ import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.test.PathUtils;
 import org.apache.hadoop.util.ToolRunner;
 import org.junit.After;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.io.BufferedWriter;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.util.ArrayList;
@@ -88,6 +95,9 @@ public class TestDFSAdmin {
   private final ByteArrayOutputStream err = new ByteArrayOutputStream();
   private static final PrintStream OLD_OUT = System.out;
   private static final PrintStream OLD_ERR = System.err;
+
+  private static final String testDir =
+          System.getProperty("test.build.data", "build/test/data");
 
   @Before
   public void setUp() throws Exception {
@@ -155,6 +165,68 @@ public class TestDFSAdmin {
       list.add(scanner.nextLine());
     }
     scanner.close();
+  }
+
+  @Test(timeout = 30000)
+  public void testMarkBadDataNodes() throws Exception {
+    DatanodeManager datanodeManager = cluster.getNamesystem()
+            .getBlockManager().getDatanodeManager();
+    DatanodeDescriptor[] datanodes = datanodeManager.getDatanodes()
+            .toArray(DatanodeDescriptor.EMPTY_ARRAY);
+    Assert.assertEquals(2, datanodes.length);
+    for (DatanodeInfo node : datanodes) {
+      Assert.assertFalse(node.isReportedBad());
+    }
+
+    final DFSAdmin dfsAdmin = new DFSAdmin(conf);
+    final String addr0 = String.format("%s:%d", datanodes[0].getIpAddr(),
+            datanodes[0].getXferPort());
+    final String addr1 = String.format("%s:%d", datanodes[1].getIpAddr(),
+            datanodes[1].getXferPort());
+
+    // mark both datanodes as bad
+    int ret = ToolRunner.run(dfsAdmin,
+            new String[]{"-markBadDataNodes", "-badNodes", addr0 + "," + addr1});
+    Assert.assertEquals(0, ret);
+    checkDataNode(datanodeManager, datanodes, new boolean[]{true, true});
+
+    // reset datanode[0] back to normal
+    ret = ToolRunner.run(dfsAdmin,
+            new String[]{"-markBadDataNodes", "-normalNodes", addr0});
+    Assert.assertEquals(0, ret);
+    checkDataNode(datanodeManager, datanodes, new boolean[]{false, true});
+
+    // reset both datanodes to normal
+    ret = ToolRunner.run(dfsAdmin,
+            new String[]{"-markBadDataNodes", "-normalNodes", addr0 + "," + addr1});
+    Assert.assertEquals(0, ret);
+    checkDataNode(datanodeManager, datanodes, new boolean[]{false, false});
+
+    // read the bad node list from the file
+    File nodeFile = new File(testDir, "nodes");
+    try (BufferedWriter writer = new BufferedWriter(new FileWriter(nodeFile))) {
+      writer.write(addr0 + "\n" + addr1 + "\n");
+    }
+    ret = ToolRunner.run(dfsAdmin,
+            new String[]{"-markBadDataNodes", "-badNodesFile",
+                    nodeFile.getAbsolutePath()});
+    Assert.assertEquals(0, ret);
+    checkDataNode(datanodeManager, datanodes, new boolean[]{true, true});
+
+    // read the normal node list from the file
+    ret = ToolRunner.run(dfsAdmin,
+            new String[]{"-markBadDataNodes", "-normalNodesFile",
+                    nodeFile.getAbsolutePath()});
+    Assert.assertEquals(0, ret);
+    checkDataNode(datanodeManager, datanodes, new boolean[]{false, false});
+  }
+
+  static void checkDataNode(DatanodeManager datanodeManager,
+          DatanodeID[] datanodes, boolean[] states) {
+    Assert.assertEquals(states[0], datanodeManager.getDatanodeByXferAddr(
+            datanodes[0].getIpAddr(), datanodes[0].getXferPort()).isReportedBad());
+    Assert.assertEquals(states[1], datanodeManager.getDatanodeByXferAddr(
+            datanodes[1].getIpAddr(), datanodes[1].getXferPort()).isReportedBad());
   }
 
   @Test(timeout = 30000)

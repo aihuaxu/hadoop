@@ -17,8 +17,9 @@
  */
 package org.apache.hadoop.hdfs.tools;
 
+import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileNotFoundException;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.net.InetSocketAddress;
@@ -49,7 +50,6 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FsShell;
 import org.apache.hadoop.fs.FsStatus;
 import org.apache.hadoop.fs.FsTracer;
-import org.apache.hadoop.fs.Hdfs;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.shell.Command;
@@ -66,6 +66,7 @@ import org.apache.hadoop.hdfs.HAUtil;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.NameNodeProxies;
 import org.apache.hadoop.hdfs.NameNodeProxiesClient.ProxyAndInfo;
+import org.apache.hadoop.hdfs.protocol.BadDataNodeInfo;
 import org.apache.hadoop.hdfs.protocol.ClientDatanodeProtocol;
 import org.apache.hadoop.hdfs.protocol.ClientProtocol;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
@@ -419,6 +420,121 @@ public class DFSAdmin extends FsShell {
   }
 
   /**
+   * Support MarkBadDataNodes command
+   */
+  private static class MarkBadDataNodesCommand {
+    private static final String NAME = "markBadDataNodes";
+
+    private static final String BADNODE_LIST = "badNodes";
+    private static final String BADNODE_LIST_FILE = "badNodesFile";
+    private static final String NORMALNODE_LIST = "normalNodes";
+    private static final String NORMALNODE_LIST_FILE = "normalNodesFile";
+
+    private static final String USAGE = "-" + NAME +
+            " [-" + BADNODE_LIST + " <datanode_ip:xferport,...>]" +
+            " [-" + BADNODE_LIST_FILE + " filename]" +
+            " [-" + NORMALNODE_LIST + " <datanode_ip:xferport,...>]" +
+            " [-" + NORMALNODE_LIST_FILE + " filename]";
+    private static final String DESCRIPTION = USAGE + ": " +
+            "Mark DataNodes as \"bad\" or \"normal\" and report to NameNode.\n" +
+            "\t\tNameNode will de-prioritize bad DataNodes for future read.\n" +
+            "\t\tThe DataNodes can be directly listed in the command (separated by \",\"),\n" +
+            "\t\tor listed in a local file (separated by line break).\n" +
+            "\t\tEach DataNode is described by a ip_address:xferport pair.";
+
+    static boolean matches(String cmd) {
+      return ("-" + NAME).equals(cmd);
+    }
+
+    static int run(DistributedFileSystem dfs, String[] argv, int idx)
+            throws IOException {
+      CommandFormat c = new CommandFormat(0, Integer.MAX_VALUE);
+      c.addOptionWithValue(BADNODE_LIST);
+      c.addOptionWithValue(BADNODE_LIST_FILE);
+      c.addOptionWithValue(NORMALNODE_LIST);
+      c.addOptionWithValue(NORMALNODE_LIST_FILE);
+
+      c.parse(argv, idx);
+      String badNodeList = c.getOptValue(BADNODE_LIST);
+      String badNodeListFile = c.getOptValue(BADNODE_LIST_FILE);
+      if (badNodeList != null && badNodeListFile != null) {
+        throw new IllegalArgumentException("do not specify the bad datanode" +
+                " list using command line and file at the same time");
+      }
+
+      String normalNodeList = c.getOptValue(NORMALNODE_LIST);
+      String normalNodeListFile = c.getOptValue(NORMALNODE_LIST_FILE);
+      if (normalNodeList != null && normalNodeListFile != null) {
+        throw new IllegalArgumentException("do not specify the normal datanode" +
+                " list using command line and file at the same time");
+      }
+
+      List<BadDataNodeInfo> nodesList = new ArrayList<>();
+      parseNodesInfo(badNodeList, true, nodesList);
+      parseNodesInfoFromFile(badNodeListFile, true, nodesList);
+      parseNodesInfo(normalNodeList, false, nodesList);
+      parseNodesInfoFromFile(normalNodeListFile, false, nodesList);
+
+      markNodes(dfs, nodesList.toArray(new BadDataNodeInfo[0]));
+      return 0;
+    }
+
+    private static void markNodes(DistributedFileSystem dfs,
+            BadDataNodeInfo[] nodesInfo) throws IOException {
+      URI dfsUri = dfs.getUri();
+      Configuration conf = dfs.getConf();
+      final boolean isHaEnabled = HAUtilClient.isLogicalUri(conf, dfsUri);
+      if (isHaEnabled) {
+        String nsId = dfsUri.getHost();
+        List<ProxyAndInfo<ClientProtocol>> proxies =
+                HAUtil.getProxiesForAllNameNodesInNameservice(conf, nsId,
+                        ClientProtocol.class);
+        for (ProxyAndInfo<ClientProtocol> proxy : proxies) {
+          proxy.getProxy().markBadDataNodes(nodesInfo);
+          System.out.println("Mark bad/normal DataNodes successfully for " +
+                  proxy.getAddress());
+        }
+      } else {
+        dfs.markBadDataNodes(nodesInfo);
+        System.out.println("Mark bad/normal DataNodes successfully");
+      }
+    }
+
+    private static void parseNodesInfo(String nodesList, boolean isBad,
+            List<BadDataNodeInfo> nodesInfo) {
+      if (nodesList == null || nodesList.isEmpty()) {
+        return;
+      }
+      String[] nodesStr = nodesList.trim().split(",");
+      for (String node : nodesStr) {
+        InetSocketAddress datanodeAddr = NetUtils.createSocketAddr(node);
+        nodesInfo.add(new BadDataNodeInfo(
+                datanodeAddr.getAddress().getHostAddress(),
+                datanodeAddr.getPort(), isBad));
+      }
+    }
+
+    private static void parseNodesInfoFromFile(String filePath, boolean isBad,
+            List<BadDataNodeInfo> nodesInfo) throws IOException {
+      if (filePath == null || filePath.isEmpty()) {
+        return;
+      }
+      try (BufferedReader reader = new BufferedReader(new FileReader(filePath))) {
+        String line;
+        while ((line = reader.readLine()) != null) {
+          String node = line.trim();
+          if (!node.isEmpty()) {
+            InetSocketAddress datanodeAddr = NetUtils.createSocketAddr(node);
+            nodesInfo.add(new BadDataNodeInfo(
+                    datanodeAddr.getAddress().getHostAddress(),
+                    datanodeAddr.getPort(), isBad));
+          }
+        }
+      }
+    }
+  }
+
+  /**
    * Common usage summary shared between "hdfs dfsadmin -help" and
    * "hdfs dfsadmin"
    */
@@ -456,6 +572,7 @@ public class DFSAdmin extends FsShell {
     "\t[-triggerBlockReport [-incremental] <datanode_host:ipc_port>] [-namenode <namenode_host:ipc_port>]]\n" +
     "\t[-setDelayDataNodeForTest <datanode_host:ipc_port> <true/false> <delayTimeInMsPerPacket>]\n" +
     "\t[-listOpenFiles]\n" +
+    "\t[" + MarkBadDataNodesCommand.USAGE +"]\n" +
     "\t[-help [cmd]]\n";
 
   /**
@@ -1315,6 +1432,8 @@ public class DFSAdmin extends FsShell {
       System.out.println(getDatanodeInfo);
     } else if ("listOpenFiles".equalsIgnoreCase(cmd)) {
       System.out.println(listOpenFiles);
+    } else if (MarkBadDataNodesCommand.matches("-" + cmd)) {
+      System.out.println(MarkBadDataNodesCommand.DESCRIPTION);
     } else if ("help".equals(cmd)) {
       System.out.println(help);
     } else {
@@ -1352,6 +1471,7 @@ public class DFSAdmin extends FsShell {
       System.out.println(triggerBlockReport);
       System.out.println(setDelayDataNodeForTest);
       System.out.println(listOpenFiles);
+      System.out.println(MarkBadDataNodesCommand.DESCRIPTION);
       System.out.println(help);
       System.out.println();
       ToolRunner.printGenericCommandUsage(System.out);
@@ -1915,6 +2035,9 @@ public class DFSAdmin extends FsShell {
     } else if ("-fairCallQueueBlackList".equals(cmd)) {
       System.err.println("Usage: hdfs dfsadmin " +
           "-fairCallQueueBlackList [add <user> | delete <user> | get]");
+    } else if (MarkBadDataNodesCommand.matches(cmd)) {
+      System.err.println("Usage: hdfs dfsadmin"
+              + " [" + MarkBadDataNodesCommand.USAGE + "]");
     } else {
       System.err.println("Usage: hdfs dfsadmin");
       System.err.println("Note: Administrative commands can only be run as the HDFS superuser.");
@@ -2078,8 +2201,13 @@ public class DFSAdmin extends FsShell {
         printUsage(cmd);
         return exitCode;
       }
+    } else if (MarkBadDataNodesCommand.matches(cmd)) {
+      if (argv.length < 3) {
+        printUsage(cmd);
+        return exitCode;
+      }
     }
-    
+
     // initialize DFSAdmin
     try {
       init();
@@ -2163,6 +2291,8 @@ public class DFSAdmin extends FsShell {
         exitCode = listOpenFiles();
       } else if ("-fairCallQueueBlackList".equals(cmd)) {
         exitCode = blackListUser(argv, i);
+      } else if (MarkBadDataNodesCommand.matches(cmd)) {
+        exitCode = MarkBadDataNodesCommand.run(getDFS(), argv, i);
       } else if ("-help".equals(cmd)) {
         if (i < argv.length) {
           printHelp(argv[i]);
