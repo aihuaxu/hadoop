@@ -142,8 +142,8 @@
         </exclusions>
     </dependency>
     <dependency>
-      <groupId>org.apache.zookeeper</groupId>
-      <artifactId>zookeeper</artifactId>
+      <groupId>com.uber.data.zookeeper</groupId>
+      <artifactId>zookeeper-server</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.curator</groupId>

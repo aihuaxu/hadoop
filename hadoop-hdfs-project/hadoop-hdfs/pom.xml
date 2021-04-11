@@ -63,8 +63,8 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
       <scope>compile</scope>
     </dependency>
     <dependency>
-      <groupId>org.apache.zookeeper</groupId>
-      <artifactId>zookeeper</artifactId>
+      <groupId>com.uber.data.zookeeper</groupId>
+      <artifactId>zookeeper-server</artifactId>
       <type>test-jar</type>
       <scope>test</scope>
     </dependency>

@@ -183,16 +183,16 @@
       <artifactId>curator-test</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.apache.zookeeper</groupId>
-      <artifactId>zookeeper</artifactId>
+      <groupId>com.uber.data.zookeeper</groupId>
+      <artifactId>zookeeper-server</artifactId>
     </dependency>
     <dependency>
       <groupId>org.fusesource.leveldbjni</groupId>
       <artifactId>leveldbjni-all</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.apache.zookeeper</groupId>
-      <artifactId>zookeeper</artifactId>
+      <groupId>com.uber.data.zookeeper</groupId>
+      <artifactId>zookeeper-server</artifactId>
       <type>test-jar</type>
     </dependency>
     <!-- 'mvn dependency:analyze' fails to detect use of this dependency -->

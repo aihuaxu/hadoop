@@ -38,9 +38,6 @@ import org.apache.hadoop.ha.ActiveStandbyElector.ActiveStandbyElectorCallback;
 import org.apache.hadoop.ha.HAServiceProtocol.HAServiceState;
 import org.apache.hadoop.ha.HAServiceProtocol.StateChangeRequestInfo;
 import org.apache.hadoop.ha.HAServiceProtocol.RequestSource;
-import org.apache.hadoop.net.DNSDomainNameResolver;
-import org.apache.hadoop.net.DomainNameResolver;
-import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.ZKUtil;
 import org.apache.hadoop.util.ZKUtil.ZKAuthInfo;
 import org.apache.hadoop.ha.HealthMonitor.State;
@@ -66,14 +63,6 @@ public abstract class ZKFailoverController {
   static final Log LOG = LogFactory.getLog(ZKFailoverController.class);
   
   public static final String ZK_QUORUM_KEY = "ha.zookeeper.quorum";
-
-  // Configurations to resolve DNS to zookeeper quorum
-  public static final String RESOLVE_ADDRESS_NEEDED_KEY = "ha.zookeeper.quorum.resolve-needed";
-  public static final boolean RESOLVE_ADDRESS_NEEDED_DEFAULT = false;
-  public static final String RESOLVE_SERVICE_KEY = "ha.zookeeper.quorum.resolver.impl";
-  public static final String  RESOLVE_ADDRESS_TO_FQDN = "ha.zookeeper.quorum.resolver.useFQDN";
-  public static final boolean RESOLVE_ADDRESS_TO_FQDN_DEFAULT = true;
-
   private static final String ZK_SESSION_TIMEOUT_KEY = "ha.zookeeper.session-timeout.ms";
   private static final int ZK_SESSION_TIMEOUT_DEFAULT = 5*1000;
   private static final String ZK_PARENT_ZNODE_KEY = "ha.zookeeper.parent-znode";
@@ -362,26 +351,11 @@ public abstract class ZKFailoverController {
     int maxRetryNum = conf.getInt(
         CommonConfigurationKeys.HA_FC_ELECTOR_ZK_OP_RETRIES_KEY,
         CommonConfigurationKeys.HA_FC_ELECTOR_ZK_OP_RETRIES_DEFAULT);
-
-    boolean resolveQuorumNeeded =
-            conf.getBoolean(RESOLVE_ADDRESS_NEEDED_KEY, RESOLVE_ADDRESS_NEEDED_DEFAULT);
-
-    // decide whether to access server by IP or by host name
-    boolean requireFQDN =
-            conf.getBoolean(RESOLVE_ADDRESS_TO_FQDN, RESOLVE_ADDRESS_TO_FQDN_DEFAULT);
-
-    Class<? extends DomainNameResolver> resolverClass = conf.getClass(
-            RESOLVE_SERVICE_KEY,
-            DNSDomainNameResolver.class,
-            DomainNameResolver.class);
-    DomainNameResolver dnr = ReflectionUtils.newInstance(resolverClass, conf);
-
     elector = new ActiveStandbyElector(zkQuorum,
-            zkTimeout, getParentZnode(), zkAcls, zkAuths,
-            new ElectorCallbacks(), maxRetryNum, true,
-            resolveQuorumNeeded, requireFQDN, dnr);
+        zkTimeout, getParentZnode(), zkAcls, zkAuths,
+        new ElectorCallbacks(), maxRetryNum);
   }
-
+  
   private String getParentZnode() {
     String znode = conf.get(ZK_PARENT_ZNODE_KEY,
         ZK_PARENT_ZNODE_DEFAULT);

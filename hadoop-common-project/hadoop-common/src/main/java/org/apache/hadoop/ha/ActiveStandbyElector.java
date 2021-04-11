@@ -19,9 +19,6 @@
 package org.apache.hadoop.ha;
 
 import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.net.UnknownHostException;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -34,10 +31,8 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
-import org.apache.hadoop.net.DomainNameResolver;
 import org.apache.hadoop.util.ZKUtil.ZKAuthInfo;
 import org.apache.hadoop.util.StringUtils;
-import org.apache.zookeeper.client.ConnectStringParser;
 import org.apache.zookeeper.data.ACL;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.Watcher;
@@ -181,10 +176,6 @@ public class ActiveStandbyElector implements StatCallback, StringCallback {
   private boolean monitorLockNodePending = false;
   private ZooKeeper monitorLockNodeClient;
 
-  private final boolean resolveQuorumNeeded;
-  private final boolean requireFQDN;
-  private final DomainNameResolver resolver;
-
   /**
    * Create a new ActiveStandbyElector object <br/>
    * The elector is created by providing to it the Zookeeper configuration, the
@@ -261,56 +252,6 @@ public class ActiveStandbyElector implements StatCallback, StringCallback {
       List<ZKAuthInfo> authInfo, ActiveStandbyElectorCallback app,
       int maxRetryNum, boolean failFast) throws IOException,
       HadoopIllegalArgumentException, KeeperException {
-    this(zookeeperHostPorts, zookeeperSessionTimeout, parentZnodeName, acl,
-            authInfo, app, maxRetryNum, failFast, false, false, null);
-  }
-
-  /**
-   * Create a new ActiveStandbyElector object <br/>
-   * The elector is created by providing to it the Zookeeper configuration, the
-   * parent znode under which to create the znode and a reference to the
-   * callback interface. <br/>
-   * The parent znode name must be the same for all service instances and
-   * different across services. <br/>
-   * After the leader has been lost, a new leader will be elected after the
-   * session timeout expires. Hence, the app must set this parameter based on
-   * its needs for failure response time. The session timeout must be greater
-   * than the Zookeeper disconnect timeout and is recommended to be 3X that
-   * value to enable Zookeeper to retry transient disconnections. Setting a very
-   * short session timeout may result in frequent transitions between active and
-   * standby states during issues like network outages/GS pauses.
-   *
-   * @param zookeeperHostPorts
-   *          ZooKeeper hostPort for all ZooKeeper servers or DNS hosts
-   * @param zookeeperSessionTimeout
-   *          ZooKeeper session timeout
-   * @param parentZnodeName
-   *          znode under which to create the lock
-   * @param acl
-   *          ZooKeeper ACL's
-   * @param authInfo a list of authentication credentials to add to the
-   *                 ZK connection
-   * @param app
-   *          reference to callback interface object
-   * @param failFast
-   *          whether need to add the retry when establishing ZK connection.
-   * @param resolveQuorumNeeded
-   *          whether resolving zookeeper servers from DNS hosts configured in
-   *          zookeeperHostPorts
-   * @param requireFQDN whether resolving zookeeper servers into hostname or IP
-   *                    address. Hostname is needed in secured cluster.
-   * @param resolver  the implementation class for DomainNameResolver.
-   * @throws IOException
-   * @throws HadoopIllegalArgumentException
-   */
-  public ActiveStandbyElector(String zookeeperHostPorts,
-      int zookeeperSessionTimeout, String parentZnodeName, List<ACL> acl,
-      List<ZKAuthInfo> authInfo, ActiveStandbyElectorCallback app,
-      int maxRetryNum, boolean failFast,
-      boolean resolveQuorumNeeded,
-      boolean requireFQDN,
-      DomainNameResolver resolver) throws IOException,
-      HadoopIllegalArgumentException, KeeperException {
     if (app == null || acl == null || parentZnodeName == null
         || zookeeperHostPorts == null || zookeeperSessionTimeout <= 0) {
       throw new HadoopIllegalArgumentException("Invalid argument");
@@ -324,10 +265,6 @@ public class ActiveStandbyElector implements StatCallback, StringCallback {
     zkLockFilePath = znodeWorkingDir + "/" + LOCK_FILENAME;
     zkBreadCrumbPath = znodeWorkingDir + "/" + BREADCRUMB_FILENAME;
     this.maxRetryNum = maxRetryNum;
-
-    this.resolveQuorumNeeded = resolveQuorumNeeded;
-    this.requireFQDN = requireFQDN;
-    this.resolver = resolver;
 
     // establish the ZK Connection for future API calls
     if (failFast) {
@@ -371,39 +308,7 @@ public class ActiveStandbyElector implements StatCallback, StringCallback {
     }
     joinElectionInternal();
   }
-
-  /**
-   * Resolve configured zookeeper quorum DNS into the quorum string if necessary.
-   * Otherwise, the original quorum is returned.
-   *
-   * @return The zookeeper quorum string
-   * @throws IOException If there are issues resolving the addresses.
-   */
-  private String resolveQuorumIfNecessary() throws UnknownHostException {
-    if (zkHostPort == null || !this.resolveQuorumNeeded) {
-      // Early return is no resolve is necessary
-      return zkHostPort;
-    }
-
-    // decide whether to access server by IP or by host name
-    // If the address needs to be resolved, get all of the IP addresses
-    // from this address and pass them into the proxy
-    LOG.info(String.format("Zookeeper quorum will be resolved with %s",
-            resolver.getClass().getName()));
-
-    List<String> resolvedHosts = new ArrayList<>();
-    ConnectStringParser parser = new ConnectStringParser(zkHostPort);
-    for (InetSocketAddress address : parser.getServerAddresses()) {
-      String[] resolvedHostNames = resolver.getAllResolvedHostnameByDomainName(
-              address.getHostName(), requireFQDN);
-      for (String hostname : resolvedHostNames) {
-        resolvedHosts.add(hostname + ":" + address.getPort());
-      }
-    }
-
-    return StringUtils.join(",", resolvedHosts);
-  }
-
+  
   /**
    * @return true if the configured parent znode exists
    */
@@ -798,8 +703,7 @@ public class ActiveStandbyElector implements StatCallback, StringCallback {
    * @throws IOException
    */
   protected ZooKeeper createZooKeeper() throws IOException {
-    String zkQuorum = resolveQuorumIfNecessary();
-    return new ZooKeeper(zkQuorum, zkSessionTimeout, watcher);
+    return new ZooKeeper(zkHostPort, zkSessionTimeout, watcher);
   }
 
   private void fatalError(String errorMessage) {

@@ -89,8 +89,8 @@
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>org.apache.zookeeper</groupId>
-      <artifactId>zookeeper</artifactId>
+      <groupId>com.uber.data.zookeeper</groupId>
+      <artifactId>zookeeper-server</artifactId>
       <exclusions>
         <exclusion>
           <groupId>jline</groupId>

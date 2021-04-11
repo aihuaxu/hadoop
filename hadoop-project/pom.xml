@@ -75,7 +75,7 @@
     <protobuf.version>2.5.0</protobuf.version>
     <protoc.path>${env.HADOOP_PROTOC_PATH}</protoc.path>
 
-    <zookeeper.version>3.4.13</zookeeper.version>
+    <zookeeper.version>3.4.14-u2</zookeeper.version>
     <curator.version>2.7.1</curator.version>
     <findbugs.version>3.0.0</findbugs.version>
 
@@ -860,8 +860,8 @@
       </dependency>
 
       <dependency>
-        <groupId>org.apache.zookeeper</groupId>
-        <artifactId>zookeeper</artifactId>
+        <groupId>com.uber.data.zookeeper</groupId>
+        <artifactId>zookeeper-server</artifactId>
         <version>${zookeeper.version}</version>
         <exclusions>
           <exclusion>
@@ -884,8 +884,8 @@
         </exclusions>
       </dependency>
       <dependency>
-        <groupId>org.apache.zookeeper</groupId>
-        <artifactId>zookeeper</artifactId>
+        <groupId>com.uber.data.zookeeper</groupId>
+        <artifactId>zookeeper-server</artifactId>
         <version>${zookeeper.version}</version>
         <type>test-jar</type>
         <exclusions>
@@ -975,21 +975,46 @@
        <groupId>org.apache.curator</groupId>
        <artifactId>curator-recipes</artifactId>
        <version>${curator.version}</version>
+       <exclusions>
+          <exclusion>
+            <groupId>org.apache.zookeeper</groupId>
+            <artifactId>zookeeper</artifactId>
+          </exclusion>
+        </exclusions>
      </dependency>
      <dependency>
        <groupId>org.apache.curator</groupId>
        <artifactId>curator-client</artifactId>
        <version>${curator.version}</version>
+       <exclusions>
+          <exclusion>
+            <groupId>org.apache.zookeeper</groupId>
+            <artifactId>zookeeper</artifactId>
+          </exclusion>
+      </exclusions>
      </dependency>
      <dependency>
        <groupId>org.apache.curator</groupId>
        <artifactId>curator-framework</artifactId>
        <version>${curator.version}</version>
+       <exclusions>
+          <exclusion>
+            <groupId>org.apache.zookeeper</groupId>
+            <artifactId>zookeeper</artifactId>
+          </exclusion>
+        </exclusions>
      </dependency>
      <dependency>
        <groupId>org.apache.curator</groupId>
        <artifactId>curator-test</artifactId>
        <version>${curator.version}</version>
+       <exclusions>
+          <exclusion>
+            <groupId>org.apache.zookeeper</groupId>
+            <artifactId>zookeeper</artifactId>
+          </exclusion>
+      </exclusions>
+
      </dependency>
      <dependency>
        <groupId>org.bouncycastle</groupId>

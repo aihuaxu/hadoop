@@ -19,13 +19,9 @@
 package org.apache.hadoop.ha;
 
 import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 import java.util.Collections;
 import java.util.List;
 
-import org.apache.commons.lang.reflect.FieldUtils;
-import org.apache.hadoop.net.MockDomainNameResolver;
 import org.apache.zookeeper.AsyncCallback;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
@@ -48,9 +44,6 @@ import org.apache.hadoop.ha.ActiveStandbyElector.ActiveStandbyElectorCallback;
 import org.apache.hadoop.ha.ActiveStandbyElector.ActiveNotFoundException;
 import org.apache.hadoop.util.ZKUtil.ZKAuthInfo;
 import org.apache.hadoop.test.GenericTestUtils;
-
-import static org.junit.Assert.assertEquals;
-import static org.mockito.Mockito.mock;
 
 public class TestActiveStandbyElector {
 
@@ -787,26 +780,5 @@ public class TestActiveStandbyElector {
     // joinElection should not be called.
     Mockito.verify(mockZK, Mockito.times(0)).create(ZK_LOCK_NAME, null,
         Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL, elector, mockZK);
-  }
-
-  @Test
-  public void testResolveDNSQuorum()
-          throws NoSuchMethodException, IllegalAccessException, InvocationTargetException {
-
-    ActiveStandbyElector elector = mock(ActiveStandbyElector.class);
-    FieldUtils.writeField(elector, "zkHostPort", MockDomainNameResolver.DOMAIN1, true);
-    FieldUtils.writeField(elector, "resolveQuorumNeeded", false, true);
-    FieldUtils.writeField(elector, "requireFQDN", true, true);
-    FieldUtils.writeField(elector, "resolver", new MockDomainNameResolver(), true);
-
-    Method initZKMethod = ActiveStandbyElector.class
-            .getDeclaredMethod("resolveQuorumIfNecessary");
-    initZKMethod.setAccessible(true);
-    String zkQuorum = (String)initZKMethod.invoke(elector);
-    assertEquals(MockDomainNameResolver.DOMAIN1, zkQuorum);
-
-    FieldUtils.writeField(elector, "resolveQuorumNeeded", true, true);
-    zkQuorum = (String)initZKMethod.invoke(elector);
-    assertEquals("host01.test:2181,host02.test:2181", zkQuorum);
   }
 }
