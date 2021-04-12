@@ -27,7 +27,17 @@ public class MetricsPublisher {
   private static final String DATANODE_TAG = "datanode";
 
   private final int metricsSamplePercent;
+
+  /**
+  * Parent M3 scope for metrics with a "datanode" tag.
+  * "host" tag must be removed. otherwise total cardinality would be greater
+  * than 100K which would cause an m3 ban
+  */
+  private Scope dnParentScope;
+
+  // General scope with a "host" tag.
   private Scope scope;
+
   /**
    * HDFS client emits metrics with tag "datanode". As there are thousands
    * of datanodes and tagging the scope actually creates a new scope which
@@ -54,11 +64,12 @@ public class MetricsPublisher {
     this.metricsSamplePercent = metricsSamplePercent;
 
     try {
-      scope = createM3Client(metricsReporterAddr, false);
+      dnParentScope = createM3Client(metricsReporterAddr, false);
+      scope = createM3Client(metricsReporterAddr, true);
     } catch (Exception e) {
       LOG.error("Unable to initialize m3 client.", e);
     }
-    if (scope == null) { // in case creation failed silently
+    if (dnParentScope == null || scope == null) { // in case creation failed silently
       LOG.error("Unable to initialize m3 client.");
       return;
     }
@@ -71,13 +82,13 @@ public class MetricsPublisher {
           public Scope load(String datanode) {
             Map<String, String> map = new HashMap<>();
             map.put(DATANODE_TAG, datanode);
-            return scope.tagged(map);
+            return dnParentScope.tagged(map);
           }
         });
   }
 
   public boolean shallIEmit() {
-    return scope != null
+    return dnParentScope != null && scope != null
         && ThreadLocalRandom.current().nextInt(100) < metricsSamplePercent;
   }
 
@@ -91,7 +102,7 @@ public class MetricsPublisher {
       return;
     }
 
-    if (scope != null) {
+    if (dnParentScope != null) {
       try {
         Scope dnScope = dnSubscopeCache.get(datanode);
         switch (metricType) {
@@ -142,8 +153,6 @@ public class MetricsPublisher {
     int port = Integer.parseInt(splits[1]);
     StatsReporter reporter =
         new M3Reporter.Builder(new InetSocketAddress(hostname, port))
-            // must set to false. otherwise total cardinality would be greater
-            // than 100K which would cause an m3 ban
             .includeHost(includeHost)
             .commonTags(tagsBuilder.build())
             .build();
