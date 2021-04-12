@@ -303,6 +303,18 @@ public class Client implements AutoCloseable {
     return refCount==0;
   }
 
+  public Map<String, Integer> getUserToConnectionsMap() {
+    Map<ConnectionId, Connection> connCopy = new HashMap<>(connections);
+    final Map<String, Integer> info = new TreeMap<>();
+
+    for (Map.Entry<ConnectionId, Connection> entry : connCopy.entrySet()) {
+      String key = entry.getKey().address.getHostString() + " " + entry.getKey().ticket.getShortUserName();
+      info.put(key, info.getOrDefault(key, 0) + 1);
+
+    }
+    return info;
+  }
+
   /** Check the rpc response header. */
   void checkResponse(RpcResponseHeaderProto header) throws IOException {
     if (header == null) {

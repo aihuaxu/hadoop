@@ -26,12 +26,14 @@ import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.hdfs.server.federation.MiniRouterDFSCluster.RouterContext;
 import org.apache.hadoop.hdfs.server.federation.RouterConfigBuilder;
 import org.apache.hadoop.hdfs.server.federation.StateStoreDFSCluster;
+import org.apache.hadoop.hdfs.server.federation.metrics.FederationRPCMetrics;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.hdfs.server.namenode.NameNodeRpcServer;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.ipc.StandbyException;
 import org.apache.hadoop.ipc.metrics.RpcMetrics;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.eclipse.jetty.util.ajax.JSON;
 import org.junit.After;
 import org.junit.Test;
 import org.slf4j.Logger;
@@ -42,6 +44,7 @@ import java.net.URI;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -137,39 +140,6 @@ public class TestRouterConnectionOverload {
     validateNumConnection(conf, 2);
   }
 
-  private void validateNumConnection(Configuration conf, int expectedNumException)
-          throws Exception {
-    setupCluster(conf);
-
-    List<Integer> numConnections = new ArrayList<>();
-
-    Thread metricThread = new Thread(() -> {
-      NameNodeRpcServer nnRpcServer =
-              (NameNodeRpcServer) (cluster.getCluster().getNameNode(0).getRpcServer());
-      RpcMetrics nnRpcMetrics =
-              nnRpcServer.getClientRpcServer().getRpcMetrics();
-
-      while (true) {
-        try {
-          Thread.sleep(1000);
-          numConnections.add(nnRpcMetrics.numOpenConnections());
-        } catch (InterruptedException e) {
-          return;
-        }
-      }
-    });
-
-    metricThread.start();
-    makeRouterCall(200, 10);
-    Thread.sleep(10000);
-    metricThread.interrupt();
-
-    for (int numConnection : numConnections) {
-      assertTrue("More connections created:" + numConnection,
-              numConnection <= expectedNumException);
-    }
-  }
-
   @Test
   public void testMultipleUsers() throws Exception {
     Configuration conf = createConf();
@@ -207,6 +177,83 @@ public class TestRouterConnectionOverload {
 
     Thread.sleep(10000);
     metricThread.interrupt();
+  }
+
+  @Test
+  public void testRpcMetrics() throws Exception {
+    Configuration conf = createConf();
+    conf.setInt(RBFConfigKeys.DFS_ROUTER_IPC_CONNECTION_SIZE, 2);
+    setupCluster(conf);
+
+    List<String> rpcConnectionsJson = new ArrayList<>();
+
+    Thread metricThread = new Thread(() -> {
+      FederationRPCMetrics routerMetrics = cluster.getRouters().get(0).getRouter().getRpcServer().getRPCMetrics();
+
+      while (true) {
+        try {
+          Thread.sleep(100);
+          rpcConnectionsJson.add(routerMetrics.getRpcConnections());
+        } catch (InterruptedException e) {
+          return;
+        }
+      }
+    });
+
+    UserGroupInformation realUser = UserGroupInformation.createRemoteUser("realUser");
+    UserGroupInformation[] users = new UserGroupInformation[1];
+    for (int i = 0; i < users.length; i++) {
+      users[i] = UserGroupInformation.createProxyUserForTesting("user" + i, realUser, new String[]{"group1"});
+    }
+
+    metricThread.start();
+    for (int i = 0; i < 10; i++) {
+      makeRouterCall(users, 200, 10);
+    }
+
+    Thread.sleep(10000);
+    metricThread.interrupt();
+
+    int numValid = 0;
+    for (String json : rpcConnectionsJson) {
+      Map<String, Integer> rpcConnections = (Map<String, Integer>) JSON.parse(json);
+      numValid += (rpcConnections.isEmpty() ? 0 : 1);
+    }
+
+    assertTrue(numValid > 0);
+  }
+
+  private void validateNumConnection(Configuration conf, int expectedNumException)
+          throws Exception {
+    setupCluster(conf);
+
+    List<Integer> numConnections = new ArrayList<>();
+
+    Thread metricThread = new Thread(() -> {
+      NameNodeRpcServer nnRpcServer =
+              (NameNodeRpcServer) (cluster.getCluster().getNameNode(0).getRpcServer());
+      RpcMetrics nnRpcMetrics =
+              nnRpcServer.getClientRpcServer().getRpcMetrics();
+
+      while (true) {
+        try {
+          Thread.sleep(1000);
+          numConnections.add(nnRpcMetrics.numOpenConnections());
+        } catch (InterruptedException e) {
+          return;
+        }
+      }
+    });
+
+    metricThread.start();
+    makeRouterCall(200, 10);
+    Thread.sleep(10000);
+    metricThread.interrupt();
+
+    for (int numConnection : numConnections) {
+      assertTrue("More connections created:" + numConnection,
+              numConnection <= expectedNumException);
+    }
   }
 
   /**

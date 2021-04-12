@@ -29,6 +29,13 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableRate;
+import org.eclipse.jetty.util.ajax.JSON;
+
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Implementation of the RPC metrics collector.
@@ -270,6 +277,25 @@ public class FederationRPCMetrics implements FederationRPCMBean {
   public String getAsyncCallerPool() {
     return rpcServer.getRPCClient().getAsyncCallerPoolJson();
   }
+
+  public String getRpcConnections() {
+    Set<Thread> threadSet = Thread.getAllStackTraces().keySet();
+
+    final Map<String, Integer> info = new TreeMap<>();
+
+    Pattern pattern = Pattern.compile("IPC Client \\(.+\\) connection to (.+) from (\\S+)");
+    for (Thread thread : threadSet) {
+      String name = thread.getName();
+      Matcher matcher = pattern.matcher(name);
+      if (matcher.matches()) {
+        String key = matcher.group(1) + " " + matcher.group(2);
+        info.put(key, info.getOrDefault(key, 0) + 1);
+      }
+    }
+
+    return JSON.toString(info);
+  }
+
 
   /**
    * Add the time to proxy an operation from the moment the Router sends it to
