@@ -407,16 +407,6 @@ public interface HdfsClientConfigKeys {
     long    RETRY_TIMEOUT_MS_DEFAULT = 5*MINUTE;
   }
 
-  /** dfs.client.hedged.read configuration properties */
-  interface HedgedRead {
-    String PREFIX = HdfsClientConfigKeys.PREFIX + "hedged.read.";
-
-    String  THRESHOLD_MILLIS_KEY = PREFIX + "threshold.millis";
-    long    THRESHOLD_MILLIS_DEFAULT = 500;
-    String  THREADPOOL_SIZE_KEY = PREFIX + "threadpool.size";
-    int     THREADPOOL_SIZE_DEFAULT = 0;
-  }
-
   /** dfs.client.fast_switch.read configuration properties */
   interface FastSwitchRead {
     String PREFIX = HdfsClientConfigKeys.PREFIX + "fast_switch.read.";
@@ -427,6 +417,16 @@ public interface HdfsClientConfigKeys {
     long    THRESHOLD_MILLIS_DEFAULT = 10000;
     String  THREADPOOL_SIZE_KEY = PREFIX + "threadpool.size";
     int     THREADPOOL_SIZE_DEFAULT = 10;
+  }
+
+  /** dfs.client.hedged.read configuration properties */
+  interface HedgedRead {
+    String PREFIX = HdfsClientConfigKeys.PREFIX + "hedged.read.";
+
+    String  THRESHOLD_MILLIS_KEY = PREFIX + "threshold.millis";
+    long    THRESHOLD_MILLIS_DEFAULT = 500;
+    String  THREADPOOL_SIZE_KEY = PREFIX + "threadpool.size";
+    int     THREADPOOL_SIZE_DEFAULT = 0;
   }
 
   /** dfs.http.client configuration properties */

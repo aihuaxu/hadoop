@@ -137,13 +137,12 @@ public class DfsClientConf {
 
   private final ShortCircuitConf shortCircuitConf;
 
-  private final long hedgedReadThresholdMillis;
-  private final int hedgedReadThreadpoolSize;
-
   private final boolean fastSwitchEnabled;
   private final long fastSwitchThreshold;
   private final int fastSwitchThreadpoolSize;
 
+  private final long hedgedReadThresholdMillis;
+  private final int hedgedReadThreadpoolSize;
   private final List<Class<? extends ReplicaAccessorBuilder>>
       replicaAccessorBuilderClasses;
 
@@ -269,13 +268,6 @@ public class DfsClientConf {
 
     shortCircuitConf = new ShortCircuitConf(conf);
 
-    hedgedReadThresholdMillis = conf.getLong(
-        HedgedRead.THRESHOLD_MILLIS_KEY,
-        HedgedRead.THRESHOLD_MILLIS_DEFAULT);
-    hedgedReadThreadpoolSize = conf.getInt(
-        HdfsClientConfigKeys.HedgedRead.THREADPOOL_SIZE_KEY,
-        HdfsClientConfigKeys.HedgedRead.THREADPOOL_SIZE_DEFAULT);
-
     fastSwitchEnabled = conf.getBoolean(
         FastSwitchRead.ENABLED,
         FastSwitchRead.ENABLED_DEFAULT);
@@ -285,6 +277,13 @@ public class DfsClientConf {
     fastSwitchThreshold = conf.getLong(
         FastSwitchRead.THRESHOLD_MILLIS_KEY,
         FastSwitchRead.THRESHOLD_MILLIS_DEFAULT);
+
+    hedgedReadThresholdMillis = conf.getLong(
+        HedgedRead.THRESHOLD_MILLIS_KEY,
+        HedgedRead.THRESHOLD_MILLIS_DEFAULT);
+    hedgedReadThreadpoolSize = conf.getInt(
+        HdfsClientConfigKeys.HedgedRead.THREADPOOL_SIZE_KEY,
+        HdfsClientConfigKeys.HedgedRead.THREADPOOL_SIZE_DEFAULT);
 
     replicaAccessorBuilderClasses = loadReplicaAccessorBuilderClasses(conf);
 

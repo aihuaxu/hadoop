@@ -44,3 +44,4 @@ public class TestParallelFastSwitchRead extends TestParallelReadUtil {
     TestParallelReadUtil.teardownCluster();
   }
 }
+

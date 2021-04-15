@@ -182,6 +182,9 @@ class BlockSender implements java.io.Closeable {
    */
   private static final long LONG_READ_THRESHOLD_BYTES = 256 * 1024;
 
+  private static volatile boolean delayDataNodeReadForTest = false;
+  private static AtomicLong delayTimeInMilliSecondsPerPacket = new AtomicLong(0L);
+
   /**
    * Constructor
    * 
@@ -479,6 +482,16 @@ class BlockSender implements java.io.Closeable {
     }
   }
 
+  public static void enableDelayDataNodeForRead(long delayTime) {
+    Preconditions.checkArgument(delayTime > 0);
+    delayDataNodeReadForTest = true;
+    delayTimeInMilliSecondsPerPacket.set(delayTime);
+  }
+
+  public static void disableDelayDataNodeForRead() {
+    delayDataNodeReadForTest = false;
+  }
+
   private static Replica getReplica(ExtendedBlock block, DataNode datanode)
       throws ReplicaNotFoundException {
     Replica replica = datanode.data.getReplica(block.getBlockPoolId(),
@@ -552,15 +565,17 @@ class BlockSender implements java.io.Closeable {
    */
   private int sendPacket(ByteBuffer pkt, int maxChunks, OutputStream out,
       boolean transferTo, DataTransferThrottler throttler) throws IOException {
+
     if (datanode.getDelayDataNodeForTest()) {
       LOG.info("Delay the DataNode for reading. Delay each packet for "
-              + datanode.getDelayTimeInMsPerPacket() + " ms.");
+          + datanode.getDelayTimeInMsPerPacket() + " ms.");
       try {
         Thread.sleep(datanode.getDelayTimeInMsPerPacket().get());
       } catch (InterruptedException ie) {
         LOG.info("Read delay got interrupted");
       }
     }
+
     int dataLen = (int) Math.min(endOffset - offset,
                              (chunkSize * (long) maxChunks));
     
