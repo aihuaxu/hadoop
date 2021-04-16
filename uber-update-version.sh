@@ -1,6 +1,6 @@
 #!/bin/bash
 
-BASE_VERSION=2.8.2
+BASE_VERSION=2.8.2-slownode-test
 START_COMMIT=042c04d
 
 echo "Calculating the new version number ..."
