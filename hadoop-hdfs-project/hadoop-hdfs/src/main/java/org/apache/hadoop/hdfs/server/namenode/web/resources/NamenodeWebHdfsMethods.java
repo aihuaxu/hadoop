@@ -985,6 +985,10 @@ public class NamenodeWebHdfsMethods {
       String userHome = DFSUtilClient.getHomeDirectory(conf, ugi)
           .toUri().getPath();
       final String js = JsonUtil.toJsonString("Path", userHome);
+      final String operationName = "getHomeDirectory";
+      // By default, useIpcCallq is set to true so this call is added to the RPC
+      // call queue. Thus the remote user and remote IP will also be logged.
+      namenode.getNamesystem().logAuditEvent(true, operationName, userHome);
       return Response.ok(js).type(MediaType.APPLICATION_JSON).build();
     }
     case GETACLSTATUS: {

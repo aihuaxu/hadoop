@@ -220,6 +220,20 @@ public class TestAuditLogs {
     assertTrue("failed to read from file", val >= 0);
   }
 
+  @Test
+  public void testAuditWebHdfsGetHomeDirectory() throws Exception {
+    setupAuditLogs();
+
+    WebHdfsFileSystem webfs = WebHdfsTestUtil.getWebHdfsFileSystemAs(
+            userGroupInfo, conf, WebHdfsConstants.WEBHDFS_SCHEME);
+    Path homeDir = webfs.getHomeDirectory();
+
+    final Pattern webGetHomeDirPattern = Pattern.compile(
+            ".*cmd=getHomeDirectory.*src=" + homeDir.toUri().getPath()
+                    + ".*proto=webhdfs.*");
+    verifyAuditLogsCheckPattern(true, 1, webGetHomeDirPattern);
+  }
+
   /** test that stat via webhdfs puts proper entry in audit log */
   @Test
   public void testAuditWebHdfsStat() throws Exception {
