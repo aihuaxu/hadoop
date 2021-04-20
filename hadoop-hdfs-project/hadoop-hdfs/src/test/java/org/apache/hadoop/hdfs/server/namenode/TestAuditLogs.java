@@ -124,6 +124,7 @@ public class TestAuditLogs {
     conf.setBoolean(HdfsClientConfigKeys.DFS_WEBHDFS_ENABLED_KEY, true);
     conf.setBoolean(DFSConfigKeys.DFS_NAMENODE_AUDIT_LOG_ASYNC_KEY, useAsyncLog);
     conf.setBoolean(DFSConfigKeys.DFS_NAMENODE_EDITS_ASYNC_LOGGING, useAsyncEdits);
+    conf.setBoolean(DFSConfigKeys.DFS_NAMENODE_AUDIT_LOG_LOCK_TIME_KEY, true);
     util = new DFSTestUtil.Builder().setName("TestAuditAllowed").
         setNumFiles(20).build();
     cluster = new MiniDFSCluster.Builder(conf).numDataNodes(4).build();
@@ -144,8 +145,8 @@ public class TestAuditLogs {
 
   @After
   public void teardownCluster() throws Exception {
-    util.cleanup(fs, "/srcdat");
     if (fs != null) {
+      util.cleanup(fs, "/srcdat");
       fs.close();
       fs = null;
     }
@@ -231,6 +232,28 @@ public class TestAuditLogs {
     final Pattern webGetHomeDirPattern = Pattern.compile(
             ".*cmd=getHomeDirectory.*src=" + homeDir.toUri().getPath()
                     + ".*proto=webhdfs.*");
+    verifyAuditLogsCheckPattern(true, 1, webGetHomeDirPattern);
+  }
+
+  @Test
+  public void testAuditLockTime() throws Exception {
+    if (fs != null) {
+      fs.close();
+      fs = null;
+    }
+    if (cluster != null) {
+      cluster.shutdown();
+    }
+    cluster = new MiniDFSCluster.Builder(conf).numDataNodes(0).build();
+
+    setupAuditLogs();
+    WebHdfsFileSystem webfs = WebHdfsTestUtil.getWebHdfsFileSystemAs(
+            userGroupInfo, conf, WebHdfsConstants.WEBHDFS_SCHEME);
+    Path homeDir = webfs.getHomeDirectory();
+
+    final Pattern webGetHomeDirPattern = Pattern.compile(
+            ".*cmd=getHomeDirectory.*src=" + homeDir.toUri().getPath()
+                    + ".*proto=webhdfs.*lockTime=0.*");
     verifyAuditLogsCheckPattern(true, 1, webGetHomeDirPattern);
   }
 

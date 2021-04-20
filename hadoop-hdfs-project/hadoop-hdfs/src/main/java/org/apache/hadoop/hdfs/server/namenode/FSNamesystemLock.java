@@ -104,8 +104,18 @@ class FSNamesystemLock {
   private final AtomicLong longestReadLockHeldIntervalMs = new AtomicLong(0);
 
   /* Lock-related information */
-  private static final ThreadLocal<Boolean> IS_READ_LOCK = new ThreadLocal<Boolean>();
-  private static final ThreadLocal<Long> LOCK_INTERVAL_NS = new ThreadLocal<Long>();
+  private static final ThreadLocal<Boolean> IS_READ_LOCK = new ThreadLocal<Boolean>() {
+    @Override
+    public Boolean initialValue() {
+      return false;
+    }
+  };
+  private static final ThreadLocal<Long> LOCK_INTERVAL_NS = new ThreadLocal<Long>() {
+    @Override
+    public Long initialValue() {
+      return 0L;
+    }
+  };
 
   @VisibleForTesting
   static final String OP_NAME_OTHER = "OTHER";
