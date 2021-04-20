@@ -35,6 +35,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.nodelabels.RMNodeLabelsMana
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer;
 
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerImpl;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.AppSchedulingInfo;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.NodeType;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ResourceLimits;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerAppUtils;
@@ -63,6 +64,7 @@ import org.apache.hadoop.yarn.util.resource.Resources;
  */
 public class RegularContainerAllocator extends AbstractContainerAllocator {
   private static final Log LOG = LogFactory.getLog(RegularContainerAllocator.class);
+  private static final int APP_SCHEDULING_INFO_RETRY_MAX = 10;
 
   public RegularContainerAllocator(FiCaSchedulerApp application,
       ResourceCalculator rc, RMContext rmContext,
@@ -180,9 +182,19 @@ public class RegularContainerAllocator extends AbstractContainerAllocator {
     int missedNonPartitionedRequestSchedulingOpportunity = 0;
     // Only do this when request associated with given scheduler key accepts
     // NO_LABEL under RESPECT_EXCLUSIVITY mode
+    int appSchedulingInfoRetryCount = 0;
+    AppPlacementAllocator<FiCaSchedulerNode> appSchedulingInfo = appInfo.getAppPlacementAllocator(schedulerKey);
+    while (appSchedulingInfoRetryCount <= APP_SCHEDULING_INFO_RETRY_MAX && appSchedulingInfo == null) {
+      appSchedulingInfoRetryCount++;
+      LOG.info("appSchedulingInfo of " + schedulerKey + " is null. #" + appSchedulingInfoRetryCount + " of retry.");
+      appSchedulingInfo = appInfo.getAppPlacementAllocator(schedulerKey);
+    }
+    if (appSchedulingInfo == null) {
+      LOG.error("appSchedulingInfo of " + schedulerKey + " is null and exhausted " + APP_SCHEDULING_INFO_RETRY_MAX + " of retries");
+    }
+
     if (StringUtils.equals(RMNodeLabelsManager.NO_LABEL,
-        appInfo.getAppPlacementAllocator(schedulerKey)
-            .getPrimaryRequestedNodePartition())) {
+        appInfo.getAppPlacementAllocator(schedulerKey).getPrimaryRequestedNodePartition())) {
       missedNonPartitionedRequestSchedulingOpportunity =
           application.addMissedNonPartitionedRequestSchedulingOpportunity(
               schedulerKey);
