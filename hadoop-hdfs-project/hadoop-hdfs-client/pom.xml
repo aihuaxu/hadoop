@@ -191,12 +191,17 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
                 <includes>
                   <include>com.uber.m3:tally-core</include>
                   <include>com.uber.m3:tally-m3</include>
+                  <include>org.apache.thrift:libthrift</include>
                 </includes>
               </artifactSet>
               <relocations>
                 <relocation>
                   <pattern>com.uber.m3</pattern>
                   <shadedPattern>org.apache.hadoop.hdfs.m3</shadedPattern>
+                </relocation>
+                <relocation>
+                  <pattern>org.apache.thrift</pattern>
+                  <shadedPattern>org.apache.hadoop.hdfs.m3.thrift</shadedPattern>
                 </relocation>
               </relocations>
             </configuration>
