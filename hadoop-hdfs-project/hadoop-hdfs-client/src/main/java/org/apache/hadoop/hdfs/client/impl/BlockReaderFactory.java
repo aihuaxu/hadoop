@@ -854,7 +854,9 @@ public class BlockReaderFactory implements ShortCircuitReplicaCreator {
 
   @SuppressWarnings("deprecation")
   private BlockReader getRemoteBlockReader(Peer peer) throws IOException {
+    LOG.info("Value of isUseLegacyBlockReader is: " + conf.getShortCircuitConf().isUseLegacyBlockReader());
     if (conf.getShortCircuitConf().isUseLegacyBlockReader()) {
+      LOG.warn("Using deprecated BlockReaderRemote.");
       return BlockReaderRemote.newBlockReader(fileName,
           block, token, startOffset, length, conf.getIoBufferSize(),
           verifyChecksum, clientName, peer, datanode,
