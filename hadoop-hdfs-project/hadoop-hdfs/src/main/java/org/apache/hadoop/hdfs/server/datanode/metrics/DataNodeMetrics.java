@@ -73,6 +73,10 @@ public class DataNodeMetrics {
   MutableCounterLong remoteBytesRead;
   @Metric("Bytes written by remote client")
   MutableCounterLong remoteBytesWritten;
+  @Metric("Number of times the packet read was slow")
+  MutableCounterLong slowPacketReads;
+  @Metric("Total milliseconds spent by all slow packet reads")
+  MutableCounterLong totalSlowPacketReadTime;
 
   // RamDisk metrics on read/write
   @Metric MutableCounterLong ramDiskBlocksWrite;
@@ -299,6 +303,13 @@ public class DataNodeMetrics {
     totalReadTime.incr(timeTaken);
   }
 
+  public void incrSlowPacketReads() {
+    slowPacketReads.incr();
+  }
+
+  public void incrTotalSlowPacketReadTime(long timeTaken) {
+    totalSlowPacketReadTime.incr(timeTaken);
+  }
 
   public void addPacketAckRoundTripTimeNanos(long latencyNanos) {
     packetAckRoundTripTimeNanos.add(latencyNanos);

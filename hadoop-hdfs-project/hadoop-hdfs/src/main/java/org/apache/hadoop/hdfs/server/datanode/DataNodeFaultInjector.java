@@ -72,4 +72,9 @@ public class DataNodeFaultInjector {
    * Used as a hook to delay writing a packet to os cache.
    */
   public void delayWriteToOsCache() {}
+
+  /**
+   * Used as a hook to delay writing a packet to client on read
+   */
+  public void delaySendBlock() {}
 }

@@ -984,6 +984,10 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   public static final double
       DFS_DATANODE_RESERVE_FOR_ARCHIVE_DEFAULT_PERCENTAGE_DEFAULT = 0.0;
 
+  public static final String DFS_DATANODE_METRICS_SLOW_PACKET_READ_THRESHOLD_MS_KEY =
+          "dfs.datanode.metrics.slow-packet-read.threshold-ms";
+  public static final int DFS_DATANODE_METRICS_SLOW_PACKET_READ_THRESHOLD_MS_DEFAULT = 1000;
+
   // dfs.client.retry confs are moved to HdfsClientConfigKeys.Retry 
   @Deprecated
   public static final String  DFS_CLIENT_RETRY_POLICY_ENABLED_KEY
