@@ -176,6 +176,38 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
           <excludePackageNames>org.apache.hadoop.hdfs.protocol.proto</excludePackageNames>
         </configuration>
       </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-shade-plugin</artifactId>
+        <version>3.2.1</version>
+        <executions>
+          <execution>
+            <phase>package</phase>
+            <goals>
+              <goal>shade</goal>
+            </goals>
+            <configuration>
+              <artifactSet>
+                <includes>
+                  <include>com.uber.m3:tally-core</include>
+                  <include>com.uber.m3:tally-m3</include>
+                  <include>org.apache.thrift:libthrift</include>
+                </includes>
+              </artifactSet>
+              <relocations>
+                <relocation>
+                  <pattern>com.uber.m3</pattern>
+                  <shadedPattern>org.apache.hadoop.hdfs.m3</shadedPattern>
+                </relocation>
+                <relocation>
+                  <pattern>org.apache.thrift</pattern>
+                  <shadedPattern>org.apache.hadoop.hdfs.m3.thrift</shadedPattern>
+                </relocation>
+              </relocations>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
     </plugins>
   </build>
 </project>
