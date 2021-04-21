@@ -102,6 +102,9 @@ public class DNConf {
   final long cacheReportInterval;
   final long datanodeSlowIoWarningThresholdMs;
 
+  // Any reads that take longer than this will be logged as slow reads
+  final long slowReadThresholdMs;
+
   final String minimumNameNodeVersion;
   final String encryptionAlgorithm;
   final SaslPropertiesResolver saslPropsResolver;
@@ -145,6 +148,10 @@ public class DNConf {
     transferToAllowed = getConf().getBoolean(
         DFS_DATANODE_TRANSFERTO_ALLOWED_KEY,
         DFS_DATANODE_TRANSFERTO_ALLOWED_DEFAULT);
+
+    slowReadThresholdMs = getConf().getLong(
+        DFSConfigKeys.DFS_DATANODE_METRICS_SLOW_PACKET_READ_THRESHOLD_MS_KEY,
+        DFSConfigKeys.DFS_DATANODE_METRICS_SLOW_PACKET_READ_THRESHOLD_MS_DEFAULT);
 
     readaheadLength = getConf().getLong(
         HdfsClientConfigKeys.DFS_DATANODE_READAHEAD_BYTES_KEY,

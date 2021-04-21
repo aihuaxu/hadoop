@@ -38,6 +38,7 @@ import net.jcip.annotations.NotThreadSafe;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -58,6 +59,8 @@ import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.util.Time;
 import org.junit.Test;
 import org.mockito.Mockito;
+import org.mockito.invocation.InvocationOnMock;
+import org.mockito.stubbing.Answer;
 
 import javax.management.MBeanServer;
 import javax.management.ObjectName;
@@ -133,7 +136,6 @@ public class TestDataNodeMetrics {
       Path testFile = new Path("/testFlushNanosMetric.txt");
       FSDataOutputStream fout = fs.create(testFile);
       fout.write(new byte[1]);
-      fout.hsync();
       fout.close();
       List<DataNode> datanodes = cluster.getDataNodes();
       DataNode datanode = datanodes.get(0);
@@ -395,5 +397,58 @@ public class TestDataNodeMetrics {
         return lb.getLocations().length == expected;
       }
     }, 1000, 6000);
+  }
+
+  @Test
+  public void testSlowReadMetrics() throws Exception {
+    Configuration conf = new HdfsConfiguration();
+    final int DFS_DATANODE_METRICS_SLOW_PACKET_READ_THRESHOLD_MS = 1000;
+    conf.set(DFSConfigKeys.DFS_DATANODE_METRICS_SLOW_PACKET_READ_THRESHOLD_MS_KEY,
+            "" + DFS_DATANODE_METRICS_SLOW_PACKET_READ_THRESHOLD_MS);
+    final int NUM_DATANODES = 3;
+    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf)
+            .numDataNodes(NUM_DATANODES).build();
+    try {
+      cluster.waitActive();
+      DistributedFileSystem fs = cluster.getFileSystem();
+      final DataNodeFaultInjector injector =
+              Mockito.mock(DataNodeFaultInjector.class);
+      Answer answer = new Answer() {
+        @Override
+        public Object answer(InvocationOnMock invocationOnMock)
+                throws Throwable {
+          // make the op taking longer time
+          Thread.sleep(DFS_DATANODE_METRICS_SLOW_PACKET_READ_THRESHOLD_MS + 1);
+          return null;
+        }
+      };
+      Mockito.doAnswer(answer).when(injector).delaySendBlock();
+      DataNodeFaultInjector.set(injector);
+      Path testFile = new Path("/testSlowReadMetrics.txt");
+      FSDataOutputStream fout = fs.create(testFile);
+      fout.write(new byte[1]);
+      fout.close();
+      FSDataInputStream fin = fs.open(testFile);
+      fin.read();
+      fin.close();
+      List<DataNode> datanodes = cluster.getDataNodes();
+      long sumSlowPacketReads = 0;
+      long sumTotalSlowPacketReadTime = 0;
+      for (DataNode datanode : datanodes) {
+        MetricsRecordBuilder dnMetrics = getMetrics(datanode.getMetrics().name());
+        sumSlowPacketReads += getLongCounter("SlowPacketReads", dnMetrics);
+        sumTotalSlowPacketReadTime += getLongCounter("TotalSlowPacketReadTime", dnMetrics);
+      }
+      assertTrue("At least 1 slow packet read",
+              sumSlowPacketReads >= 1L);
+      assertTrue("At least 1000 ms in slow packet read",
+              sumTotalSlowPacketReadTime >= 1000L);
+    } finally {
+      // cluster initialization and shutdown can be moved to setUp and tearDown to
+      // reduce duplicated code.
+      if (cluster != null) {
+        cluster.shutdown();
+      }
+    }
   }
 }

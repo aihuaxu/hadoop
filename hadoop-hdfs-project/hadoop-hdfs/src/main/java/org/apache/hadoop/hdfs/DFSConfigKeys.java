@@ -1003,6 +1003,10 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
       "dfs.use.dfs.network.topology";
   public static final boolean DFS_USE_DFS_NETWORK_TOPOLOGY_DEFAULT = true;
 
+  public static final String DFS_DATANODE_METRICS_SLOW_PACKET_READ_THRESHOLD_MS_KEY =
+          "dfs.datanode.metrics.slow-packet-read.threshold-ms";
+  public static final int DFS_DATANODE_METRICS_SLOW_PACKET_READ_THRESHOLD_MS_DEFAULT = 1000;
+
   // dfs.client.retry confs are moved to HdfsClientConfigKeys.Retry 
   @Deprecated
   public static final String  DFS_CLIENT_RETRY_POLICY_ENABLED_KEY

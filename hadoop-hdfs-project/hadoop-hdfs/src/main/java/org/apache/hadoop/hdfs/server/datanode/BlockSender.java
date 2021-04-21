@@ -48,6 +48,7 @@ import org.apache.hadoop.io.ReadaheadPool.ReadaheadRequest;
 import org.apache.hadoop.net.SocketOutputStream;
 import org.apache.hadoop.util.AutoCloseableLock;
 import org.apache.hadoop.util.DataChecksum;
+import org.apache.hadoop.util.Time;
 import org.apache.htrace.core.TraceScope;
 
 import static org.apache.hadoop.io.nativeio.NativeIO.POSIX.POSIX_FADV_DONTNEED;
@@ -800,8 +801,17 @@ class BlockSender implements java.io.Closeable {
 
       while (endOffset > offset && !Thread.currentThread().isInterrupted()) {
         manageOsCache();
+
+        long start = Time.monotonicNow();
         long len = sendPacket(pktBuf, maxChunksPerPacket, streamForSendChunks,
             transferTo, throttler);
+        // no-op in prod
+        DataNodeFaultInjector.get().delaySendBlock();
+        long duration = Time.monotonicNow() - start;
+        if (duration > datanode.getDnConf().slowReadThresholdMs) {
+          datanode.metrics.incrSlowPacketReads();
+          datanode.metrics.incrTotalSlowPacketReadTime(duration);
+        }
         offset += len;
         totalRead += len + (numberOfChunks(len) * checksumSize);
         seqno++;
