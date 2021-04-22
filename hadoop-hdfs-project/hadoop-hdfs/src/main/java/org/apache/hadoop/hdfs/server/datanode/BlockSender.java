@@ -805,6 +805,10 @@ class BlockSender implements java.io.Closeable {
         if (duration > datanode.getDnConf().slowReadThresholdMs) {
           datanode.metrics.incrSlowPacketReads();
           datanode.metrics.incrTotalSlowPacketReadTime(duration);
+          if (LOG.isWarnEnabled()) {
+            LOG.warn("Slow BlockSender send packet to client took " + duration
+                + "ms for block " + block.getBlockId());
+          }
         }
         offset += len;
         totalRead += len + (numberOfChunks(len) * checksumSize);

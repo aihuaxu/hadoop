@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdfs.client.impl;
 
 import org.apache.hadoop.hdfs.HdfsConfiguration;
+import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
 import org.apache.hadoop.hdfs.net.Peer;
 import org.apache.hadoop.hdfs.util.MetricsPublisher;
 import org.junit.Test;
@@ -30,6 +31,7 @@ import static org.mockito.Mockito.*;
 public class TestBlockReaderRemote2 extends TestBlockReaderBase {
   HdfsConfiguration createConf() {
     HdfsConfiguration conf = new HdfsConfiguration();
+    conf.setInt(HdfsClientConfigKeys.DFS_CLIENT_METRICS_EMIT_READ_PACKET_TIME_THRESHOLD_KEY, -1);
     return conf;
   }
 
@@ -38,7 +40,6 @@ public class TestBlockReaderRemote2 extends TestBlockReaderBase {
     BlockReaderRemote2 remote2 = (BlockReaderRemote2)reader;
     MetricsPublisher mockPublisher = mock(MetricsPublisher.class);
     remote2.metricsPublisher = mockPublisher;
-    when(mockPublisher.shallIEmit()).thenReturn(true);
 
     Random random = new Random();
     byte [] buf = new byte[1024];
@@ -48,11 +49,15 @@ public class TestBlockReaderRemote2 extends TestBlockReaderBase {
           Math.min(buf.length, random.nextInt(100)));
     }
     reader.close();
-    verify(mockPublisher, times(1 )).shallIEmit();
-    verify(mockPublisher, times(2 )).emit(
+    verify(mockPublisher, atLeast(1)).emit(
         eq(MetricsPublisher.MetricType.GAUGE),
         Mockito.<String>any(),
-        Mockito.<String>any(),
+        eq(BlockReaderRemote2.SLOW_PACKET_TIME),
         Mockito.anyLong());
+    verify(mockPublisher, atLeast(1)).emit(
+        eq(MetricsPublisher.MetricType.COUNTER),
+        Mockito.<String>any(),
+        eq(BlockReaderRemote2.NUM_SLOW_PACKET),
+        eq(1L));
   }
 }
