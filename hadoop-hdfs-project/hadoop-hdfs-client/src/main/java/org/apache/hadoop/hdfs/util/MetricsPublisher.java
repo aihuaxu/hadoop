@@ -26,8 +26,6 @@ public class MetricsPublisher {
   private static final String SERVICE_NAME = "hadoop";
   private static final String DATANODE_TAG = "datanode";
 
-  private final int metricsSamplePercent;
-
   /**
   * Parent M3 scope for metrics with a "datanode" tag.
   * "host" tag must be removed. otherwise total cardinality would be greater
@@ -48,21 +46,18 @@ public class MetricsPublisher {
   /**
    * @param metricsReporterAddr In the form of "hostname:port"
    */
-  public static MetricsPublisher getInstance(int metricsSamplePercent,
-                                             String metricsReporterAddr) {
+  public static MetricsPublisher getInstance(String metricsReporterAddr) {
     if (INSTANCE == null) {
       synchronized (MetricsPublisher.class) {
         if (INSTANCE == null) {
-          INSTANCE = new MetricsPublisher(metricsSamplePercent, metricsReporterAddr);
+          INSTANCE = new MetricsPublisher(metricsReporterAddr);
         }
       }
     }
     return INSTANCE;
   }
 
-  private MetricsPublisher(int metricsSamplePercent, String metricsReporterAddr) {
-    this.metricsSamplePercent = metricsSamplePercent;
-
+  private MetricsPublisher(String metricsReporterAddr) {
     try {
       dnParentScope = createM3Client(metricsReporterAddr, false);
       scope = createM3Client(metricsReporterAddr, true);
@@ -85,11 +80,6 @@ public class MetricsPublisher {
             return dnParentScope.tagged(map);
           }
         });
-  }
-
-  public boolean shallIEmit() {
-    return dnParentScope != null && scope != null
-        && ThreadLocalRandom.current().nextInt(100) < metricsSamplePercent;
   }
 
   /**

@@ -867,7 +867,7 @@ public class BlockReaderFactory implements ShortCircuitReplicaCreator {
           fileName, block, token, startOffset, length,
           verifyChecksum, clientName, peer, datanode,
           clientContext.getPeerCache(), cachingStrategy, tracer,
-          metricsPublisher, networkDistance);
+          metricsPublisher, networkDistance, conf);
     }
   }
 

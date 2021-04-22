@@ -129,14 +129,14 @@ public class BlockReaderRemote2 implements BlockReader {
   MetricsPublisher metricsPublisher;
 
   private final int networkDistance;
+  private DfsClientConf conf;
 
   /**
    * Metrics
    */
-  private long totalTime; // in nano seconds
-  private long maxPacketTime; // in nano seconds
-  private static final String MAX_PACKET_TIME = "client.blkreader.max_packet_time";
-  private static final String TOTAL_TIME = "client.blkreader.total_time";
+  @VisibleForTesting
+  static final String SLOW_PACKET_TIME = "client.blockreader.slow_packet_time";
+  static final String NUM_SLOW_PACKET = "client.blockreader.num_slow_packet";
 
   @VisibleForTesting
   public Peer getPeer() {
@@ -197,9 +197,19 @@ public class BlockReaderRemote2 implements BlockReader {
 
   private void readNextPacket() throws IOException {
     //Read packet headers.
-    long nanoTick = Time.monotonicNowNanos();
+    long start = Time.monotonicNow();
     packetReceiver.receiveNextPacket(in);
-    updateMetrics(Time.monotonicNowNanos() - nanoTick);
+    long duration = Time.monotonicNow() - start;
+    if (duration > conf.getMetricsReadPacketEmitThreshold()) {
+      LOG.warn("BlockReaderRemote2 slow read packet took " + duration
+          + "ms for block " + blockId);
+      if (metricsPublisher != null) {
+        metricsPublisher.emit(MetricsPublisher.MetricType.GAUGE,
+            datanodeID.getHostName(), SLOW_PACKET_TIME, duration);
+        metricsPublisher.emit(MetricsPublisher.MetricType.COUNTER,
+            datanodeID.getHostName(), NUM_SLOW_PACKET, 1);
+      }
+    }
 
     PacketHeader curHeader = packetReceiver.getHeader();
     curDataSlice = packetReceiver.getDataSlice();
@@ -294,7 +304,8 @@ public class BlockReaderRemote2 implements BlockReader {
                                DataChecksum checksum, boolean verifyChecksum,
                                long startOffset, long firstChunkOffset, long bytesToRead, Peer peer,
                                DatanodeID datanodeID, PeerCache peerCache, Tracer tracer,
-                               MetricsPublisher metricsPublisher, int networkDistance) {
+                               MetricsPublisher metricsPublisher, int networkDistance,
+                               DfsClientConf conf) {
     // Path is used only for printing block and file information in debug
     this.peer = peer;
     this.datanodeID = datanodeID;
@@ -316,20 +327,12 @@ public class BlockReaderRemote2 implements BlockReader {
     this.tracer = tracer;
     this.metricsPublisher = metricsPublisher;
     this.networkDistance = networkDistance;
+    this.conf = conf;
   }
 
 
   @Override
   public synchronized void close() throws IOException {
-    if (metricsPublisher != null && totalTime > 0
-        && metricsPublisher.shallIEmit()) {
-      String dnHost = datanodeID.getHostName();
-      metricsPublisher.emit(MetricsPublisher.MetricType.GAUGE, dnHost,
-          MAX_PACKET_TIME, maxPacketTime);
-      metricsPublisher.emit(MetricsPublisher.MetricType.GAUGE, dnHost,
-          TOTAL_TIME, totalTime);
-    }
-
     packetReceiver.close();
     startOffset = -1;
     checksum = null;
@@ -422,7 +425,7 @@ public class BlockReaderRemote2 implements BlockReader {
       CachingStrategy cachingStrategy,
       Tracer tracer,
       MetricsPublisher metricsPublisher,
-      int networkDistance) throws IOException {
+      int networkDistance, DfsClientConf conf) throws IOException {
     // in and out will be closed when sock is closed (by the caller)
     final DataOutputStream out = new DataOutputStream(new BufferedOutputStream(
         peer.getOutputStream()));
@@ -455,7 +458,7 @@ public class BlockReaderRemote2 implements BlockReader {
 
     return new BlockReaderRemote2(file, block.getBlockId(), checksum,
         verifyChecksum, startOffset, firstChunkOffset, len, peer, datanodeID,
-        peerCache, tracer, metricsPublisher, networkDistance);
+        peerCache, tracer, metricsPublisher, networkDistance, conf);
   }
 
   static void checkSuccess(
@@ -491,10 +494,5 @@ public class BlockReaderRemote2 implements BlockReader {
   @Override
   public int getNetworkDistance() {
     return networkDistance;
-  }
-
-  private void updateMetrics(long timeRead) {
-    totalTime += timeRead;
-    maxPacketTime = Math.max(maxPacketTime, timeRead);
   }
 }
