@@ -97,7 +97,7 @@ public class ConnectionPool {
   private AtomicInteger index = new AtomicInteger(0);
 
   /** Number of ipc connections this pool can create */
-  private final int numIpcConnections;
+  private int numIpcConnections;
 
   /** Create one base connectionId and calculate hashCode to reuse */
   private final Client.ConnectionId baseConnectionId;
@@ -192,6 +192,10 @@ public class ConnectionPool {
             conf.getInt(clusterSpecificKey, globalNumIpcConnections));
 
     return numIpcConnections;
+  }
+
+  public void setNumIpcConnections(int numIpcConnections) {
+    this.numIpcConnections = numIpcConnections;
   }
 
   /**

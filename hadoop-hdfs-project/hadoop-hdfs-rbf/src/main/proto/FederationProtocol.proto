@@ -243,3 +243,13 @@ message GetSafeModeRequestProto {
 message GetSafeModeResponseProto {
   optional bool isInSafeMode = 1;
 }
+
+message SetPoolIpcConnectionsRequestProto {
+  required string nsId = 1;
+  required string user = 2;
+  required uint32 numConnections = 3;
+}
+
+message SetPoolIpcConnectionsResponseProto {
+  required bool status = 1;
+}

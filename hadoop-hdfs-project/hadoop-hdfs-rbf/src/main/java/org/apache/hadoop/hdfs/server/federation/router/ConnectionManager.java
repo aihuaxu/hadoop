@@ -410,6 +410,34 @@ public class ConnectionManager {
     }
   }
 
+  public boolean setPoolIpcConnections(String nsId, String user, int numConnections) {
+    if (numConnections <= 0) {
+      LOG.error("Invalid number of pool connections:{}", numConnections);
+      return false;
+    }
+
+    if (nsId == null ) {
+      LOG.error("nsId can't be empty");
+      return false;
+    }
+
+    if (user == null) {
+      LOG.error("user can't be empty");
+      return false;
+    }
+
+    conf.setInt(RBFConfigKeys.DFS_ROUTER_IPC_CONNECTION_SIZE + "." + nsId + "." + user, numConnections);
+    Map<ConnectionPoolId, ConnectionPool> poolsCopy = new HashMap<>(pools);
+    for (Entry<ConnectionPoolId, ConnectionPool> entry : pools.entrySet()) {
+      if (entry.getKey().getNnId().equalsIgnoreCase(nsId)
+              && entry.getKey().getUgi().getShortUserName().equalsIgnoreCase(user)) {
+        ConnectionPool pool = entry.getValue();
+        pool.setNumIpcConnections(numConnections);
+      }
+    }
+
+    return true;
+  }
 
   /**
    * Removes stale connections not accessed recently from the pool. This is

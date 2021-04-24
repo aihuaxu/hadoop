@@ -39,20 +39,7 @@ import org.apache.hadoop.hdfs.protocolPB.RouterAdminProtocolServerSideTranslator
 import org.apache.hadoop.hdfs.server.federation.resolver.MountTableManager;
 import org.apache.hadoop.hdfs.server.federation.resolver.RemoteLocation;
 import org.apache.hadoop.hdfs.server.federation.store.MountTableStore;
-import org.apache.hadoop.hdfs.server.federation.store.protocol.AddMountTableEntryRequest;
-import org.apache.hadoop.hdfs.server.federation.store.protocol.AddMountTableEntryResponse;
-import org.apache.hadoop.hdfs.server.federation.store.protocol.EnterSafeModeRequest;
-import org.apache.hadoop.hdfs.server.federation.store.protocol.EnterSafeModeResponse;
-import org.apache.hadoop.hdfs.server.federation.store.protocol.GetMountTableEntriesRequest;
-import org.apache.hadoop.hdfs.server.federation.store.protocol.GetMountTableEntriesResponse;
-import org.apache.hadoop.hdfs.server.federation.store.protocol.GetSafeModeRequest;
-import org.apache.hadoop.hdfs.server.federation.store.protocol.GetSafeModeResponse;
-import org.apache.hadoop.hdfs.server.federation.store.protocol.LeaveSafeModeRequest;
-import org.apache.hadoop.hdfs.server.federation.store.protocol.LeaveSafeModeResponse;
-import org.apache.hadoop.hdfs.server.federation.store.protocol.RemoveMountTableEntryRequest;
-import org.apache.hadoop.hdfs.server.federation.store.protocol.RemoveMountTableEntryResponse;
-import org.apache.hadoop.hdfs.server.federation.store.protocol.UpdateMountTableEntryRequest;
-import org.apache.hadoop.hdfs.server.federation.store.protocol.UpdateMountTableEntryResponse;
+import org.apache.hadoop.hdfs.server.federation.store.protocol.*;
 import org.apache.hadoop.hdfs.server.federation.store.records.MountTable;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
@@ -73,7 +60,7 @@ import com.google.protobuf.BlockingService;
  * router. It is created, started, and stopped by {@link Router}.
  */
 public class RouterAdminServer extends AbstractService
-    implements MountTableManager, RouterStateManager {
+    implements MountTableManager, RouterStateManager, ConnectionConfigManager {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(RouterAdminServer.class);
@@ -382,5 +369,15 @@ public class RouterAdminServer extends AbstractService
    */
   public static String getSuperGroup(){
     return superGroup;
+  }
+
+  @Override
+  public SetPoolIpcConnectionsResponse setPoolIpcConnections(
+          SetPoolIpcConnectionsRequest request) throws IOException {
+    boolean status = this.router.getRpcServer().getRPCClient()
+            .setPoolIpcConnections(request.getNsId(),
+                    request.getUser(),
+                    request.getNumConnections());
+    return SetPoolIpcConnectionsResponse.newInstance(status);
   }
 }

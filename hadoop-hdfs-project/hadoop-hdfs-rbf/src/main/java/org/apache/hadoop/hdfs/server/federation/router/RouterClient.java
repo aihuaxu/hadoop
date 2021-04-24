@@ -73,6 +73,10 @@ public class RouterClient implements Closeable {
     return proxy;
   }
 
+  public ConnectionConfigManager getConnectionConfigManager() {
+    return proxy;
+  }
+
   @Override
   public synchronized void close() throws IOException {
     RPC.stopProxy(proxy);

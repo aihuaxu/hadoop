@@ -37,20 +37,7 @@ import org.apache.hadoop.hdfs.server.federation.router.RouterClient;
 import org.apache.hadoop.hdfs.server.federation.router.RBFConfigKeys;
 import org.apache.hadoop.hdfs.server.federation.router.RouterQuotaUsage;
 import org.apache.hadoop.hdfs.server.federation.router.RouterStateManager;
-import org.apache.hadoop.hdfs.server.federation.store.protocol.AddMountTableEntryRequest;
-import org.apache.hadoop.hdfs.server.federation.store.protocol.AddMountTableEntryResponse;
-import org.apache.hadoop.hdfs.server.federation.store.protocol.EnterSafeModeRequest;
-import org.apache.hadoop.hdfs.server.federation.store.protocol.EnterSafeModeResponse;
-import org.apache.hadoop.hdfs.server.federation.store.protocol.GetMountTableEntriesRequest;
-import org.apache.hadoop.hdfs.server.federation.store.protocol.GetMountTableEntriesResponse;
-import org.apache.hadoop.hdfs.server.federation.store.protocol.GetSafeModeRequest;
-import org.apache.hadoop.hdfs.server.federation.store.protocol.GetSafeModeResponse;
-import org.apache.hadoop.hdfs.server.federation.store.protocol.LeaveSafeModeRequest;
-import org.apache.hadoop.hdfs.server.federation.store.protocol.LeaveSafeModeResponse;
-import org.apache.hadoop.hdfs.server.federation.store.protocol.RemoveMountTableEntryRequest;
-import org.apache.hadoop.hdfs.server.federation.store.protocol.RemoveMountTableEntryResponse;
-import org.apache.hadoop.hdfs.server.federation.store.protocol.UpdateMountTableEntryRequest;
-import org.apache.hadoop.hdfs.server.federation.store.protocol.UpdateMountTableEntryResponse;
+import org.apache.hadoop.hdfs.server.federation.store.protocol.*;
 import org.apache.hadoop.hdfs.server.federation.store.records.MountTable;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.RemoteException;
@@ -99,7 +86,8 @@ public class RouterAdmin extends Configured implements Tool {
         + "\t[-setQuota <path> -nsQuota <nsQuota> -ssQuota "
         + "<quota in bytes or quota size string>]\n"
         + "\t[-clrQuota <path>]\n"
-        + "\t[-safemode enter | leave | get]\n";
+        + "\t[-safemode enter | leave | get]\n"
+        + "\t[-setPoolIpcConnections [-ns <nameservice>] [-u <user>] <numConnections>]\n";
 
     System.out.println(usage);
   }
@@ -153,6 +141,12 @@ public class RouterAdmin extends Configured implements Tool {
         printUsage();
         return exitCode;
       }
+    } else if ("-setPoolIpcConnections".equalsIgnoreCase(cmd)) {
+        if (argv.length != 2 || argv.length != 4 || argv.length != 6) {
+          System.err.println("Incorrect parameters specified for cmd " + cmd);
+          printUsage();
+          return exitCode;
+      }
     }
 
     // Initialize RouterClient
@@ -204,6 +198,8 @@ public class RouterAdmin extends Configured implements Tool {
         }
       } else if ("-safemode".equals(cmd)) {
         manageSafeMode(argv[i]);
+      } else  if ("-setPoolIpcConnections".equalsIgnoreCase(cmd)) {
+        setPoolIpcConnections(argv, i);
       } else {
         printUsage();
         return exitCode;
@@ -690,6 +686,58 @@ public class RouterAdmin extends Configured implements Tool {
     } else if (cmd.equals("get")) {
       boolean result = getSafeMode();
       System.out.println("Safe Mode: " + result);
+    }
+  }
+
+  /**
+   * Manage ipc connections for name service and/or users.
+   *
+   * @param parameters Parameters of the ipc connections.
+   * @param i Index in the parameters.
+   */
+  private void setPoolIpcConnections(String[] parameters, int i)
+          throws IOException {
+    String nsId = null, user = null;
+
+    int numConnections = -1;
+    try {
+      numConnections = Integer.parseInt(parameters[parameters.length - 1]);
+    } catch(NumberFormatException e) {
+      throw new IllegalArgumentException(
+              "Cannot parse numIpcConnections: " + parameters[parameters.length - 1]);
+    }
+
+    if (numConnections <= 0) {
+      throw new IllegalArgumentException(
+            "Input numIpcConnections value should be a positive number.");
+    }
+
+    while (i < parameters.length-1) {
+      if (parameters[i].equals("-ns")) {
+        i++;
+        nsId = parameters[i];
+      } else if (parameters[i].equals("-u")) {
+        i++;
+        user = parameters[i];
+      } else {
+        throw new IllegalArgumentException(
+                "Invalid input parameters for command " + parameters[0]);
+      }
+
+      i++;
+    }
+
+    SetPoolIpcConnectionsRequest request = SetPoolIpcConnectionsRequest.newInstance();
+    request.setNsId(nsId);
+    request.setUser(user);
+    request.setNumConnections(numConnections);
+    SetPoolIpcConnectionsResponse response =
+            client.getConnectionConfigManager().setPoolIpcConnections(request);
+
+    if (response.getStatus()) {
+      System.out.println("Successfully updated IPC connection for ns " + nsId + " and user " + user);
+    } else {
+      System.out.println("Failed to update IPC connection for ns " + nsId + " and user " + user);
     }
   }
 

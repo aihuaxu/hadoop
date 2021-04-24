@@ -1290,4 +1290,12 @@ public class RouterRpcClient {
           ugi, m.getName());
     }
   }
+
+  public boolean setPoolIpcConnections(String nsId, String user, int numConnections) {
+    if (connectionManager == null) {
+      return false;
+    }
+
+    return connectionManager.setPoolIpcConnections(nsId, user, numConnections);
+  }
 }

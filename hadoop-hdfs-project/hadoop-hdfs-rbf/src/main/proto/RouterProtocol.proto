@@ -59,4 +59,9 @@ service RouterAdminProtocolService {
    * Verify if current Router state is safe mode state.
    */
   rpc getSafeMode(GetSafeModeRequestProto) returns (GetSafeModeResponseProto);
+
+  /**
+   * Set the number of IPC connection for a pool.
+   */
+  rpc setPoolIpcConnections(SetPoolIpcConnectionsRequestProto) returns (SetPoolIpcConnectionsResponseProto);
 }

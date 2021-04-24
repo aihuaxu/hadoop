@@ -21,6 +21,7 @@ import java.io.IOException;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.hdfs.federation.protocol.proto.HdfsServerFederationProtos;
 import org.apache.hadoop.hdfs.federation.protocol.proto.HdfsServerFederationProtos.AddMountTableEntryRequestProto;
 import org.apache.hadoop.hdfs.federation.protocol.proto.HdfsServerFederationProtos.AddMountTableEntryResponseProto;
 import org.apache.hadoop.hdfs.federation.protocol.proto.HdfsServerFederationProtos.EnterSafeModeRequestProto;
@@ -33,37 +34,13 @@ import org.apache.hadoop.hdfs.federation.protocol.proto.HdfsServerFederationProt
 import org.apache.hadoop.hdfs.federation.protocol.proto.HdfsServerFederationProtos.LeaveSafeModeResponseProto;
 import org.apache.hadoop.hdfs.federation.protocol.proto.HdfsServerFederationProtos.RemoveMountTableEntryRequestProto;
 import org.apache.hadoop.hdfs.federation.protocol.proto.HdfsServerFederationProtos.RemoveMountTableEntryResponseProto;
+import org.apache.hadoop.hdfs.federation.protocol.proto.HdfsServerFederationProtos.SetPoolIpcConnectionsRequestProto;
+import org.apache.hadoop.hdfs.federation.protocol.proto.HdfsServerFederationProtos.SetPoolIpcConnectionsResponseProto;
 import org.apache.hadoop.hdfs.federation.protocol.proto.HdfsServerFederationProtos.UpdateMountTableEntryRequestProto;
 import org.apache.hadoop.hdfs.federation.protocol.proto.HdfsServerFederationProtos.UpdateMountTableEntryResponseProto;
 import org.apache.hadoop.hdfs.server.federation.router.RouterAdminServer;
-import org.apache.hadoop.hdfs.server.federation.store.protocol.AddMountTableEntryRequest;
-import org.apache.hadoop.hdfs.server.federation.store.protocol.AddMountTableEntryResponse;
-import org.apache.hadoop.hdfs.server.federation.store.protocol.EnterSafeModeRequest;
-import org.apache.hadoop.hdfs.server.federation.store.protocol.EnterSafeModeResponse;
-import org.apache.hadoop.hdfs.server.federation.store.protocol.GetMountTableEntriesRequest;
-import org.apache.hadoop.hdfs.server.federation.store.protocol.GetMountTableEntriesResponse;
-import org.apache.hadoop.hdfs.server.federation.store.protocol.GetSafeModeRequest;
-import org.apache.hadoop.hdfs.server.federation.store.protocol.GetSafeModeResponse;
-import org.apache.hadoop.hdfs.server.federation.store.protocol.LeaveSafeModeRequest;
-import org.apache.hadoop.hdfs.server.federation.store.protocol.LeaveSafeModeResponse;
-import org.apache.hadoop.hdfs.server.federation.store.protocol.RemoveMountTableEntryRequest;
-import org.apache.hadoop.hdfs.server.federation.store.protocol.RemoveMountTableEntryResponse;
-import org.apache.hadoop.hdfs.server.federation.store.protocol.UpdateMountTableEntryRequest;
-import org.apache.hadoop.hdfs.server.federation.store.protocol.UpdateMountTableEntryResponse;
-import org.apache.hadoop.hdfs.server.federation.store.protocol.impl.pb.AddMountTableEntryRequestPBImpl;
-import org.apache.hadoop.hdfs.server.federation.store.protocol.impl.pb.AddMountTableEntryResponsePBImpl;
-import org.apache.hadoop.hdfs.server.federation.store.protocol.impl.pb.EnterSafeModeRequestPBImpl;
-import org.apache.hadoop.hdfs.server.federation.store.protocol.impl.pb.EnterSafeModeResponsePBImpl;
-import org.apache.hadoop.hdfs.server.federation.store.protocol.impl.pb.GetMountTableEntriesRequestPBImpl;
-import org.apache.hadoop.hdfs.server.federation.store.protocol.impl.pb.GetMountTableEntriesResponsePBImpl;
-import org.apache.hadoop.hdfs.server.federation.store.protocol.impl.pb.GetSafeModeRequestPBImpl;
-import org.apache.hadoop.hdfs.server.federation.store.protocol.impl.pb.GetSafeModeResponsePBImpl;
-import org.apache.hadoop.hdfs.server.federation.store.protocol.impl.pb.LeaveSafeModeRequestPBImpl;
-import org.apache.hadoop.hdfs.server.federation.store.protocol.impl.pb.LeaveSafeModeResponsePBImpl;
-import org.apache.hadoop.hdfs.server.federation.store.protocol.impl.pb.RemoveMountTableEntryRequestPBImpl;
-import org.apache.hadoop.hdfs.server.federation.store.protocol.impl.pb.RemoveMountTableEntryResponsePBImpl;
-import org.apache.hadoop.hdfs.server.federation.store.protocol.impl.pb.UpdateMountTableEntryRequestPBImpl;
-import org.apache.hadoop.hdfs.server.federation.store.protocol.impl.pb.UpdateMountTableEntryResponsePBImpl;
+import org.apache.hadoop.hdfs.server.federation.store.protocol.*;
+import org.apache.hadoop.hdfs.server.federation.store.protocol.impl.pb.*;
 
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
@@ -208,4 +185,19 @@ public class RouterAdminProtocolServerSideTranslatorPB implements
       throw new ServiceException(e);
     }
   }
+
+  @Override
+  public SetPoolIpcConnectionsResponseProto setPoolIpcConnections(
+          RpcController controller,
+          SetPoolIpcConnectionsRequestProto request)
+          throws ServiceException {
+    try {
+      SetPoolIpcConnectionsRequest req = new SetPoolIpcConnectionsRequestPBImpl(request);
+      SetPoolIpcConnectionsResponse response = server.setPoolIpcConnections(req);
+      SetPoolIpcConnectionsResponsePBImpl responsePB =
+              (SetPoolIpcConnectionsResponsePBImpl) response;
+      return responsePB.getProto();
+    } catch (IOException e) {
+      throw new ServiceException(e);
+    }  }
 }

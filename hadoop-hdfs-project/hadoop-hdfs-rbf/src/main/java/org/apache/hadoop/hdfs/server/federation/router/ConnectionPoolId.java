@@ -101,6 +101,8 @@ public class ConnectionPoolId implements Comparable<ConnectionPoolId> {
     return ret;
   }
 
+  String getNnId() { return this.nnId; }
+
   @VisibleForTesting
   UserGroupInformation getUgi() {
     return this.ugi;
