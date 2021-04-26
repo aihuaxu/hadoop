@@ -196,18 +196,20 @@ public interface HdfsClientConfigKeys {
   String DFS_NAMENODE_RESOLVE_PATH_ENABLED_NAMESERVICES = "dfs.namenode.resolve-path.enabled.nameservices";
   String DFS_NAMENODE_RESOLVE_PATH_ENABLED_NAMESERVICES_DEFAULT = "ns-router";
 
-  String DFS_CLIENT_METRICS_SAMPLE_PERCENTAGE_KEY =
-      "dfs.client.metrics.sample.percentage";
-  int DFS_CLIENT_METRICS_SAMPLE_PERCENTAGE_DEFAULT = 10;
-
   String DFS_CLIENT_METRICS_REPORTER_ADDR_KEY =
       "dfs.client.metrics.reporter.addr";
   String DFS_CLIENT_METRICS_REPORTER_ADDR_DEFAULT =
       "localhost:9052";
 
+  // For end to end read() and pread() which may involve several data nodes
   String DFS_CLIENT_METRICS_EMIT_READ_TIME_THRESHOLD_KEY =
       "dfs.client.metrics.emit.read-time.threshold.ms";
   int DFS_CLIENT_METRICS_EMIT_READ_TIME_THRESHOLD_DEFAULT = 3 * 1000;
+
+  // Packet level metrics on a single data node
+  String DFS_CLIENT_METRICS_EMIT_READ_PACKET_TIME_THRESHOLD_KEY =
+      "dfs.client.metrics.emit.read-packet-time.threshold.ms";
+  int DFS_CLIENT_METRICS_EMIT_READ_PACKET_TIME_THRESHOLD_DEFAULT = 1000;
 
   /**
    * These are deprecated config keys to client code.

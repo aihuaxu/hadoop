@@ -148,10 +148,9 @@ public class DfsClientConf {
 
   private final boolean dataTransferTcpNoDelay;
 
-  private final int metricsSamplePercent;
   private final String metricsReporterAddr;
   private final int metricsReadEmitThreshold;
-
+  private final int metricsReadPacketEmitThreshold;
 
   public DfsClientConf(Configuration conf) {
     // The hdfsTimeout is currently the same as the ipc timeout
@@ -287,18 +286,17 @@ public class DfsClientConf {
 
     replicaAccessorBuilderClasses = loadReplicaAccessorBuilderClasses(conf);
 
-    metricsSamplePercent = conf.getInt(
-        HdfsClientConfigKeys.DFS_CLIENT_METRICS_SAMPLE_PERCENTAGE_KEY,
-        HdfsClientConfigKeys.DFS_CLIENT_METRICS_SAMPLE_PERCENTAGE_DEFAULT);
-
     metricsReporterAddr = conf.get(
         HdfsClientConfigKeys.DFS_CLIENT_METRICS_REPORTER_ADDR_KEY,
         HdfsClientConfigKeys.DFS_CLIENT_METRICS_REPORTER_ADDR_DEFAULT);
 
     metricsReadEmitThreshold = conf.getInt(
         HdfsClientConfigKeys.DFS_CLIENT_METRICS_EMIT_READ_TIME_THRESHOLD_KEY,
-        HdfsClientConfigKeys.DFS_CLIENT_METRICS_EMIT_READ_TIME_THRESHOLD_DEFAULT
-    );
+        HdfsClientConfigKeys.DFS_CLIENT_METRICS_EMIT_READ_TIME_THRESHOLD_DEFAULT);
+
+    metricsReadPacketEmitThreshold = conf.getInt(
+        HdfsClientConfigKeys.DFS_CLIENT_METRICS_EMIT_READ_PACKET_TIME_THRESHOLD_KEY,
+        HdfsClientConfigKeys.DFS_CLIENT_METRICS_EMIT_READ_PACKET_TIME_THRESHOLD_DEFAULT);
   }
 
   @SuppressWarnings("unchecked")
@@ -648,13 +646,6 @@ public class DfsClientConf {
   }
 
   /**
-   * @return the metricsSamplePercent
-   */
-  public int getMetricsSamplePercent() {
-    return metricsSamplePercent;
-  }
-
-  /**
    * @return Metrics reporter addr, like "localhost:9052"
    */
   public String getMetricsReporterAddr() {
@@ -666,6 +657,13 @@ public class DfsClientConf {
    */
   public int getMetricsReadEmitThreshold() {
     return metricsReadEmitThreshold;
+  }
+
+  /**
+   * @return the metricsReadPacketEmitThreshold
+   */
+  public int getMetricsReadPacketEmitThreshold() {
+    return metricsReadPacketEmitThreshold;
   }
 
   /**

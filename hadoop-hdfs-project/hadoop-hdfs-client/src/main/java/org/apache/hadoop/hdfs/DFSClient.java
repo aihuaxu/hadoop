@@ -378,8 +378,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
     this.saslClient = new SaslDataTransferClient(
         conf, DataTransferSaslUtil.getSaslPropertiesResolver(conf),
         TrustedChannelResolver.getInstance(conf), nnFallbackToSimpleAuth);
-    metricsPublisher = MetricsPublisher.getInstance(
-        dfsClientConf.getMetricsSamplePercent(), dfsClientConf.getMetricsReporterAddr());
+    metricsPublisher = MetricsPublisher.getInstance(dfsClientConf.getMetricsReporterAddr());
   }
 
   /**
