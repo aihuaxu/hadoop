@@ -53,7 +53,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import com.google.common.base.Preconditions;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.ByteBufferReadable;
 import org.apache.hadoop.fs.ByteBufferUtil;
 import org.apache.hadoop.fs.CanSetDropBehind;
@@ -65,7 +64,6 @@ import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.fs.HasEnhancedByteBufferAccess;
 import org.apache.hadoop.fs.ReadOption;
 import org.apache.hadoop.fs.StorageType;
-import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
 import org.apache.hadoop.hdfs.client.impl.BlockReaderFactory;
 import org.apache.hadoop.hdfs.client.impl.DfsClientConf;
 import org.apache.hadoop.hdfs.protocol.ClientDatanodeProtocol;
@@ -1074,11 +1072,9 @@ public class DFSInputStream extends FSInputStream
               FAST_SWITCH_TIMEOUT_COUNT, 1);
           if (shouldSwitch) {
             dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.COUNTER,
-                currentNode.getHostName(),
                 FAST_SWITCH_SWITCH_COUNT, 1);
             ThreadPoolExecutor threadpool = (ThreadPoolExecutor) bufferReaderExecutor;
             dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.GAUGE,
-                currentNode.getHostName(),
                 FAST_SWITCH_ACTIVE_THREAD_COUNT, threadpool.getActiveCount());
 
             // Try Switch
@@ -1104,8 +1100,9 @@ public class DFSInputStream extends FSInputStream
               // Give up on any further switch for this block and empty slownodes list.
               // Keep waiting for the currect blockreader.
               dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.COUNTER,
-                  currentNode.getHostName(), FAST_SWITCH_TOO_MANY_SLOWNESS_COUNT, 1);
-              DFSClient.LOG.info("Too many slow reads, give up further read switch." +
+                  FAST_SWITCH_TOO_MANY_SLOWNESS_COUNT, 1);
+              DFSClient.LOG.info("All candidate replicas are slow, it is likely that client is slow." +
+                  " Give up further read switch." +
                   " Slownode List: [" + getSlowNodesNames() + "].");
               slownodes.clear();
               shouldSwitch = false;
@@ -1133,11 +1130,9 @@ public class DFSInputStream extends FSInputStream
                   corruptedBlockMap);
             } else {
               IOException e = (IOException) result.exception;
-              if (!retryCurrentNode) {
-                DFSClient.LOG.warn("Exception while reading from "
-                    + getCurrentBlock() + " of " + src + " from "
-                    + currentNode, e);
-              }
+              DFSClient.LOG.warn("Exception while reading from "
+                  + getCurrentBlock() + " of " + src + " from "
+                  + currentNode, e);
               ioe = e;
               dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.COUNTER,
                   currentNode.getHostName(), READ_NUM_EXCEPTIONS, 1);
