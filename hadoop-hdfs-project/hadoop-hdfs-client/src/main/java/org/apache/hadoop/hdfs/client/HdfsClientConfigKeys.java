@@ -204,12 +204,12 @@ public interface HdfsClientConfigKeys {
   // For end to end read() and pread() which may involve several data nodes
   String DFS_CLIENT_METRICS_EMIT_READ_TIME_THRESHOLD_KEY =
       "dfs.client.metrics.emit.read-time.threshold.ms";
-  int DFS_CLIENT_METRICS_EMIT_READ_TIME_THRESHOLD_DEFAULT = 3 * 1000;
+  int DFS_CLIENT_METRICS_EMIT_READ_TIME_THRESHOLD_DEFAULT = 10 * 1000;
 
-  // Packet level metrics on a single data node
+  // Packet level metrics on reading from a single data node
   String DFS_CLIENT_METRICS_EMIT_READ_PACKET_TIME_THRESHOLD_KEY =
       "dfs.client.metrics.emit.read-packet-time.threshold.ms";
-  int DFS_CLIENT_METRICS_EMIT_READ_PACKET_TIME_THRESHOLD_DEFAULT = 1000;
+  int DFS_CLIENT_METRICS_EMIT_READ_PACKET_TIME_THRESHOLD_DEFAULT = 3 * 1000;
 
   /**
    * These are deprecated config keys to client code.
