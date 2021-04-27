@@ -73,6 +73,7 @@ import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier;
 import org.apache.hadoop.hdfs.server.datanode.CachingStrategy;
 import org.apache.hadoop.hdfs.server.namenode.NotReplicatedYetException;
 import org.apache.hadoop.hdfs.util.ByteArrayManager;
+import org.apache.hadoop.hdfs.util.MetricsPublisher;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.MultipleIOException;
 import org.apache.hadoop.ipc.RemoteException;
@@ -527,6 +528,10 @@ class DataStreamer extends Daemon {
   private final String[] favoredNodes;
   private final EnumSet<AddBlockFlag> addBlockFlags;
 
+  static final String SLOW_PACKET_TIME = "client.datastreamer.slow_packet_time";
+  static final String NUM_SLOW_PACKET = "client.datastreamer.num_slow_packet";
+  static final String NUM_BAD_DATANODE = "client.datastreamer.num_bad_datanode";
+
   private DataStreamer(HdfsFileStatus stat, ExtendedBlock block,
                        DFSClient dfsClient, String src,
                        Progressable progress, DataChecksum checksum,
@@ -896,6 +901,7 @@ class DataStreamer extends Daemon {
         LOG.warn("Slow waitForAckedSeqno took {}ms (threshold={}ms). File being"
                 + " written: {}, block: {}, Write pipeline datanodes: {}.",
             duration, dfsclientSlowLogThresholdMs, src, block, nodes);
+        emitSlowDatanode(duration);
       }
     }
   }
@@ -1087,6 +1093,7 @@ class DataStreamer extends Daemon {
                     + " took " + duration + "ms (threshold="
                     + dfsclientSlowLogThresholdMs + "ms); ack: " + ack
                     + ", targets: " + Arrays.asList(targets));
+                emitSlowDatanode(duration);
               }
             }
           }
@@ -1117,6 +1124,7 @@ class DataStreamer extends Daemon {
             // node error
             if (reply != SUCCESS) {
               errorState.setBadNodeIndex(i); // mark bad datanode
+              emitBadDatanode(targets[i]);
               throw new IOException("Bad response " + reply +
                   " for " + block + " from datanode " + targets[i]);
             }
@@ -1794,6 +1802,8 @@ class DataStreamer extends Daemon {
           errorState.initRestartingNode(i,
               "Datanode " + i + " is restarting: " + nodes[i],
               shouldWaitForRestart(i));
+        } else {
+          emitBadDatanode(nodes[i]);
         }
         errorState.setError(true);
         lastException.set(ie);
@@ -2124,5 +2134,17 @@ class DataStreamer extends Daemon {
     final ExtendedBlock extendedBlock = block.getCurrentBlock();
     return  (extendedBlock == null ? null : extendedBlock.getLocalBlock())
         + "@" + Arrays.toString(getNodes());
+  }
+
+  private void emitSlowDatanode(long duration) {
+    dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.GAUGE,
+        SLOW_PACKET_TIME, duration);
+    dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.COUNTER,
+        NUM_SLOW_PACKET, 1);
+  }
+
+  private void emitBadDatanode(DatanodeInfo datanodeInfo) {
+    dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.COUNTER,
+        datanodeInfo.getHostName(), NUM_BAD_DATANODE, 1);
   }
 }

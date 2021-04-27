@@ -13,7 +13,6 @@ import java.net.InetSocketAddress;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -28,6 +27,7 @@ public class MetricsPublisher {
 
   /**
   * Parent M3 scope for metrics with a "datanode" tag.
+  * Subscopes created from this scope are cached in dnSubscopeCache.
   * "host" tag must be removed. otherwise total cardinality would be greater
   * than 100K which would cause an m3 ban
   */
