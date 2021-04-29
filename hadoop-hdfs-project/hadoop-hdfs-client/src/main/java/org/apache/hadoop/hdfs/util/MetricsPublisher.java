@@ -1,89 +1,121 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.apache.hadoop.hdfs.util;
 
-
-import com.google.common.cache.*;
-import com.uber.m3.tally.*;
+import com.google.common.annotations.VisibleForTesting;
+import com.uber.m3.tally.RootScopeBuilder;
+import com.uber.m3.tally.Scope;
+import com.uber.m3.tally.ScopeBuilder;
+import com.uber.m3.tally.StatsReporter;
 import com.uber.m3.tally.m3.M3Reporter;
+import com.uber.m3.util.Duration;
 import com.uber.m3.util.ImmutableMap;
-
+import org.apache.hadoop.hdfs.client.impl.DfsClientConf;
+import org.apache.hadoop.util.ShutdownHookManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.InetSocketAddress;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
+import java.util.Collections;
 
 /**
- * MetricsPublisher is thread safe.
+ * A thread-safe metrics publisher that publishes hdfs client metrics to M3.
  */
 public class MetricsPublisher {
   private static final Logger LOG = LoggerFactory.getLogger(MetricsPublisher.class);
-  private static volatile MetricsPublisher INSTANCE;
+  private static MetricsPublisher INSTANCE;
 
   private static final String SERVICE_NAME = "hadoop";
   private static final String DATANODE_TAG = "datanode";
+  private static final String UBER_ENVIRONMENT = "UBER_ENVIRONMENT";
+  static final int SHUTDOWN_HOOK_PRIORITY = 10;
 
-  /**
-  * Parent M3 scope for metrics with a "datanode" tag.
-  * Subscopes created from this scope are cached in dnSubscopeCache.
-  * "host" tag must be removed. otherwise total cardinality would be greater
-  * than 100K which would cause an m3 ban
-  */
-  private Scope dnParentScope;
+  public enum MetricType {
+    GAUGE,
+    COUNTER
+  }
 
-  // General scope with a "host" tag.
-  private Scope scope;
-
-  /**
-   * HDFS client emits metrics with tag "datanode". As there are thousands
-   * of datanodes and tagging the scope actually creates a new scope which
-   * is rather expensive, we cache the subscopes.
-   */
-  private LoadingCache<String, Scope> dnSubscopeCache;
-
-  /**
-   * @param metricsReporterAddr In the form of "hostname:port"
-   */
-  public static MetricsPublisher getInstance(String metricsReporterAddr) {
+  public static synchronized MetricsPublisher getInstance(DfsClientConf conf) {
     if (INSTANCE == null) {
-      synchronized (MetricsPublisher.class) {
-        if (INSTANCE == null) {
-          INSTANCE = new MetricsPublisher(metricsReporterAddr);
-        }
-      }
+      INSTANCE = new MetricsPublisher(conf);
+      ShutdownHookManager.get().addShutdownHook(shutdownHook, SHUTDOWN_HOOK_PRIORITY);
     }
     return INSTANCE;
   }
 
-  private MetricsPublisher(String metricsReporterAddr) {
-    try {
-      dnParentScope = createM3Client(metricsReporterAddr, false);
-      scope = createM3Client(metricsReporterAddr, true);
-    } catch (Exception e) {
-      LOG.error("Unable to initialize m3 client.", e);
+  private static final Runnable shutdownHook = new Runnable() {
+    @Override
+    public void run() {
+      if (INSTANCE != null) {
+        INSTANCE.close();
+      }
     }
-    if (dnParentScope == null || scope == null) { // in case creation failed silently
-      LOG.error("Unable to initialize m3 client.");
-      return;
-    }
+  };
 
-    dnSubscopeCache = CacheBuilder.newBuilder()
-        .maximumSize(5000)
-        .expireAfterAccess(5, TimeUnit.MINUTES)
-        .build(new CacheLoader<String, Scope>() {
-          @Override
-          public Scope load(String datanode) {
-            Map<String, String> map = new HashMap<>();
-            map.put(DATANODE_TAG, datanode);
-            return dnParentScope.tagged(map);
-          }
-        });
+  /**
+   * Parent M3 scope for metrics with a "datanode" tag.
+   * When datanode tag is enabled, there will be NO tag for client host
+   * otherwise the total cardinality would be too large for M3 to handle
+   */
+  private final Scope dnParentScope;
+
+  /**
+   * General scope with a "host" tag.
+   */
+  private final Scope scope;
+
+  private MetricsPublisher(DfsClientConf conf) {
+    final InetSocketAddress reporterAddr =
+            getReporterAddress(conf.getMetricsReporterAddr());
+    final long reportInterval = conf.getMetricsReportIntervalMs();
+
+    dnParentScope = createM3Client(reporterAddr, false, reportInterval);
+    scope = createM3Client(reporterAddr, true, reportInterval);
+  }
+
+  private InetSocketAddress getReporterAddress(String reporterAddrStr) {
+    String[] splits = reporterAddrStr.trim().split(":");
+    String hostname = splits[0];
+    int port = Integer.parseInt(splits[1]);
+    return new InetSocketAddress(hostname, port);
+  }
+
+  private void close() {
+    try {
+      if (dnParentScope != null) {
+        dnParentScope.close();
+      }
+      if (scope != null) {
+        scope.close();
+      }
+    } catch (Exception e) {
+      LOG.warn("Could not close metrics clients gracefully", e);
+    }
+  }
+
+  @VisibleForTesting
+  public void closeForTest() {
+    close();
   }
 
   /**
-   * For client side datanode metrics which adds a special tag "datanode".
+   * Emit client->datanode metrics with the "datanode" tag.
+   * @param datanode the host name of the datanode
    */
   public void emit(MetricType metricType, String datanode,
                             String name, long amount) {
@@ -91,63 +123,67 @@ public class MetricsPublisher {
       LOG.warn("emit is called with empty datanode.");
       return;
     }
-
-    if (dnParentScope != null) {
-      try {
-        Scope dnScope = dnSubscopeCache.get(datanode);
-        switch (metricType) {
-          case GAUGE:
-            dnScope.gauge(name).update(amount);
-            break;
-          case COUNTER:
-            dnScope.counter(name).inc(amount);
-            break;
-        }
-      } catch (ExecutionException x) {
-        LOG.warn("Unable to emit metrics", x);
+    if (dnParentScope == null) {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("MetricsPublisher#dnParentScope is null");
       }
+      return;
     }
+
+    Scope dnScope = getDatanodeScope(datanode);
+    switch (metricType) {
+      case GAUGE:
+        dnScope.gauge(name).update(amount);
+        break;
+      case COUNTER:
+        dnScope.counter(name).inc(amount);
+        break;
+    }
+  }
+
+  private Scope getDatanodeScope(String datanode) {
+    return dnParentScope.tagged(Collections.singletonMap(DATANODE_TAG, datanode));
   }
 
   public void emit(MetricType metricType, String name, long amount) {
-    if (scope != null) {
-      switch (metricType) {
-        case GAUGE:
-          scope.gauge(name).update(amount);
-          break;
-        case COUNTER:
-          scope.counter(name).inc(amount);
-          break;
+    if (scope == null) {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("MetricsPublisher#scope is null");
       }
+      return;
+    }
+    switch (metricType) {
+      case GAUGE:
+        scope.gauge(name).update(amount);
+        break;
+      case COUNTER:
+        scope.counter(name).inc(amount);
+        break;
     }
   }
 
-
-  public enum MetricType {
-    GAUGE,
-    COUNTER
-  }
-
-  private static Scope createM3Client(String metricsReporterAddr, boolean includeHost) {
+  private static Scope createM3Client(InetSocketAddress reporterAddr,
+          boolean includeHost, long reportInterval) {
     ImmutableMap.Builder<String, String> tagsBuilder = new ImmutableMap.Builder<>();
     tagsBuilder.put(M3Reporter.SERVICE_TAG, SERVICE_NAME);
 
-    String uberEnviroment = System.getenv().get("UBER_ENVIRONMENT");
-    if (uberEnviroment == null || uberEnviroment.length() == 0) {
-      uberEnviroment = M3Reporter.DEFAULT_TAG_VALUE;
+    String uberEnvironment = System.getenv().get(UBER_ENVIRONMENT);
+    if (uberEnvironment == null || uberEnvironment.isEmpty()) {
+      uberEnvironment = M3Reporter.DEFAULT_TAG_VALUE;
     }
-    tagsBuilder.put(M3Reporter.ENV_TAG, uberEnviroment);
+    tagsBuilder.put(M3Reporter.ENV_TAG, uberEnvironment);
 
-    String[] splits = metricsReporterAddr.trim().split(":");
-    String hostname = splits[0];
-    int port = Integer.parseInt(splits[1]);
-    StatsReporter reporter =
-        new M3Reporter.Builder(new InetSocketAddress(hostname, port))
-            .includeHost(includeHost)
-            .commonTags(tagsBuilder.build())
-            .build();
+    try {
+      StatsReporter reporter = new M3Reporter.Builder(reporterAddr)
+              .includeHost(includeHost)
+              .commonTags(tagsBuilder.build())
+              .build();
 
-    ScopeBuilder scopeBuilder = new RootScopeBuilder().reporter(reporter);
-    return scopeBuilder.reportEvery(com.uber.m3.util.Duration.ofSeconds(10));
+      ScopeBuilder scopeBuilder = new RootScopeBuilder().reporter(reporter);
+      return scopeBuilder.reportEvery(Duration.ofMillis(reportInterval));
+    } catch (Exception e) {
+      LOG.error("Unable to initialize m3 client.", e);
+      return null;
+    }
   }
 }
