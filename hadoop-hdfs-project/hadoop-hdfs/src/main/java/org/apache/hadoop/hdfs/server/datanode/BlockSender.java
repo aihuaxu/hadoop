@@ -803,10 +803,10 @@ class BlockSender implements java.io.Closeable {
         manageOsCache();
 
         long start = Time.monotonicNow();
-        long len = sendPacket(pktBuf, maxChunksPerPacket, streamForSendChunks,
-            transferTo, throttler);
         // no-op in prod
         DataNodeFaultInjector.get().delaySendBlock();
+        long len = sendPacket(pktBuf, maxChunksPerPacket, streamForSendChunks,
+            transferTo, throttler);
         long duration = Time.monotonicNow() - start;
         if (duration > datanode.getDnConf().slowReadThresholdMs) {
           datanode.metrics.incrSlowPacketReads();

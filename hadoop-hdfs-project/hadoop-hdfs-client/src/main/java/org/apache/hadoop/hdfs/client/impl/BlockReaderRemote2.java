@@ -135,8 +135,8 @@ public class BlockReaderRemote2 implements BlockReader {
    * Metrics
    */
   @VisibleForTesting
-  static final String SLOW_PACKET_TIME = "client.blockreader.slow_packet_time";
-  static final String NUM_SLOW_PACKET = "client.blockreader.num_slow_packet";
+  public static final String SLOW_PACKET_TIME = "client.blockreader.slow_packet_time";
+  public static final String NUM_SLOW_PACKET = "client.blockreader.num_slow_packet";
 
   @VisibleForTesting
   public Peer getPeer() {

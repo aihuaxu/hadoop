@@ -145,10 +145,10 @@ public class DFSInputStream extends FSInputStream
   private IdentityHashStore<ByteBuffer, Object> extendedReadBuffers;
 
   private static final String READ_NUM_EXCEPTIONS = "client.read.num_exceptions";
-  private static final String SLOW_READ_TIME = "client.slow_read_time";
-  private static final String NUM_SLOW_READ = "client.num_slow_read";
-  private static final String SLOW_PREAD_TIME = "client.slow_pread_time";
-  private static final String NUM_SLOW_PREAD = "client.num_slow_pread";
+  static final String SLOW_READ_TIME = "client.slow_read_time";
+  static final String NUM_SLOW_READ = "client.num_slow_read";
+  static final String SLOW_PREAD_TIME = "client.slow_pread_time";
+  static final String NUM_SLOW_PREAD = "client.num_slow_pread";
 
   private synchronized IdentityHashStore<ByteBuffer, Object>
         getExtendedReadBuffers() {

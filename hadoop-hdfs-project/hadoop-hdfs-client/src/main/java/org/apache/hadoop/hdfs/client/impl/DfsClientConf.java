@@ -144,6 +144,7 @@ public class DfsClientConf {
   private final boolean dataTransferTcpNoDelay;
 
   private final String metricsReporterAddr;
+  private final long metricsReportIntervalMs;
   private final int metricsReadEmitThreshold;
   private final int metricsReadPacketEmitThreshold;
 
@@ -274,6 +275,9 @@ public class DfsClientConf {
     metricsReporterAddr = conf.get(
         HdfsClientConfigKeys.DFS_CLIENT_METRICS_REPORTER_ADDR_KEY,
         HdfsClientConfigKeys.DFS_CLIENT_METRICS_REPORTER_ADDR_DEFAULT);
+    metricsReportIntervalMs = conf.getLong(
+            HdfsClientConfigKeys.DFS_CLIENT_METRICS_REPORT_INTERVAL_KEY,
+            HdfsClientConfigKeys.DFS_CLIENT_METRICS_REPORT_INTERVAL_DEFAULT);
 
     metricsReadEmitThreshold = conf.getInt(
         HdfsClientConfigKeys.DFS_CLIENT_METRICS_EMIT_READ_TIME_THRESHOLD_KEY,
@@ -623,6 +627,13 @@ public class DfsClientConf {
    */
   public String getMetricsReporterAddr() {
     return metricsReporterAddr;
+  }
+
+  /**
+   * @return time interval for M3 client to report metrics
+   */
+  public long getMetricsReportIntervalMs() {
+    return metricsReportIntervalMs;
   }
 
   /**

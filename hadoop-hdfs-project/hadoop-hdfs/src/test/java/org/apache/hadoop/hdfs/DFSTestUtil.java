@@ -72,6 +72,10 @@ import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import com.uber.m3.tally.RootScopeBuilder;
+import com.uber.m3.tally.Scope;
+import com.uber.m3.tally.ScopeBuilder;
+import com.uber.m3.util.Duration;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.UnhandledException;
 import org.apache.commons.logging.Log;
@@ -147,6 +151,7 @@ import org.apache.hadoop.hdfs.server.protocol.ReceivedDeletedBlockInfo.BlockStat
 import org.apache.hadoop.hdfs.server.protocol.StorageReceivedDeletedBlocks;
 import org.apache.hadoop.hdfs.tools.DFSAdmin;
 import org.apache.hadoop.hdfs.tools.JMXGet;
+import org.apache.hadoop.hdfs.util.StatsReporterForTest;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.nativeio.NativeIO;
 import org.apache.hadoop.net.NetUtils;
@@ -278,6 +283,13 @@ public class DFSTestUtil {
     newLog.restart();
     Whitebox.setInternalState(fsn.getFSImage(), "editLog", newLog);
     Whitebox.setInternalState(fsn.getFSDirectory(), "editLog", newLog);
+  }
+
+  public static Scope createM3ClientForTest(long reportInterval,
+          Map<String, Long> counterMap, Map<String, Double> gaugeMap) {
+    StatsReporterForTest reporter = new StatsReporterForTest(counterMap, gaugeMap);
+    ScopeBuilder scopeBuilder = new RootScopeBuilder().reporter(reporter);
+    return scopeBuilder.reportEvery(Duration.ofMillis(reportInterval));
   }
 
   /** class MyFile contains enough information to recreate the contents of
