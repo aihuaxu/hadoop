@@ -181,6 +181,8 @@ public class DFSInputStream extends FSInputStream
   private static final String NUM_SLOW_READ = "client.num_slow_read";
   private static final String SLOW_PREAD_TIME = "client.slow_pread_time";
   private static final String NUM_SLOW_PREAD = "client.num_slow_pread";
+  private static final String SLOW_BLOCKREADER_CREATION = "client.slow_blockreader_creation";
+  private static final String SLOW_DO_READ = "client.slow_doread";
 
   // Fast switch metrics
   private static final String FAST_SWITCH_TIMEOUT_COUNT = "client.fast_switch_timeout_count";
@@ -678,6 +680,8 @@ public class DFSInputStream extends FSInputStream
    * We get block ID and the IDs of the destinations at startup, from the namenode.
    */
   private synchronized DatanodeInfo blockSeekTo(long target) throws IOException {
+    long startTick = Time.monotonicNow();
+
     if (target >= getFileLength()) {
       throw new IOException("Attempted to read past end of file");
     }
@@ -749,6 +753,8 @@ public class DFSInputStream extends FSInputStream
           // Put chosen node into dead list, continue
           addToDeadNodes(chosenNode);
         }
+      } finally {
+        emitBlockSeekToMetrics(startTick);
       }
     }
   }
@@ -875,7 +881,14 @@ public class DFSInputStream extends FSInputStream
     @Override
     public int doRead(BlockReader blockReader, int off, int len)
         throws IOException {
+      long start = Time.monotonicNow();
       int nRead = blockReader.read(buf, off, len);
+      long span = Time.monotonicNow() - start;
+      if (span > dfsClient.getConf().getMetricsReadEmitThreshold()) {
+        dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.GAUGE,
+            SLOW_DO_READ, span);
+        DFSClient.LOG.warn("doRead is slow: " + span + "ms. " + "DataNode: " + currentNode.getName());
+      }
       updateReadStatistics(readStatistics, nRead, blockReader);
       return nRead;
     }
@@ -900,6 +913,7 @@ public class DFSInputStream extends FSInputStream
     @Override
     public int doRead(BlockReader blockReader, int off, int len)
         throws IOException {
+      long start = Time.monotonicNow();
       int oldpos = buf.position();
       int oldlimit = buf.limit();
       boolean success = false;
@@ -916,6 +930,12 @@ public class DFSInputStream extends FSInputStream
           // Reset to original state so that retries work correctly.
           buf.position(oldpos);
           buf.limit(oldlimit);
+        }
+        long span = Time.monotonicNow() - start;
+        if (span > dfsClient.getConf().getMetricsReadEmitThreshold()) {
+          dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.GAUGE,
+              SLOW_DO_READ, span);
+          DFSClient.LOG.warn("doRead is slow: " + span + "ms. " + "DataNode: " + currentNode.getName());
         }
       }
     }
@@ -2235,6 +2255,15 @@ public class DFSInputStream extends FSInputStream
           NUM_SLOW_PREAD, 1);
       dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.GAUGE,
           SLOW_PREAD_TIME, span);
+    }
+  }
+
+  private void emitBlockSeekToMetrics(long startTick) {
+    long span = Time.monotonicNow() - startTick;
+    if (span > dfsClient.getConf().getMetricsReadEmitThreshold()) {
+      DFSClient.LOG.warn("Slow block seek to took " + span + "ms. " + "Datanode: " + currentNode.getHostName());
+      dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.GAUGE,
+          SLOW_BLOCKREADER_CREATION, span);
     }
   }
 }
