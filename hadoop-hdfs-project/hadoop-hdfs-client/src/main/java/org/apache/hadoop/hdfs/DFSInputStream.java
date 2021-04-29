@@ -1047,6 +1047,7 @@ public class DFSInputStream extends FSInputStream
     Future<ReadResult> currentFuture = null;
 
     boolean sourceFound;
+    int currentSwitchCount = 0;
 
     while (true) {
       try {
@@ -1056,8 +1057,10 @@ public class DFSInputStream extends FSInputStream
           Callable<ReadResult> readAction = doRead(len);
           currentFuture = executorCompletionService.submit(readAction);
         }
+        // Timeout value will increase by each switch for the current read.
         Future<ReadResult> finishedFuture = executorCompletionService.poll(
-            dfsClient.getConf().getFastSwitchThreshold(), TimeUnit.MILLISECONDS);
+            dfsClient.getConf().getFastSwitchThreshold() * (currentSwitchCount + 1),
+            TimeUnit.MILLISECONDS);
         // Make sure we are reading from correct future.
         // They were likely finished before cancellation.
         if (finishedFuture != null && finishedFuture != currentFuture) {
@@ -1093,6 +1096,7 @@ public class DFSInputStream extends FSInputStream
               currentFuture.cancel(true);
               abandonedReaders.add(oldReader);
               currentFuture = null;
+              currentSwitchCount++;
               switchCount++;
             } else {
               // All available nodes are either slow or dead.
