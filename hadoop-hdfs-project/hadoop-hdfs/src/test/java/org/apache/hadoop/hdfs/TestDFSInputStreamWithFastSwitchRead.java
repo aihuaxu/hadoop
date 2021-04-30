@@ -29,6 +29,10 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Random;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeoutException;
 
 import static org.junit.Assert.assertEquals;
@@ -171,26 +175,47 @@ public class TestDFSInputStreamWithFastSwitchRead {
     }
   }
 
+  private Callable<Boolean> doRead(final MiniDFSCluster cluster) {
+    return new Callable<Boolean>() {
+      @Override
+      public Boolean call() {
+        try {
+          writeFile(cluster);
+          DFSInputStream fin = validateSimpleRead(cluster);
+          fin.close();
+        } catch (IOException e) {
+          System.out.println("testtest + " + e);
+        }
+        return true;
+      }
+    };
+  }
+
   /**
    * When all the nodes are relatively slow, read should not fail
    * It should just use the last node available.
    * @throws IOException
    */
   @Test(timeout=300000)
-  public void testAllNodesAreSlow() throws IOException {
+  public void testAllNodesAreSlow() throws Exception {
     Configuration conf = generateConfig();
     MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(3).build();
     cluster.getDataNodes().get(0).setDelayDataNodeForTest(true, 5000);
     cluster.getDataNodes().get(1).setDelayDataNodeForTest(true, 5000);
     cluster.getDataNodes().get(2).setDelayDataNodeForTest(true, 5000);
     try {
-      writeFile(cluster);
-      DFSInputStream fin = validateSimpleRead(cluster);
-      // Times of switching should be related to the number of blocks.
-      // Round-up
-      int shouldSwitchTimes = ((TEST_FILE_LEN + BLOCK_SIZE - 1) / BLOCK_SIZE) * 2;
-      assertEquals(shouldSwitchTimes, fin.switchCount);
-      fin.close();
+//      writeFile(cluster);
+//      DFSInputStream fin = validateSimpleRead(cluster);
+//      // Times of switching should be related to the number of blocks.
+//      // Round-up
+//      int shouldSwitchTimes = ((TEST_FILE_LEN + BLOCK_SIZE - 1) / BLOCK_SIZE) * 2;
+//      assertEquals(shouldSwitchTimes, fin.switchCount);
+//      fin.close();
+      ExecutorService e = Executors.newSingleThreadExecutor();
+      Future f = e.submit(doRead(cluster));
+      Thread.sleep(1000);
+      f.cancel(true);
+      Thread.sleep(10000);
     } finally {
       cluster.shutdown();
     }

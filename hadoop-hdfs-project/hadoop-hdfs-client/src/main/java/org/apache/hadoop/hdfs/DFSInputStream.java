@@ -1047,7 +1047,7 @@ public class DFSInputStream extends FSInputStream
 
   private synchronized int readBufferFastSwitch(ReaderStrategy reader, int off, int len,
       Map<ExtendedBlock, Set<DatanodeInfo>> corruptedBlockMap)
-      throws IOException {
+      throws IOException, InterruptedException {
     IOException ioe;
 
     boolean retryCurrentNode = true;
@@ -1067,9 +1067,11 @@ public class DFSInputStream extends FSInputStream
           currentFuture = executorCompletionService.submit(readAction);
         }
         // Timeout value will increase by each switch for the current read.
-        Future<ReadResult> finishedFuture = executorCompletionService.poll(
+        Future<ReadResult> finishedFuture;
+        finishedFuture = executorCompletionService.poll(
             dfsClient.getConf().getFastSwitchThreshold() * (currentSwitchCount + 1),
             TimeUnit.MILLISECONDS);
+
         // Make sure we are reading from correct future.
         // They were likely finished before cancellation.
         if (finishedFuture != null && finishedFuture != currentFuture) {
@@ -1171,11 +1173,13 @@ public class DFSInputStream extends FSInputStream
             currentFuture = null;
           }
         }
-      } catch (ExecutionException | InterruptedException e) {
+      } catch (ExecutionException e) {
         String errMsg = "Reader thread exits unexpectedly," +
             " when reading datanode: " + currentNode;
         DFSClient.LOG.error(errMsg, e);
         throw new IOException(errMsg);
+      } catch (InterruptedException e) {
+        throw e;
       }
     }
   }
@@ -1188,6 +1192,7 @@ public class DFSInputStream extends FSInputStream
     Map<ExtendedBlock,Set<DatanodeInfo>> corruptedBlockMap = new HashMap<>();
     failures = 0;
     if (pos < getFileLength()) {
+      boolean shouldRetry = true;
       int retries = 2;
       while (retries > 0) {
         try {
@@ -1210,7 +1215,12 @@ public class DFSInputStream extends FSInputStream
 
           int result;
           if (useFastSwitch) {
-            result = readBufferFastSwitch(strategy, off, realLen, corruptedBlockMap);
+            try {
+              result = readBufferFastSwitch(strategy, off, realLen, corruptedBlockMap);
+            } catch (InterruptedException e) {
+              shouldRetry = false;
+              throw new IOException(e);
+            }
           } else {
             result = readBuffer(strategy, off, realLen, corruptedBlockMap);
           }
@@ -1232,7 +1242,7 @@ public class DFSInputStream extends FSInputStream
           }
           blockEnd = -1;
           if (currentNode != null) { addToDeadNodes(currentNode); }
-          if (--retries == 0) {
+          if (--retries == 0 || !shouldRetry) {
             throw e;
           }
         } finally {
