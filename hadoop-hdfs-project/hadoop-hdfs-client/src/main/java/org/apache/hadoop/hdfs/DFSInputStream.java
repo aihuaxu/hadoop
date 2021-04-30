@@ -743,6 +743,11 @@ public class DFSInputStream extends FSInputStream
           // The encryption key used is invalid.
           refetchEncryptionKey--;
           dfsClient.clearDataEncryptionKey();
+        } else if (ex instanceof InterruptedIOException) {
+          DFSClient.LOG.warn("Interrupted when constructing block reader to "
+              + targetAddr
+              + ", add to deadNodes and continue. " + ex, ex);
+          throw ex;
         } else if (refetchToken > 0 && tokenRefetchNeeded(ex, targetAddr)) {
           refetchToken--;
           fetchBlockAt(target);
@@ -1068,6 +1073,7 @@ public class DFSInputStream extends FSInputStream
         }
         // Timeout value will increase by each switch for the current read.
         Future<ReadResult> finishedFuture;
+        long startTime = Time.monotonicNow();
         finishedFuture = executorCompletionService.poll(
             dfsClient.getConf().getFastSwitchThreshold() * (currentSwitchCount + 1),
             TimeUnit.MILLISECONDS);
@@ -1082,6 +1088,7 @@ public class DFSInputStream extends FSInputStream
 
         // TODO: Consider other conditions to switch.
         if (finishedFuture == null) {
+          DFSClient.LOG.warn("Waited time + " + (Time.monotonicNow() - startTime));
           DFSClient.LOG.warn("executorCompletionService + " + executorCompletionService);
           dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.COUNTER,
               currentNode.getHostName(),
@@ -1173,17 +1180,17 @@ public class DFSInputStream extends FSInputStream
             currentFuture = null;
           }
         }
-      } catch (ExecutionException e) {
-        String errMsg = "Reader thread exits unexpectedly," +
-            " when reading datanode: " + currentNode;
-        DFSClient.LOG.error(errMsg, e);
-        throw new IOException(errMsg);
       } catch (InterruptedException e) {
         if (currentFuture != null) {
           DFSClient.LOG.info("Cancelling future due to interrupt.");
           currentFuture.cancel(true);
         }
         throw e;
+      } catch (ExecutionException e) {
+        String errMsg = "Reader thread exits unexpectedly," +
+            " when reading datanode: " + currentNode;
+        DFSClient.LOG.error(errMsg, e);
+        throw new IOException(errMsg);
       }
     }
   }
@@ -2267,8 +2274,10 @@ public class DFSInputStream extends FSInputStream
   private void emitBlockSeekToMetrics(long startTick) {
     long span = Time.monotonicNow() - startTick;
     if (span > dfsClient.getConf().getMetricsReadEmitThreshold()) {
-      DFSClient.LOG.warn("Detect slowness when connecting to datanode." +
-          " Took " + span + "ms. " + "Datanode: " + currentNode.getName());
+      if (currentNode != null) {
+        DFSClient.LOG.warn("Detect slowness when connecting to datanode." +
+            " Took " + span + "ms. " + "Datanode: " + currentNode.getName());
+      }
       dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.GAUGE,
           SLOW_BLOCKREADER_CREATION, span);
     }
