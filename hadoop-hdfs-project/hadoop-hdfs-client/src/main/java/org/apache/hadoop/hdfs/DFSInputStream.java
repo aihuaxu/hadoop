@@ -999,8 +999,13 @@ public class DFSInputStream extends FSInputStream
         BlockReader currentReader = blockReader;
         ByteBuffer bb = ByteBuffer.allocate(len);
         try {
+          long start = Time.monotonicNow();
           int nread = blockReader.read(bb);
           bb.flip();
+          long span = Time.monotonicNow() - start;
+          if (span > 10000) {
+            DFSClient.LOG.warn("Do read span: " + span + ", Datanode: " + currentNode.getName());
+          }
           return new ReadResult(nread, bb, null, blockReader);
         } catch (InterruptedIOException iie) {
           try {
@@ -1068,12 +1073,14 @@ public class DFSInputStream extends FSInputStream
         // Make sure we are reading from correct future.
         // They were likely finished before cancellation.
         if (finishedFuture != null && finishedFuture != currentFuture) {
+          DFSClient.LOG.warn("FinishedFuture + " + finishedFuture);
           continue;
         }
         ReadResult result;
 
         // TODO: Consider other conditions to switch.
         if (finishedFuture == null) {
+          DFSClient.LOG.warn("executorCompletionService + " + executorCompletionService);
           dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.COUNTER,
               currentNode.getHostName(),
               FAST_SWITCH_TIMEOUT_COUNT, 1);
@@ -1083,6 +1090,7 @@ public class DFSInputStream extends FSInputStream
             ThreadPoolExecutor threadpool = (ThreadPoolExecutor) bufferReaderExecutor;
             dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.GAUGE,
                 FAST_SWITCH_ACTIVE_THREAD_COUNT, threadpool.getActiveCount());
+            DFSClient.LOG.info("Try to switch blockreader. Active thread count: " + threadpool.getActiveCount());
 
             // Try Switch
             DFSClient.LOG.info("Try to switch blockreader. Current slow datanode: " + currentNode.getName());
