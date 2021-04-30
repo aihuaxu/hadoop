@@ -215,6 +215,9 @@ public interface HdfsClientConfigKeys {
       "dfs.client.metrics.emit.read-packet-time.threshold.ms";
   int DFS_CLIENT_METRICS_EMIT_READ_PACKET_TIME_THRESHOLD_DEFAULT = 3 * 1000;
 
+  // Client metrics environment to distinguish clients
+  String DFS_CLIENT_METRICS_ENV_KEY = "dfs.client.metrics.env";
+
   /**
    * These are deprecated config keys to client code.
    */
