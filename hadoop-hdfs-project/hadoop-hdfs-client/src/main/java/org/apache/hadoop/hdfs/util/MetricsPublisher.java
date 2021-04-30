@@ -43,7 +43,10 @@ public class MetricsPublisher {
   private static final String SERVICE_NAME = "hadoop";
   private static final String DATANODE_TAG = "datanode";
   private static final String UBER_ENVIRONMENT = "UBER_ENVIRONMENT";
-  static final int SHUTDOWN_HOOK_PRIORITY = 10;
+  // If client doesn't configure an environment name, use the UBER_ENVIRONMENT
+  // system environment variable but add a prefix so we can easily identify them
+  private static final String UBER_ENVIRONMENT_PREFIX = "uber_env_";
+  private static final int SHUTDOWN_HOOK_PRIORITY = 10;
 
   public enum MetricType {
     GAUGE,
@@ -80,15 +83,11 @@ public class MetricsPublisher {
   private final Scope scope;
 
   private MetricsPublisher(DfsClientConf conf) {
-    final InetSocketAddress reporterAddr =
-            getReporterAddress(conf.getMetricsReporterAddr());
-    final long reportInterval = conf.getMetricsReportIntervalMs();
-
-    dnParentScope = createM3Client(reporterAddr, false, reportInterval);
-    scope = createM3Client(reporterAddr, true, reportInterval);
+    dnParentScope = createM3Client(false, conf);
+    scope = createM3Client(true, conf);
   }
 
-  private InetSocketAddress getReporterAddress(String reporterAddrStr) {
+  private static InetSocketAddress getReporterAddress(String reporterAddrStr) {
     String[] splits = reporterAddrStr.trim().split(":");
     String hostname = splits[0];
     int port = Integer.parseInt(splits[1]);
@@ -162,16 +161,15 @@ public class MetricsPublisher {
     }
   }
 
-  private static Scope createM3Client(InetSocketAddress reporterAddr,
-          boolean includeHost, long reportInterval) {
+  private static Scope createM3Client(boolean includeHost, DfsClientConf conf) {
+    final InetSocketAddress reporterAddr =
+        getReporterAddress(conf.getMetricsReporterAddr());
+    final long reportInterval = conf.getMetricsReportIntervalMs();
+    final String metricsEnvironment = getMetricsEnvironment(conf);
+
     ImmutableMap.Builder<String, String> tagsBuilder = new ImmutableMap.Builder<>();
     tagsBuilder.put(M3Reporter.SERVICE_TAG, SERVICE_NAME);
-
-    String uberEnvironment = System.getenv().get(UBER_ENVIRONMENT);
-    if (uberEnvironment == null || uberEnvironment.isEmpty()) {
-      uberEnvironment = M3Reporter.DEFAULT_TAG_VALUE;
-    }
-    tagsBuilder.put(M3Reporter.ENV_TAG, uberEnvironment);
+    tagsBuilder.put(M3Reporter.ENV_TAG, metricsEnvironment);
 
     try {
       StatsReporter reporter = new M3Reporter.Builder(reporterAddr)
@@ -185,5 +183,20 @@ public class MetricsPublisher {
       LOG.error("Unable to initialize m3 client.", e);
       return null;
     }
+  }
+
+  private static String getMetricsEnvironment(DfsClientConf conf) {
+    String metricsEnvironment = conf.getMetricsEnvironment();
+    if (metricsEnvironment != null && !metricsEnvironment.isEmpty()) {
+      return metricsEnvironment;
+    }
+
+    metricsEnvironment = UBER_ENVIRONMENT_PREFIX;
+    String uberEnvironment = System.getenv().get(UBER_ENVIRONMENT);
+    if (uberEnvironment != null && !uberEnvironment.isEmpty()) {
+      metricsEnvironment += uberEnvironment;
+    }
+
+    return metricsEnvironment;
   }
 }

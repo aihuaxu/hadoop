@@ -147,6 +147,7 @@ public class DfsClientConf {
   private final long metricsReportIntervalMs;
   private final int metricsReadEmitThreshold;
   private final int metricsReadPacketEmitThreshold;
+  private final String metricsEnvironment;
 
   public DfsClientConf(Configuration conf) {
     // The hdfsTimeout is currently the same as the ipc timeout
@@ -286,6 +287,8 @@ public class DfsClientConf {
     metricsReadPacketEmitThreshold = conf.getInt(
         HdfsClientConfigKeys.DFS_CLIENT_METRICS_EMIT_READ_PACKET_TIME_THRESHOLD_KEY,
         HdfsClientConfigKeys.DFS_CLIENT_METRICS_EMIT_READ_PACKET_TIME_THRESHOLD_DEFAULT);
+
+    metricsEnvironment = conf.getTrimmed(HdfsClientConfigKeys.DFS_CLIENT_METRICS_ENV_KEY, "");
   }
 
   @SuppressWarnings("unchecked")
@@ -648,6 +651,13 @@ public class DfsClientConf {
    */
   public int getMetricsReadPacketEmitThreshold() {
     return metricsReadPacketEmitThreshold;
+  }
+
+  /**
+   * @return the metricsEnvironment
+   */
+  public String getMetricsEnvironment() {
+    return metricsEnvironment;
   }
 
   /**
