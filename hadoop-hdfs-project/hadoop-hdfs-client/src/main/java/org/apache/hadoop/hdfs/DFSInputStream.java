@@ -734,6 +734,7 @@ public class DFSInputStream extends FSInputStream
           DFSClient.LOG.info("Successfully connected to " + targetAddr +
                              " for " + targetBlock.getBlock());
         }
+        emitBlockSeekToMetrics(startTick);
         return chosenNode;
       } catch (IOException ex) {
         if (ex instanceof InvalidEncryptionKeyException && refetchEncryptionKey > 0) {
@@ -753,8 +754,6 @@ public class DFSInputStream extends FSInputStream
           // Put chosen node into dead list, continue
           addToDeadNodes(chosenNode);
         }
-      } finally {
-        emitBlockSeekToMetrics(startTick);
       }
     }
   }
