@@ -40,6 +40,7 @@ import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
+import javax.ws.rs.HeaderParam;
 import javax.ws.rs.POST;
 import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
@@ -105,6 +106,8 @@ import com.google.common.base.Charsets;
 import com.google.common.collect.Lists;
 import com.sun.jersey.spi.container.ResourceFilters;
 import org.apache.hadoop.util.Time;
+import org.apache.htrace.core.SpanId;
+import org.apache.htrace.core.TraceScope;
 
 /** Web-hdfs NameNode implementation. */
 @Path("")
@@ -366,6 +369,8 @@ public class NamenodeWebHdfsMethods {
   @Produces({MediaType.APPLICATION_OCTET_STREAM, MediaType.APPLICATION_JSON})
   public Response putRoot(
       @Context final UserGroupInformation ugi,
+      @HeaderParam(HTraceSpanIdParam.NAME)
+      final HTraceSpanIdParam hTraceSpanId,
       @QueryParam(DelegationParam.NAME) @DefaultValue(DelegationParam.DEFAULT)
           final DelegationParam delegation,
       @QueryParam(UserParam.NAME) @DefaultValue(UserParam.DEFAULT)
@@ -419,7 +424,8 @@ public class NamenodeWebHdfsMethods {
       @QueryParam(StoragePolicyParam.NAME) @DefaultValue(StoragePolicyParam
           .DEFAULT) final StoragePolicyParam policyName
       ) throws IOException, InterruptedException {
-    return put(ugi, delegation, username, doAsUser, ROOT, op, destination,
+    return put(ugi, hTraceSpanId, delegation,
+        username, doAsUser, ROOT, op, destination,
         owner, group, permission, overwrite, bufferSize, replication,
         blockSize, modificationTime, accessTime, renameOptions, createParent,
         delegationTokenArgument, aclPermission, xattrName, xattrValue,
@@ -434,6 +440,8 @@ public class NamenodeWebHdfsMethods {
   @Produces({MediaType.APPLICATION_OCTET_STREAM, MediaType.APPLICATION_JSON})
   public Response put(
       @Context final UserGroupInformation ugi,
+      @HeaderParam(HTraceSpanIdParam.NAME)
+      final HTraceSpanIdParam hTraceSpanId,
       @QueryParam(DelegationParam.NAME) @DefaultValue(DelegationParam.DEFAULT)
           final DelegationParam delegation,
       @QueryParam(UserParam.NAME) @DefaultValue(UserParam.DEFAULT)
@@ -489,24 +497,27 @@ public class NamenodeWebHdfsMethods {
           .DEFAULT) final StoragePolicyParam policyName
       ) throws IOException, InterruptedException {
 
-    init(ugi, delegation, username, doAsUser, path, op, destination, owner,
-        group, permission, overwrite, bufferSize, replication, blockSize,
-        modificationTime, accessTime, renameOptions, delegationTokenArgument,
-        aclPermission, xattrName, xattrValue, xattrSetFlag, snapshotName,
-        oldSnapshotName, excludeDatanodes, createFlagParam, policyName);
+    try (TraceScope scope = createTraceScope(hTraceSpanId, "NamenodeWebHdfsMethods#put")) {
 
-    return doAs(ugi, new PrivilegedExceptionAction<Response>() {
-      @Override
-      public Response run() throws IOException, URISyntaxException {
-          return put(ugi, delegation, username, doAsUser,
-              path.getAbsolutePath(), op, destination, owner, group,
-              permission, overwrite, bufferSize, replication, blockSize,
-              modificationTime, accessTime, renameOptions, createParent,
-              delegationTokenArgument, aclPermission, xattrName, xattrValue,
-              xattrSetFlag, snapshotName, oldSnapshotName, excludeDatanodes,
-              createFlagParam, policyName);
-      }
-    });
+        init(ugi, delegation, username, doAsUser, path, op, destination, owner,
+                group, permission, overwrite, bufferSize, replication, blockSize,
+                modificationTime, accessTime, renameOptions, delegationTokenArgument,
+                aclPermission, xattrName, xattrValue, xattrSetFlag, snapshotName,
+                oldSnapshotName, excludeDatanodes, createFlagParam, policyName);
+
+        return doAs(ugi, new PrivilegedExceptionAction<Response>() {
+            @Override
+            public Response run() throws IOException, URISyntaxException {
+                return put(ugi, delegation, username, doAsUser,
+                        path.getAbsolutePath(), op, destination, owner, group,
+                        permission, overwrite, bufferSize, replication, blockSize,
+                        modificationTime, accessTime, renameOptions, createParent,
+                        delegationTokenArgument, aclPermission, xattrName, xattrValue,
+                        xattrSetFlag, snapshotName, oldSnapshotName, excludeDatanodes,
+                        createFlagParam, policyName);
+            }
+        });
+    }
   }
 
   private Response put(
@@ -687,6 +698,8 @@ public class NamenodeWebHdfsMethods {
   @Produces({MediaType.APPLICATION_OCTET_STREAM, MediaType.APPLICATION_JSON})
   public Response postRoot(
       @Context final UserGroupInformation ugi,
+      @HeaderParam(HTraceSpanIdParam.NAME)
+          final HTraceSpanIdParam hTraceSpanId,
       @QueryParam(DelegationParam.NAME) @DefaultValue(DelegationParam.DEFAULT)
           final DelegationParam delegation,
       @QueryParam(UserParam.NAME) @DefaultValue(UserParam.DEFAULT)
@@ -704,7 +717,8 @@ public class NamenodeWebHdfsMethods {
       @QueryParam(NewLengthParam.NAME) @DefaultValue(NewLengthParam.DEFAULT)
           final NewLengthParam newLength
       ) throws IOException, InterruptedException {
-    return post(ugi, delegation, username, doAsUser, ROOT, op, concatSrcs,
+    return post(ugi, hTraceSpanId, delegation,
+        username, doAsUser, ROOT, op, concatSrcs,
         bufferSize, excludeDatanodes, newLength);
   }
 
@@ -715,6 +729,8 @@ public class NamenodeWebHdfsMethods {
   @Produces({MediaType.APPLICATION_OCTET_STREAM, MediaType.APPLICATION_JSON})
   public Response post(
       @Context final UserGroupInformation ugi,
+      @HeaderParam(HTraceSpanIdParam.NAME)
+          final HTraceSpanIdParam hTraceSpanId,
       @QueryParam(DelegationParam.NAME) @DefaultValue(DelegationParam.DEFAULT)
           final DelegationParam delegation,
       @QueryParam(UserParam.NAME) @DefaultValue(UserParam.DEFAULT)
@@ -734,17 +750,19 @@ public class NamenodeWebHdfsMethods {
           final NewLengthParam newLength
       ) throws IOException, InterruptedException {
 
-    init(ugi, delegation, username, doAsUser, path, op, concatSrcs, bufferSize,
-        excludeDatanodes, newLength);
+      try (TraceScope scope = createTraceScope(hTraceSpanId, "NamenodeWebHdfsMethods#post")) {
+          init(ugi, delegation, username, doAsUser, path, op, concatSrcs, bufferSize,
+                  excludeDatanodes, newLength);
 
-    return doAs(ugi, new PrivilegedExceptionAction<Response>() {
-      @Override
-      public Response run() throws IOException, URISyntaxException {
-          return post(ugi, delegation, username, doAsUser,
-              path.getAbsolutePath(), op, concatSrcs, bufferSize,
-              excludeDatanodes, newLength);
+          return doAs(ugi, new PrivilegedExceptionAction<Response>() {
+              @Override
+              public Response run() throws IOException, URISyntaxException {
+                  return post(ugi, delegation, username, doAsUser,
+                          path.getAbsolutePath(), op, concatSrcs, bufferSize,
+                          excludeDatanodes, newLength);
+              }
+          });
       }
-    });
   }
 
   private Response post(
@@ -802,6 +820,8 @@ public class NamenodeWebHdfsMethods {
   @Produces({MediaType.APPLICATION_OCTET_STREAM, MediaType.APPLICATION_JSON})
   public Response getRoot(
       @Context final UserGroupInformation ugi,
+      @HeaderParam(HTraceSpanIdParam.NAME)
+          final HTraceSpanIdParam hTraceSpanId,
       @QueryParam(DelegationParam.NAME) @DefaultValue(DelegationParam.DEFAULT)
           final DelegationParam delegation,
       @QueryParam(UserParam.NAME) @DefaultValue(UserParam.DEFAULT)
@@ -831,10 +851,37 @@ public class NamenodeWebHdfsMethods {
       @QueryParam(TokenServiceParam.NAME) @DefaultValue(TokenServiceParam.DEFAULT)
           final TokenServiceParam tokenService
       ) throws IOException, InterruptedException {
-    return get(ugi, delegation, username, doAsUser, ROOT, op, offset, length,
+    return get(ugi, hTraceSpanId, delegation, username,
+        doAsUser, ROOT, op, offset, length,
         renewer, bufferSize, xattrNames, xattrEncoding, excludeDatanodes, fsAction,
         tokenKind, tokenService);
   }
+
+  // Create a trace scope when instructed by the HTTP requests
+  protected TraceScope createTraceScope(HTraceSpanIdParam spanIdStr,
+                                        String description) throws IOException {
+    if (spanIdStr == null || spanIdStr.getValue() == null) {
+      return null;
+    }
+    // Get the SpanId from the HTTP Request Headers
+    SpanId spanId;
+    try {
+        spanId = SpanId.fromString(spanIdStr.getValue());
+    } catch (RuntimeException e) {
+        // ignored
+        return null;
+    }
+
+    // Get the NameNode Tracer
+    final Configuration conf = (Configuration)context.getAttribute(JspHelper.CURRENT_CONF);
+    final NameNode nn = (NameNode)context.getAttribute("name.node");
+    if (nn == null) {
+      // Not able to get the NameNode, ignored
+      return null;
+    }
+    return nn.getTracer().newScope(description, spanId);
+  }
+
 
   /** Handle HTTP GET request. */
   @GET
@@ -842,6 +889,8 @@ public class NamenodeWebHdfsMethods {
   @Produces({MediaType.APPLICATION_OCTET_STREAM, MediaType.APPLICATION_JSON})
   public Response get(
       @Context final UserGroupInformation ugi,
+      @HeaderParam(HTraceSpanIdParam.NAME)
+          final HTraceSpanIdParam hTraceSpanId,
       @QueryParam(DelegationParam.NAME) @DefaultValue(DelegationParam.DEFAULT)
           final DelegationParam delegation,
       @QueryParam(UserParam.NAME) @DefaultValue(UserParam.DEFAULT)
@@ -873,19 +922,21 @@ public class NamenodeWebHdfsMethods {
           final TokenServiceParam tokenService
       ) throws IOException, InterruptedException {
 
-    init(ugi, delegation, username, doAsUser, path, op, offset, length,
-        renewer, bufferSize, xattrEncoding, excludeDatanodes, fsAction,
-        tokenKind, tokenService);
+    try (TraceScope scope = createTraceScope(hTraceSpanId, "NamenodeWebHdfsMethods#get")) {
+        init(ugi, delegation, username, doAsUser, path, op, offset, length,
+                renewer, bufferSize, xattrEncoding, excludeDatanodes, fsAction,
+                tokenKind, tokenService);
 
-    return doAs(ugi, new PrivilegedExceptionAction<Response>() {
-      @Override
-      public Response run() throws IOException, URISyntaxException {
-          return get(ugi, delegation, username, doAsUser,
-              path.getAbsolutePath(), op, offset, length, renewer, bufferSize,
-              xattrNames, xattrEncoding, excludeDatanodes, fsAction, tokenKind,
-              tokenService);
-      }
-    });
+        return doAs(ugi, new PrivilegedExceptionAction<Response>() {
+            @Override
+            public Response run() throws IOException, URISyntaxException {
+                return get(ugi, delegation, username, doAsUser,
+                        path.getAbsolutePath(), op, offset, length, renewer, bufferSize,
+                        xattrNames, xattrEncoding, excludeDatanodes, fsAction, tokenKind,
+                        tokenService);
+            }
+        });
+    }
   }
 
   private Response get(
@@ -1109,6 +1160,8 @@ public class NamenodeWebHdfsMethods {
   @Produces(MediaType.APPLICATION_JSON)
   public Response deleteRoot(
       @Context final UserGroupInformation ugi,
+      @HeaderParam(HTraceSpanIdParam.NAME)
+          final HTraceSpanIdParam hTraceSpanId,
       @QueryParam(DelegationParam.NAME) @DefaultValue(DelegationParam.DEFAULT)
           final DelegationParam delegation,
       @QueryParam(UserParam.NAME) @DefaultValue(UserParam.DEFAULT)
@@ -1124,7 +1177,8 @@ public class NamenodeWebHdfsMethods {
       @QueryParam(SnapshotNameParam.NAME) @DefaultValue(SnapshotNameParam.DEFAULT)
           final SnapshotNameParam snapshotName
       ) throws IOException, InterruptedException {
-    return delete(ugi, delegation, username, doAsUser, ROOT, op, recursive,
+    return delete(ugi, hTraceSpanId, delegation,
+            username, doAsUser, ROOT, op, recursive,
             skiptrash, snapshotName);
   }
 
@@ -1134,6 +1188,8 @@ public class NamenodeWebHdfsMethods {
   @Produces(MediaType.APPLICATION_JSON)
   public Response delete(
       @Context final UserGroupInformation ugi,
+      @HeaderParam(HTraceSpanIdParam.NAME)
+          final HTraceSpanIdParam hTraceSpanId,
       @QueryParam(DelegationParam.NAME) @DefaultValue(DelegationParam.DEFAULT)
           final DelegationParam delegation,
       @QueryParam(UserParam.NAME) @DefaultValue(UserParam.DEFAULT)
@@ -1151,16 +1207,18 @@ public class NamenodeWebHdfsMethods {
           final SnapshotNameParam snapshotName
       ) throws IOException, InterruptedException {
 
-    init(ugi, delegation, username, doAsUser, path, op, recursive,
-            skiptrash, snapshotName);
+    try (TraceScope scope = createTraceScope(hTraceSpanId, "NamenodeWebHdfsMethods#delete")) {
+        init(ugi, delegation, username, doAsUser, path, op, recursive,
+                skiptrash, snapshotName);
 
-    return doAs(ugi, new PrivilegedExceptionAction<Response>() {
-      @Override
-      public Response run() throws IOException {
-          return delete(ugi, delegation, username, doAsUser,
-              path.getAbsolutePath(), op, recursive, skiptrash, snapshotName);
-      }
-    });
+        return doAs(ugi, new PrivilegedExceptionAction<Response>() {
+            @Override
+            public Response run() throws IOException {
+                return delete(ugi, delegation, username, doAsUser,
+                        path.getAbsolutePath(), op, recursive, skiptrash, snapshotName);
+            }
+        });
+    }
   }
 
   private Response delete(
