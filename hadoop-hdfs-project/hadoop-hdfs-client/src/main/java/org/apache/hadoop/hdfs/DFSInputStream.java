@@ -182,7 +182,6 @@ public class DFSInputStream extends FSInputStream
   private static final String SLOW_PREAD_TIME = "client.slow_pread_time";
   private static final String NUM_SLOW_PREAD = "client.num_slow_pread";
   private static final String SLOW_BLOCKREADER_CREATION = "client.slow_blockreader_creation";
-  private static final String SLOW_DO_READ = "client.slow_doread";
 
   // Fast switch metrics
   private static final String FAST_SWITCH_TIMEOUT_COUNT = "client.fast_switch_timeout_count";
