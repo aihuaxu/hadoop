@@ -880,9 +880,7 @@ public class DFSInputStream extends FSInputStream
     @Override
     public int doRead(BlockReader blockReader, int off, int len)
         throws IOException {
-      long startTick = Time.monotonicNow();
       int nRead = blockReader.read(buf, off, len);
-      emitSlowDoReadMetrics(startTick);
       updateReadStatistics(readStatistics, nRead, blockReader);
       return nRead;
     }
@@ -907,7 +905,6 @@ public class DFSInputStream extends FSInputStream
     @Override
     public int doRead(BlockReader blockReader, int off, int len)
         throws IOException {
-      long startTick = Time.monotonicNow();
       int oldpos = buf.position();
       int oldlimit = buf.limit();
       boolean success = false;
@@ -925,7 +922,6 @@ public class DFSInputStream extends FSInputStream
           buf.position(oldpos);
           buf.limit(oldlimit);
         }
-        emitSlowDoReadMetrics(startTick);
       }
     }
 
@@ -1004,9 +1000,7 @@ public class DFSInputStream extends FSInputStream
         BlockReader currentReader = blockReader;
         ByteBuffer bb = ByteBuffer.allocate(len);
         try {
-          long startTick = Time.monotonicNow();
           int nread = blockReader.read(bb);
-          emitSlowDoReadMetrics(startTick);
           bb.flip();
           return new ReadResult(nread, bb, null, blockReader);
         } catch (InterruptedIOException iie) {
@@ -2256,16 +2250,6 @@ public class DFSInputStream extends FSInputStream
           " Took " + span + "ms. " + "Datanode: " + currentNode.getName());
       dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.GAUGE,
           SLOW_BLOCKREADER_CREATION, span);
-    }
-  }
-
-  private void emitSlowDoReadMetrics(long startTick) {
-    long span = Time.monotonicNow() - startTick;
-    if (span > dfsClient.getConf().getMetricsReadEmitThreshold()) {
-      dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.GAUGE,
-          SLOW_DO_READ, span);
-      DFSClient.LOG.warn("Detect slowness when reading from datanode." +
-          " Took " + span + "ms. " + "DataNode: " + currentNode.getName());
     }
   }
 }
