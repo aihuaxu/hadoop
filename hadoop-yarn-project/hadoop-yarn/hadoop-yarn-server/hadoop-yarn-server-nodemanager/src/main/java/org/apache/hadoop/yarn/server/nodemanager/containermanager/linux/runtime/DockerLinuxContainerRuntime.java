@@ -206,6 +206,8 @@ public class DockerLinuxContainerRuntime implements LinuxContainerRuntime {
   @InterfaceAudience.Private
   public static final String ENV_DOCKER_CONTAINER_DELAYED_REMOVAL =
       "YARN_CONTAINER_RUNTIME_DOCKER_DELAYED_REMOVAL";
+  // TODO: Support staging and production https://t3.uberinternal.com/browse/YARN-576
+  private static final String ENV_DOCKER_SPIFFE_PRODUCTION = "production";
 
   private Configuration conf;
   private DockerClient dockerClient;
@@ -752,8 +754,8 @@ public class DockerLinuxContainerRuntime implements LinuxContainerRuntime {
      */
     if (UserGroupInformation.isSecurityEnabled() && dockerSpiffeLabelKey != null &&
             dockerSpiffeLabelValuePrefix != null) {
-      // Add docker label com.uber.spiffe:yarn/uidNumber/900021
-      String spiffeUIDNumberPath = dockerSpiffeLabelValuePrefix + uid;
+      // Add docker label com.uber.spiffe:yarn/uidNumber/900021/production
+      String spiffeUIDNumberPath = dockerSpiffeLabelValuePrefix + uid + "/" + ENV_DOCKER_SPIFFE_PRODUCTION;
       String spiffeDockerLabel = String.format("%s:%s", dockerSpiffeLabelKey, spiffeUIDNumberPath);
       if (containerLabelStr.equals("")) {
         containerLabelStr = spiffeDockerLabel;

@@ -519,7 +519,8 @@ public class TestDockerContainerRuntime {
 
     byte[] dockerCommand = Files.readAllBytes(Paths.get(dockerCommandFile));
     String dockerCommandStr = new String(dockerCommand, StandardCharsets.UTF_8);
-    Assert.assertTrue(dockerCommandStr.contains("org.apache.hadoop.spiffe:yarn/uidNumber/"));
+    String spiffeLabelRegex = ".*org.apache.hadoop.spiffe:yarn/uidNumber/\\d+/production.*";
+    Assert.assertTrue(dockerCommandStr.matches(spiffeLabelRegex));
   }
 
   @Test
