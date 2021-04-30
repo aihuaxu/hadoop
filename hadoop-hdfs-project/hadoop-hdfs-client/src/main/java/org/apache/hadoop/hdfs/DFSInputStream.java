@@ -1179,6 +1179,10 @@ public class DFSInputStream extends FSInputStream
         DFSClient.LOG.error(errMsg, e);
         throw new IOException(errMsg);
       } catch (InterruptedException e) {
+        if (currentFuture != null) {
+          DFSClient.LOG.info("Cancelling future due to interrupt.");
+          currentFuture.cancel(true);
+        }
         throw e;
       }
     }
