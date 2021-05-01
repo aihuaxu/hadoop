@@ -746,7 +746,7 @@ public class DFSInputStream extends FSInputStream
         } else if (ex instanceof InterruptedIOException) {
           DFSClient.LOG.warn("Interrupted when constructing block reader to "
               + targetAddr
-              + ", add to deadNodes and continue. " + ex, ex);
+              + ", do not retry.", ex);
           throw ex;
         } else if (refetchToken > 0 && tokenRefetchNeeded(ex, targetAddr)) {
           refetchToken--;
@@ -1088,6 +1088,11 @@ public class DFSInputStream extends FSInputStream
 
         // TODO: Consider other conditions to switch.
         if (finishedFuture == null) {
+          if (Thread.interrupted()) {
+            String errMsg = "Read interrupted when reading from + " + currentNode.getName();
+            DFSClient.LOG.warn(errMsg);
+            throw new InterruptedException(errMsg);
+          }
           DFSClient.LOG.warn("Waited time + " + (Time.monotonicNow() - startTime));
           DFSClient.LOG.warn("executorCompletionService + " + executorCompletionService);
           dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.COUNTER,
