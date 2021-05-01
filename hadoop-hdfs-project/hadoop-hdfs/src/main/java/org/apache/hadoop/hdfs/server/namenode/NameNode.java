@@ -332,7 +332,8 @@ public class NameNode implements NameNodeStatusMXBean {
   public static final HAState STANDBY_STATE = new StandbyState();
   public static final HAState OBSERVER_STATE = new ObserverState();
 
-  private static final String NAMENODE_HTRACE_PREFIX = "namenode.htrace.";
+  @VisibleForTesting
+  public static final String NAMENODE_HTRACE_PREFIX = "namenode.htrace.";
 
   public static final Log MetricsLog =
       LogFactory.getLog("NameNodeMetricsLog");
@@ -991,6 +992,13 @@ public class NameNode implements NameNodeStatusMXBean {
       }
     }
     tracer.close();
+  }
+
+  /**
+   * Used by {@link org.apache.hadoop.hdfs.server.namenode.web.resources.NamenodeWebHdfsMethods}
+   */
+  public Tracer getTracer() {
+    return tracer;
   }
 
   synchronized boolean isStopRequested() {
