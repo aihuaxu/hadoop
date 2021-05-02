@@ -36,6 +36,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletionService;
@@ -998,16 +999,19 @@ public class DFSInputStream extends FSInputStream
     }
   }
 
-  private Callable<ReadResult> doRead(final int len) {
+  private Callable<ReadResult> doRead(final int len, final UUID uuid) {
     return new Callable<ReadResult>() {
       @Override
       public ReadResult call() {
+        futureState.put(uuid, "Read called, blockreader + " + blockReader);
         BlockReader currentReader = blockReader;
         ByteBuffer bb = ByteBuffer.allocate(len);
         String dnName = currentNode.getName();
         long start = Time.monotonicNow();
         try {
+          futureState.put(uuid, "Read started, blockreader + " + blockReader);
           int nread = blockReader.read(bb);
+          futureState.put(uuid, "Read finished, blockreader + " + blockReader);
           bb.flip();
           long span = Time.monotonicNow() - start;
           if (span > 5000) {
@@ -1015,6 +1019,8 @@ public class DFSInputStream extends FSInputStream
                 SLOW_DOREAD_TIME, span);
             DFSClient.LOG.warn("Do read span: " + span + ", Datanode: " + dnName);
           }
+          futureState.put(uuid, "Read returned, blockreader + " + blockReader);
+          futureState.remove(uuid);
           return new ReadResult(nread, bb, null, blockReader);
         } catch (InterruptedIOException iie) {
           long span = Time.monotonicNow() - start;
@@ -1023,8 +1029,12 @@ public class DFSInputStream extends FSInputStream
                 SLOW_DOREAD_TIME, span);
             DFSClient.LOG.warn("Interrupted: Do read span: " + span + ", Datanode: " + dnName);
           }
+          futureState.put(uuid, "Read Interrupted, blockreader + " + blockReader);
           try {
+            futureState.put(uuid, "Read Interrupted, closing blockreader + " + currentReader);
             currentReader.close();
+            futureState.put(uuid, "Read returned with interrupt, blockreader + " + currentReader);
+            futureState.remove(uuid);
             return new ReadResult(0, null, new IOException("This reader is closed."), blockReader);
           } catch (IOException e) {
             DFSClient.LOG.warn("Failed to close blockreader after reader interrupted.");
@@ -1037,7 +1047,13 @@ public class DFSInputStream extends FSInputStream
                 SLOW_DOREAD_TIME, span);
             DFSClient.LOG.warn("IOE: Do read span: " + span + ", Datanode: " + dnName + ", IOE: " + e);
           }
+          futureState.put(uuid, "Read IOE, closing blockreader + " + currentReader);
+          futureState.remove(uuid);
           return new ReadResult(0, null, e, blockReader);
+        } catch (Exception e) {
+          long span = Time.monotonicNow() - start;
+          DFSClient.LOG.warn("Other exception: Do read span: " + span + ", Datanode: " + dnName + ", IOE: " + e);
+          return null;
         }
       }
     };
@@ -1066,6 +1082,8 @@ public class DFSInputStream extends FSInputStream
     return sb.toString();
   }
 
+  Map<UUID, String> futureState = new ConcurrentHashMap<>();
+
   private synchronized int readBufferFastSwitch(ReaderStrategy reader, int off, int len,
       Map<ExtendedBlock, Set<DatanodeInfo>> corruptedBlockMap)
       throws IOException, InterruptedException {
@@ -1075,6 +1093,7 @@ public class DFSInputStream extends FSInputStream
 
     // Current reader
     Future<ReadResult> currentFuture = null;
+    UUID futureUuid = null;
 
     boolean sourceFound;
     int currentSwitchCount = 0;
@@ -1084,7 +1103,8 @@ public class DFSInputStream extends FSInputStream
         // Currentfuture is null, when we do read at the first time or retry read.
         // Also check to make sure currentFuture is in progress, otherwise start a retry.
         if (currentFuture == null) {
-          Callable<ReadResult> readAction = doRead(len);
+          futureUuid = UUID.randomUUID();
+          Callable<ReadResult> readAction = doRead(len, futureUuid);
           currentFuture = executorCompletionService.submit(readAction);
         }
         // Timeout value will increase by each switch for the current read.
@@ -1110,7 +1130,12 @@ public class DFSInputStream extends FSInputStream
             throw new InterruptedException(errMsg);
           }
           DFSClient.LOG.warn("Waited time + " + (Time.monotonicNow() - startTime));
-          DFSClient.LOG.warn("Future state + " + currentFuture);
+          DFSClient.LOG.warn("Current future + " + currentFuture);
+          if (futureState.containsKey(futureUuid)) {
+            DFSClient.LOG.warn("Future state: " + futureState.get(futureUuid));
+          } else {
+            DFSClient.LOG.warn("Future state does not exist. uuid: " + futureUuid);
+          }
           DFSClient.LOG.warn("executorCompletionService + " + executorCompletionService);
           dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.COUNTER,
               currentNode.getHostName(),
