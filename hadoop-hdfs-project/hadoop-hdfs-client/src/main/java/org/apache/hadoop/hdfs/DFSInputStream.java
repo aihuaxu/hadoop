@@ -20,6 +20,7 @@ package org.apache.hadoop.hdfs;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InterruptedIOException;
+import java.lang.management.ManagementFactory;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.AbstractMap;
@@ -998,10 +999,11 @@ public class DFSInputStream extends FSInputStream
     }
   }
 
-  private Callable<ReadResult> doRead(final int len) {
+  private Callable<ReadResult> doRead(final int len, final long startTime) {
     return new Callable<ReadResult>() {
       @Override
       public ReadResult call() {
+        runningFutures.add(startTime);
         BlockReader currentReader = blockReader;
         ByteBuffer bb = ByteBuffer.allocate(len);
         String dnName = currentNode.getName();
@@ -1038,10 +1040,14 @@ public class DFSInputStream extends FSInputStream
             DFSClient.LOG.warn("IOE: Do read span: " + span + ", Datanode: " + dnName + ", IOE: " + e);
           }
           return new ReadResult(0, null, e, blockReader);
+        } finally {
+          runningFutures.remove(startTime);
         }
       }
     };
   }
+
+  Set<Long> runningFutures = Collections.newSetFromMap(new ConcurrentHashMap<Long, Boolean>());
 
   static class ReadResult {
     int nread;
@@ -1075,6 +1081,7 @@ public class DFSInputStream extends FSInputStream
 
     // Current reader
     Future<ReadResult> currentFuture = null;
+    long currentFutureStartTime = 0;
 
     boolean sourceFound;
     int currentSwitchCount = 0;
@@ -1084,12 +1091,12 @@ public class DFSInputStream extends FSInputStream
         // Currentfuture is null, when we do read at the first time or retry read.
         // Also check to make sure currentFuture is in progress, otherwise start a retry.
         if (currentFuture == null) {
-          Callable<ReadResult> readAction = doRead(len);
+          currentFutureStartTime = Time.monotonicNow();
+          Callable<ReadResult> readAction = doRead(len, currentFutureStartTime);
           currentFuture = executorCompletionService.submit(readAction);
         }
         // Timeout value will increase by each switch for the current read.
         Future<ReadResult> finishedFuture;
-        long startTime = Time.monotonicNow();
         finishedFuture = executorCompletionService.poll(
             dfsClient.getConf().getFastSwitchThreshold() * (currentSwitchCount + 1),
             TimeUnit.MILLISECONDS);
@@ -1109,13 +1116,17 @@ public class DFSInputStream extends FSInputStream
             DFSClient.LOG.warn(errMsg);
             throw new InterruptedException(errMsg);
           }
-          DFSClient.LOG.warn("Waited time + " + (Time.monotonicNow() - startTime));
+          DFSClient.LOG.warn("Waited time + " + (Time.monotonicNow() - currentFutureStartTime));
           DFSClient.LOG.warn("Future state + " + currentFuture);
           DFSClient.LOG.warn("executorCompletionService + " + executorCompletionService);
+          DFSClient.LOG.warn("JVM thread count: " + ManagementFactory.getThreadMXBean().getThreadCount());
           dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.COUNTER,
               currentNode.getHostName(),
               FAST_SWITCH_TIMEOUT_COUNT, 1);
-          if (shouldSwitch) {
+          DFSClient.LOG.warn("Current future started: " + runningFutures.contains(currentFutureStartTime));
+
+          // Make sure current future is already executing.
+          if (shouldSwitch && runningFutures.contains(currentFutureStartTime)) {
             dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.COUNTER,
                 FAST_SWITCH_SWITCH_COUNT, 1);
             ThreadPoolExecutor threadpool = (ThreadPoolExecutor) bufferReaderExecutor;
@@ -1137,6 +1148,7 @@ public class DFSInputStream extends FSInputStream
               blockReader = null;
               seekToNewSource(pos);
               currentFuture.cancel(true);
+              runningFutures.remove(currentFutureStartTime);
               abandonedReaders.add(oldReader);
               currentFuture = null;
               currentSwitchCount++;
@@ -1206,6 +1218,7 @@ public class DFSInputStream extends FSInputStream
         if (currentFuture != null) {
           DFSClient.LOG.info("Cancelling future due to interrupt.");
           currentFuture.cancel(true);
+          runningFutures.remove(currentFutureStartTime);
         }
         throw e;
       } catch (ExecutionException e) {
