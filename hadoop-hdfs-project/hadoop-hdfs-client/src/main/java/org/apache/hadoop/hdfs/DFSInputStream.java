@@ -178,6 +178,7 @@ public class DFSInputStream extends FSInputStream
 
   private static final String READ_NUM_EXCEPTIONS = "client.read.num_exceptions";
   private static final String SLOW_READ_TIME = "client.slow_read_time";
+  private static final String SLOW_DOREAD_TIME = "client.slow_do_read_time";
   private static final String NUM_SLOW_READ = "client.num_slow_read";
   private static final String SLOW_PREAD_TIME = "client.slow_pread_time";
   private static final String NUM_SLOW_PREAD = "client.num_slow_pread";
@@ -1003,16 +1004,25 @@ public class DFSInputStream extends FSInputStream
       public ReadResult call() {
         BlockReader currentReader = blockReader;
         ByteBuffer bb = ByteBuffer.allocate(len);
+        String dnName = currentNode.getName();
+        long start = Time.monotonicNow();
         try {
-          long start = Time.monotonicNow();
           int nread = blockReader.read(bb);
           bb.flip();
           long span = Time.monotonicNow() - start;
-          if (span > 10000) {
-            DFSClient.LOG.warn("Do read span: " + span + ", Datanode: " + currentNode.getName());
+          if (span > 5000) {
+            dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.GAUGE,
+                SLOW_DOREAD_TIME, span);
+            DFSClient.LOG.warn("Do read span: " + span + ", Datanode: " + dnName);
           }
           return new ReadResult(nread, bb, null, blockReader);
         } catch (InterruptedIOException iie) {
+          long span = Time.monotonicNow() - start;
+          if (span > 5000) {
+            dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.GAUGE,
+                SLOW_DOREAD_TIME, span);
+            DFSClient.LOG.warn("Interrupted: Do read span: " + span + ", Datanode: " + dnName);
+          }
           try {
             currentReader.close();
             return new ReadResult(0, null, new IOException("This reader is closed."), blockReader);
@@ -1021,6 +1031,12 @@ public class DFSInputStream extends FSInputStream
             return new ReadResult(0, null, e, blockReader);
           }
         } catch (IOException e) {
+          long span = Time.monotonicNow() - start;
+          if (span > 5000) {
+            dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.GAUGE,
+                SLOW_DOREAD_TIME, span);
+            DFSClient.LOG.warn("IOE: Do read span: " + span + ", Datanode: " + dnName + ", IOE: " + e);
+          }
           return new ReadResult(0, null, e, blockReader);
         }
       }
@@ -1094,6 +1110,7 @@ public class DFSInputStream extends FSInputStream
             throw new InterruptedException(errMsg);
           }
           DFSClient.LOG.warn("Waited time + " + (Time.monotonicNow() - startTime));
+          DFSClient.LOG.warn("Future state + " + currentFuture);
           DFSClient.LOG.warn("executorCompletionService + " + executorCompletionService);
           dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.COUNTER,
               currentNode.getHostName(),
