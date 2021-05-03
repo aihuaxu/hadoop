@@ -170,6 +170,23 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
         </executions>
       </plugin>
       <plugin>
+        <artifactId>maven-jar-plugin</artifactId>
+        <configuration>
+          <archive>
+            <manifest>
+          <addDefaultImplementationEntries>true</addDefaultImplementationEntries>
+          <addDefaultSpecificationEntries>true</addDefaultSpecificationEntries>
+            </manifest>
+            <manifestEntries>
+          <Jenkins-Build-Number>${BUILD_NUMBER}</Jenkins-Build-Number>
+          <Jenkins-Build-Url>${BUILD_URL}</Jenkins-Build-Url>
+          <Git-Commit>${GIT_COMMIT}</Git-Commit>
+          <Implementation-Version>${project.version}.${BUILD_NUMBER}</Implementation-Version>
+            </manifestEntries>
+          </archive>
+        </configuration>
+      </plugin>
+      <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-javadoc-plugin</artifactId>
         <configuration>
