@@ -152,6 +152,11 @@
       <scope>compile</scope>
     </dependency>
     <dependency>
+      <groupId>apphealth</groupId>
+      <artifactId>apphealth-logger-log4j</artifactId>
+      <scope>compile</scope>
+    </dependency>
+    <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
       <scope>test</scope>
