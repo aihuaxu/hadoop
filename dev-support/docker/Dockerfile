@@ -56,7 +56,7 @@ RUN apt-get -q update && apt-get -q install --no-install-recommends -y \
     pkg-config \
     protobuf-compiler \
     protobuf-c-compiler \
-    python3 \
+    python3.7 \
     python3-pip \
     python3-pkg-resources \
     python3-setuptools \
