@@ -131,8 +131,6 @@ public class DFSInputStream extends FSInputStream
   private Set<DatanodeInfo> slownodes = new HashSet<>();
   // Should we switch for current block.
   private boolean shouldSwitch = false;
-  private Set<Long> runningFutures =
-      Collections.newSetFromMap(new ConcurrentHashMap<Long, Boolean>());
   protected int switchCount;
 
   // state shared by stateful and positional read:
@@ -328,7 +326,7 @@ public class DFSInputStream extends FSInputStream
       shouldSwitch = true;
       // TODO: Consider if we should use something else rather than FixedThreadPool.
        bufferReaderExecutor =
-          Executors.newCachedThreadPool();
+          Executors.newFixedThreadPool(dfsClient.getConf().getFastSwitchThreadpoolSize());
       executorCompletionService = new ExecutorCompletionService<>(bufferReaderExecutor);
     } else {
       useFastSwitch = false;
@@ -998,32 +996,47 @@ public class DFSInputStream extends FSInputStream
     }
   }
 
-  private Callable<ReadResult> doRead(final int len, final long startTime) {
-    return new Callable<ReadResult>() {
-      @Override
-      public ReadResult call() {
-        runningFutures.add(startTime);
-        BlockReader currentReader = blockReader;
-        ByteBuffer bb = ByteBuffer.allocate(len);
+  class DoReadCallable implements Callable<ReadResult> {
+
+    // TODO: use enum
+    String state;
+    final long startTime;
+    final int len;
+
+    DoReadCallable(int len, long startTime) {
+      this.len = len;
+      this.startTime = startTime;
+      this.state = "Initialized";
+    }
+
+    @Override
+    public ReadResult call() {
+      state = "Started";
+      BlockReader currentReader = blockReader;
+      ByteBuffer bb = ByteBuffer.allocate(len);
+      try {
+        state = "Started Reading";
+        int nread = blockReader.read(bb);
+        bb.flip();
+        return new ReadResult(nread, bb, null, blockReader);
+      } catch (InterruptedIOException iie) {
         try {
-          int nread = blockReader.read(bb);
-          bb.flip();
-          return new ReadResult(nread, bb, null, blockReader);
-        } catch (InterruptedIOException iie) {
-          try {
-            currentReader.close();
-            return new ReadResult(0, null, new IOException("This reader is closed."), blockReader);
-          } catch (IOException e) {
-            DFSClient.LOG.warn("Failed to close blockreader after reader interrupted.");
-            return new ReadResult(0, null, e, blockReader);
-          }
+          currentReader.close();
+          return new ReadResult(0, null, new IOException("This reader is closed."), blockReader);
         } catch (IOException e) {
+          DFSClient.LOG.warn("Failed to close blockreader after reader interrupted.");
           return new ReadResult(0, null, e, blockReader);
-        } finally {
-          runningFutures.remove(startTime);
         }
+      } catch (IOException e) {
+        return new ReadResult(0, null, e, blockReader);
+      } finally {
+        state = "Finished";
       }
-    };
+    }
+
+    public String getState() {
+      return state;
+    }
   }
 
   static class ReadResult {
@@ -1058,6 +1071,7 @@ public class DFSInputStream extends FSInputStream
 
     // Current reader
     Future<ReadResult> currentFuture = null;
+    DoReadCallable readAction = null;
     long currentFutureStartTime = 0;
 
     boolean sourceFound;
@@ -1069,7 +1083,7 @@ public class DFSInputStream extends FSInputStream
         // Also check to make sure currentFuture is in progress, otherwise start a retry.
         if (currentFuture == null) {
           currentFutureStartTime = Time.monotonicNow();
-          Callable<ReadResult> readAction = doRead(len, currentFutureStartTime);
+          readAction = new DoReadCallable(len, currentFutureStartTime);
           currentFuture = executorCompletionService.submit(readAction);
         }
         // Timeout value will increase by each switch for the current read.
@@ -1095,11 +1109,13 @@ public class DFSInputStream extends FSInputStream
           dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.COUNTER,
               currentNode.getHostName(),
               FAST_SWITCH_TIMEOUT_COUNT, 1);
-          if (!runningFutures.contains(currentFutureStartTime)) {
-            DFSClient.LOG.info("Current read has not started yet.");
+
+          DFSClient.LOG.info("Current state of callable: " + readAction.getState());
+          if (readAction.getState().equals("Initialized")) {
+            DFSClient.LOG.warn("Current read has not started yet.");
           }
           // Make sure current future is already executing.
-          if (shouldSwitch && runningFutures.contains(currentFutureStartTime)) {
+          if (shouldSwitch && !readAction.getState().equals("Initialized")) {
             dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.COUNTER,
                 FAST_SWITCH_SWITCH_COUNT, 1);
 
@@ -1117,7 +1133,6 @@ public class DFSInputStream extends FSInputStream
               blockReader = null;
               seekToNewSource(pos);
               currentFuture.cancel(true);
-              runningFutures.remove(currentFutureStartTime);
               abandonedReaders.add(oldReader);
               currentFuture = null;
               currentSwitchCount++;
@@ -1187,13 +1202,11 @@ public class DFSInputStream extends FSInputStream
         if (currentFuture != null) {
           DFSClient.LOG.info("Cancelling future due to interrupt.");
           currentFuture.cancel(true);
-          runningFutures.remove(currentFutureStartTime);
         }
         throw e;
       } catch (ExecutionException e) {
         String errMsg = "Reader thread exits unexpectedly," +
             " when reading datanode: " + currentNode;
-        runningFutures.remove(currentFutureStartTime);
         DFSClient.LOG.error(errMsg, e);
         throw new IOException(errMsg);
       }

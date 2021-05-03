@@ -418,7 +418,7 @@ public interface HdfsClientConfigKeys {
     String  THRESHOLD_MILLIS_KEY = PREFIX + "threshold.millis";
     long    THRESHOLD_MILLIS_DEFAULT = 10000;
     String  THREADPOOL_SIZE_KEY = PREFIX + "threadpool.size";
-    int     THREADPOOL_SIZE_DEFAULT = 10;
+    int     THREADPOOL_SIZE_DEFAULT = 4;
   }
 
   /** dfs.client.hedged.read configuration properties */
