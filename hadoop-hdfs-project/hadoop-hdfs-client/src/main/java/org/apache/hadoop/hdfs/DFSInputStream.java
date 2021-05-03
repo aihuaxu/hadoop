@@ -20,7 +20,6 @@ package org.apache.hadoop.hdfs;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InterruptedIOException;
-import java.lang.management.ManagementFactory;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.AbstractMap;
@@ -181,7 +180,6 @@ public class DFSInputStream extends FSInputStream
 
   private static final String READ_NUM_EXCEPTIONS = "client.read.num_exceptions";
   private static final String SLOW_READ_TIME = "client.slow_read_time";
-  private static final String SLOW_DOREAD_TIME = "client.slow_do_read_time";
   private static final String NUM_SLOW_READ = "client.num_slow_read";
   private static final String SLOW_PREAD_TIME = "client.slow_pread_time";
   private static final String NUM_SLOW_PREAD = "client.num_slow_pread";
@@ -330,8 +328,7 @@ public class DFSInputStream extends FSInputStream
       shouldSwitch = true;
       // TODO: Consider if we should use something else rather than FixedThreadPool.
        bufferReaderExecutor =
-          Executors.newFixedThreadPool(
-              dfsClient.getConf().getFastSwitchThreadpoolSize());
+          Executors.newCachedThreadPool();
       executorCompletionService = new ExecutorCompletionService<>(bufferReaderExecutor);
     } else {
       useFastSwitch = false;
