@@ -999,7 +999,7 @@ public class DFSInputStream extends FSInputStream
   class DoReadCallable implements Callable<ReadResult> {
 
     // TODO: use enum
-    String state;
+    volatile String state;
     final long startTime;
     final int len;
 
