@@ -233,6 +233,11 @@ public class M3MetricsPublisher implements MetricsPublisher {
     ImmutableMap.Builder<String, String> tagsBuilder = new ImmutableMap.Builder<>();
     tagsBuilder.put(M3Reporter.SERVICE_TAG, SERVICE_NAME);
     tagsBuilder.put(M3Reporter.ENV_TAG, metricsEnvironment);
+    tagsBuilder.put("language", "java");
+    String version = MetricsPublisher.class.getPackage().getImplementationVersion();
+    if (version != null) {
+      tagsBuilder.put("version", version);
+    }
 
     try {
       StatsReporter reporter = new M3Reporter.Builder(reporterAddr)

@@ -152,6 +152,9 @@ HADOOP_VERSION_FILE_NAME='hadoop_version'
 docker run --rm -i --name ${CONTAINER_NAME} \
            -e ARTIFACT_NAME=${ARTIFACT_NAME} \
            -e HADOOP_VERSION_FILE_NAME=${HADOOP_VERSION_FILE_NAME} \
+           -e BUILD_NUMBER=${BUILD_NUMBER} \
+           -e BUILD_URL=${BUILD_URL} \
+           -e GIT_COMMIT=${SRC_CODE_GIT_HASH} \
            -v ${SRC_CODE}:/hadoop:ro \
            -v ${ARTIFACTS_DIR}:/artifacts:rw \
            ${BUILD_IMAGE_NAME}
