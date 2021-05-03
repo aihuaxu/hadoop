@@ -56,7 +56,7 @@ RUN apt-get -q update && apt-get -q install --no-install-recommends -y \
     pkg-config \
     protobuf-compiler \
     protobuf-c-compiler \
-    python3.7 \
+    python3 \
     python3-pip \
     python3-pkg-resources \
     python3-setuptools \
@@ -118,8 +118,7 @@ RUN apt-get -q install --no-install-recommends -y bats
 ####
 # Install pylint and python-dateutil
 ####
-RUN pip3 install setuptools -U
-RUN pip3 install pylint python-dateutil
+RUN pip3 install pylint=1.9.0 python-dateutil
 
 ###
 # Avoid out of memory errors in builds
