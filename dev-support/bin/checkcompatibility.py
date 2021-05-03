@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
@@ -30,33 +30,16 @@ import re
 import shutil
 import subprocess
 import sys
-import urllib2
-try:
-  import argparse
-except ImportError:
-  sys.stderr.write("Please install argparse, e.g. via `pip install argparse`.")
-  sys.exit(2)
+import urllib.request
+import argparse
 
 # Various relative paths
 REPO_DIR = os.getcwd()
 
 def check_output(*popenargs, **kwargs):
-  r"""Run command with arguments and return its output as a byte string.
-  Backported from Python 2.7 as it's implemented as pure python on stdlib.
-  >>> check_output(['/usr/bin/python', '--version'])
-  Python 2.6.2
-  """
-  process = subprocess.Popen(stdout=subprocess.PIPE, *popenargs, **kwargs)
-  output, _ = process.communicate()
-  retcode = process.poll()
-  if retcode:
-    cmd = kwargs.get("args")
-    if cmd is None:
-      cmd = popenargs[0]
-    error = subprocess.CalledProcessError(retcode, cmd)
-    error.output = output
-    raise error
-  return output
+  """ Run command with arguments and return its output as a string. """
+  return subprocess.check_output(*popenargs, **kwargs, encoding='utf-8')
+
 
 def get_repo_dir():
   """ Return the path to the top of the repo. """
@@ -139,7 +122,7 @@ def checkout_java_acc(force):
   url = "https://github.com/lvc/japi-compliance-checker/archive/1.8.tar.gz"
   scratch_dir = get_scratch_dir()
   path = os.path.join(scratch_dir, os.path.basename(url))
-  jacc = urllib2.urlopen(url)
+  jacc = urllib.request.urlopen(url)
   with open(path, 'wb') as w:
     w.write(jacc.read())
 
@@ -155,9 +138,9 @@ def find_jars(path):
   all_jars = set(check_output(["find", path, "-name", "*.jar"]).splitlines())
 
   return [j for j in all_jars if (
-      "-tests" not in j and
-      "-sources" not in j and
-      "-with-dependencies" not in j)]
+          "-tests" not in j and
+          "-sources" not in j and
+          "-with-dependencies" not in j)]
 
 def write_xml_file(path, version, jars):
   """Write the XML manifest file for JACC."""
@@ -194,7 +177,7 @@ def run_java_acc(src_name, src_jars, dst_name, dst_jars, annotations):
     annotations_path = os.path.join(get_scratch_dir(), "annotations.txt")
     with file(annotations_path, "w") as f:
       for ann in annotations:
-        print >>f, ann
+        print(ann, file=f)
     args += ["-annotations-list", annotations_path]
 
   subprocess.check_call(args)
@@ -235,39 +218,39 @@ def main():
   """Main function."""
   logging.basicConfig(level=logging.INFO)
   parser = argparse.ArgumentParser(
-      description="Run Java API Compliance Checker.")
+    description="Run Java API Compliance Checker.")
   parser.add_argument("-f", "--force-download",
                       action="store_true",
                       help="Download dependencies (i.e. Java JAVA_ACC) " +
-                      "even if they are already present")
+                           "even if they are already present")
   parser.add_argument("-i", "--include-file",
                       action="append",
                       dest="include_files",
                       help="Regex filter for JAR files to be included. " +
-                      "Applied before the exclude filters. " +
-                      "Can be specified multiple times.")
+                           "Applied before the exclude filters. " +
+                           "Can be specified multiple times.")
   parser.add_argument("-e", "--exclude-file",
                       action="append",
                       dest="exclude_files",
                       help="Regex filter for JAR files to be excluded. " +
-                      "Applied after the include filters. " +
-                      "Can be specified multiple times.")
+                           "Applied after the include filters. " +
+                           "Can be specified multiple times.")
   parser.add_argument("-a", "--annotation",
                       action="append",
                       dest="annotations",
                       help="Fully-qualified Java annotation. " +
-                      "Java ACC will only check compatibility of " +
-                      "annotated classes. Can be specified multiple times.")
+                           "Java ACC will only check compatibility of " +
+                           "annotated classes. Can be specified multiple times.")
   parser.add_argument("--skip-clean",
                       action="store_true",
                       help="Skip cleaning the scratch directory.")
   parser.add_argument("--skip-build",
                       action="store_true",
                       help="Skip building the projects.")
-  parser.add_argument("src_rev", nargs=1, help="Source revision.")
-  parser.add_argument("dst_rev", nargs="?", default="HEAD",
+  parser.add_argument("src_rev", nargs=1, type=str, help="Source revision.")
+  parser.add_argument("dst_rev", nargs="?", type=str, default="HEAD",
                       help="Destination revision. " +
-                      "If not specified, will use HEAD.")
+                           "If not specified, will use HEAD.")
 
   if len(sys.argv) == 1:
     parser.print_help()
