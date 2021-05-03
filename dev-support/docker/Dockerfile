@@ -56,10 +56,11 @@ RUN apt-get -q update && apt-get -q install --no-install-recommends -y \
     pkg-config \
     protobuf-compiler \
     protobuf-c-compiler \
-    python \
-    python2.7 \
-    python2.7-dev \
-    python-pip \
+    python3 \
+    python3-pip \
+    python3-pkg-resources \
+    python3-setuptools \
+    python3-wheel \
     rsync \
     snappy \
     zlib1g-dev
@@ -115,16 +116,10 @@ RUN apt-get -q update
 RUN apt-get -q install --no-install-recommends -y bats
 
 ####
-# Install pylint
+# Install pylint and python-dateutil
+# Use 1.9.0 which is supported by Python 3.4
 ####
-RUN pip2 install --upgrade pip==20.3.4
-RUN pip2 install -U pip setuptools wheel
-RUN pip2 install pylint
-
-####
-# Install dateutil.parser
-####
-RUN pip2 install python-dateutil
+RUN pip3 install pylint==1.9.0 python-dateutil
 
 ###
 # Avoid out of memory errors in builds
