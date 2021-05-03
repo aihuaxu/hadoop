@@ -132,6 +132,8 @@ public class DFSInputStream extends FSInputStream
   private Set<DatanodeInfo> slownodes = new HashSet<>();
   // Should we switch for current block.
   private boolean shouldSwitch = false;
+  private Set<Long> runningFutures =
+      Collections.newSetFromMap(new ConcurrentHashMap<Long, Boolean>());
   protected int switchCount;
 
   // state shared by stateful and positional read:
@@ -1006,25 +1008,11 @@ public class DFSInputStream extends FSInputStream
         runningFutures.add(startTime);
         BlockReader currentReader = blockReader;
         ByteBuffer bb = ByteBuffer.allocate(len);
-        String dnName = currentNode.getName();
-        long start = Time.monotonicNow();
         try {
           int nread = blockReader.read(bb);
           bb.flip();
-          long span = Time.monotonicNow() - start;
-          if (span > 5000) {
-            dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.GAUGE,
-                SLOW_DOREAD_TIME, span);
-            DFSClient.LOG.warn("Do read span: " + span + ", Datanode: " + dnName);
-          }
           return new ReadResult(nread, bb, null, blockReader);
         } catch (InterruptedIOException iie) {
-          long span = Time.monotonicNow() - start;
-          if (span > 5000) {
-            dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.GAUGE,
-                SLOW_DOREAD_TIME, span);
-            DFSClient.LOG.warn("Interrupted: Do read span: " + span + ", Datanode: " + dnName);
-          }
           try {
             currentReader.close();
             return new ReadResult(0, null, new IOException("This reader is closed."), blockReader);
@@ -1033,12 +1021,6 @@ public class DFSInputStream extends FSInputStream
             return new ReadResult(0, null, e, blockReader);
           }
         } catch (IOException e) {
-          long span = Time.monotonicNow() - start;
-          if (span > 5000) {
-            dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.GAUGE,
-                SLOW_DOREAD_TIME, span);
-            DFSClient.LOG.warn("IOE: Do read span: " + span + ", Datanode: " + dnName + ", IOE: " + e);
-          }
           return new ReadResult(0, null, e, blockReader);
         } finally {
           runningFutures.remove(startTime);
@@ -1046,8 +1028,6 @@ public class DFSInputStream extends FSInputStream
       }
     };
   }
-
-  Set<Long> runningFutures = Collections.newSetFromMap(new ConcurrentHashMap<Long, Boolean>());
 
   static class ReadResult {
     int nread;
@@ -1104,35 +1084,27 @@ public class DFSInputStream extends FSInputStream
         // Make sure we are reading from correct future.
         // They were likely finished before cancellation.
         if (finishedFuture != null && finishedFuture != currentFuture) {
-          DFSClient.LOG.warn("FinishedFuture + " + finishedFuture);
           continue;
         }
         ReadResult result;
 
         // TODO: Consider other conditions to switch.
         if (finishedFuture == null) {
-          if (Thread.interrupted()) {
-            String errMsg = "Read interrupted when reading from + " + currentNode.getName();
-            DFSClient.LOG.warn(errMsg);
-            throw new InterruptedException(errMsg);
-          }
-          DFSClient.LOG.warn("Waited time + " + (Time.monotonicNow() - currentFutureStartTime));
-          DFSClient.LOG.warn("Future state + " + currentFuture);
-          DFSClient.LOG.warn("executorCompletionService + " + executorCompletionService);
-          DFSClient.LOG.warn("JVM thread count: " + ManagementFactory.getThreadMXBean().getThreadCount());
+          ThreadPoolExecutor threadpool = (ThreadPoolExecutor) bufferReaderExecutor;
+          dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.GAUGE,
+              FAST_SWITCH_ACTIVE_THREAD_COUNT, threadpool.getActiveCount());
+
+          DFSClient.LOG.info("Waited time + " + (Time.monotonicNow() - currentFutureStartTime));
           dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.COUNTER,
               currentNode.getHostName(),
               FAST_SWITCH_TIMEOUT_COUNT, 1);
-          DFSClient.LOG.warn("Current future started: " + runningFutures.contains(currentFutureStartTime));
-
+          if (!runningFutures.contains(currentFutureStartTime)) {
+            DFSClient.LOG.info("Current read has not started yet.");
+          }
           // Make sure current future is already executing.
           if (shouldSwitch && runningFutures.contains(currentFutureStartTime)) {
             dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.COUNTER,
                 FAST_SWITCH_SWITCH_COUNT, 1);
-            ThreadPoolExecutor threadpool = (ThreadPoolExecutor) bufferReaderExecutor;
-            dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.GAUGE,
-                FAST_SWITCH_ACTIVE_THREAD_COUNT, threadpool.getActiveCount());
-            DFSClient.LOG.info("Try to switch blockreader. Active thread count: " + threadpool.getActiveCount());
 
             // Try Switch
             DFSClient.LOG.info("Try to switch blockreader. Current slow datanode: " + currentNode.getName());
@@ -1224,6 +1196,7 @@ public class DFSInputStream extends FSInputStream
       } catch (ExecutionException e) {
         String errMsg = "Reader thread exits unexpectedly," +
             " when reading datanode: " + currentNode;
+        runningFutures.remove(currentFutureStartTime);
         DFSClient.LOG.error(errMsg, e);
         throw new IOException(errMsg);
       }
