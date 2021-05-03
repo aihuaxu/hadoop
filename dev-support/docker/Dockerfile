@@ -118,8 +118,7 @@ RUN apt-get -q install --no-install-recommends -y bats
 ####
 # Install pylint and python-dateutil
 ####
-RUN pip3 install setuptools -U
-RUN pip3 install pylint==2.6.0 python-dateutil==2.8.1
+RUN pip3 install pylint python-dateutil
 
 ###
 # Avoid out of memory errors in builds
