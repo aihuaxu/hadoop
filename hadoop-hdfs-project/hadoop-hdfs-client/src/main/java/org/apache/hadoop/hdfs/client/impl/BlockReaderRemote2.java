@@ -210,10 +210,8 @@ public class BlockReaderRemote2 implements BlockReader {
       LOG.warn("BlockReaderRemote2 slow read packet took " + duration
           + "ms for block " + blockId);
       if (metricsPublisher != null) {
-        metricsPublisher.emit(MetricsPublisher.MetricType.GAUGE,
-            datanodeID.getHostName(), SLOW_PACKET_TIME, duration);
-        metricsPublisher.emit(MetricsPublisher.MetricType.COUNTER,
-            datanodeID.getHostName(), NUM_SLOW_PACKET, 1);
+        metricsPublisher.gauge(datanodeID.getHostName(), SLOW_PACKET_TIME, duration);
+        metricsPublisher.counter(datanodeID.getHostName(), NUM_SLOW_PACKET, 1);
       }
     }
 
