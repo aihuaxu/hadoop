@@ -1152,7 +1152,7 @@ public class DFSInputStream extends FSInputStream
           }
 
           // Make sure current future is already executing.
-          if (shouldSwitch && !readAction.getState().equals("Initialized")) {
+          if (shouldSwitch && readAction.getState().equals("Started Reading")) {
             dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.COUNTER,
                 FAST_SWITCH_SWITCH_COUNT, 1);
 
