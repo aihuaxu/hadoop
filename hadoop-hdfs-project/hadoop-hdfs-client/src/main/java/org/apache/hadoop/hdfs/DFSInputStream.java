@@ -1073,12 +1073,20 @@ public class DFSInputStream extends FSInputStream
   private void logStackTraces() {
     for (Entry<Thread, StackTraceElement[]> entry : Thread.getAllStackTraces().entrySet()) {
       if (entry.getKey().getName().contains(threadPrefix)) {
+        boolean doPrint = true;
         StackTraceElement[] stackTraces = entry.getValue();
         StringBuilder sb = new StringBuilder();
         for (StackTraceElement element : stackTraces) {
+          if (element.toString().contains("java.util.concurrent.ThreadPoolExecutor.getTask")) {
+            doPrint = false;
+            DFSClient.LOG.info(entry.getKey().getName() + " is parking.");
+            break;
+          }
           sb.append(element).append("\n");
         }
-        DFSClient.LOG.info("XXX found reading threads " + entry.getKey().getName() + " stack traces: \n" + sb);
+        if (doPrint) {
+          DFSClient.LOG.info("XXX found reading threads " + entry.getKey().getName() + " stack traces: \n" + sb);
+        }
       }
     }
   }
@@ -1127,15 +1135,6 @@ public class DFSInputStream extends FSInputStream
         // TODO: Consider other conditions to switch.
         if (finishedFuture == null) {
           DFSClient.LOG.info("XXX Still got null for finishedFuture");
-          ThreadPoolExecutor threadpool = (ThreadPoolExecutor) bufferReaderExecutor;
-          dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.GAUGE,
-              FAST_SWITCH_ACTIVE_THREAD_COUNT, threadpool.getActiveCount());
-
-          DFSClient.LOG.info("XXX Waited time + " + (Time.monotonicNow() - currentFutureStartTime));
-          dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.COUNTER,
-              currentNode.getHostName(),
-              FAST_SWITCH_TIMEOUT_COUNT, 1);
-
           DFSClient.LOG.info("XXX Current state of callable: " + readAction.getState());
           if (readAction.getState().equals("Initialized")) {
             DFSClient.LOG.warn("XXX Current read has not started yet.");
