@@ -36,6 +36,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletionService;
@@ -335,7 +336,7 @@ public class DFSInputStream extends FSInputStream
     }
   }
 
-  private static final String threadPrefix = "Fast-Switch-Read-Thread";
+  private static final String threadPrefix = "Fast-Switch-Read-Thread-" + UUID.randomUUID().toString();
 
   /**
    * Grab the open-file info from namenode
