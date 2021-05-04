@@ -1077,7 +1077,7 @@ public class DFSInputStream extends FSInputStream
         for (StackTraceElement element : stackTraces) {
           sb.append(element).append("\n");
         }
-        DFSClient.LOG.info("XXX found reading threads " + entry.getKey().getName() + " stack traces: " + sb);
+        DFSClient.LOG.info("XXX found reading threads " + entry.getKey().getName() + " stack traces: \n" + sb);
       }
     }
   }
@@ -1085,7 +1085,7 @@ public class DFSInputStream extends FSInputStream
   private synchronized int readBufferFastSwitch(ReaderStrategy reader, int off, int len,
       Map<ExtendedBlock, Set<DatanodeInfo>> corruptedBlockMap)
       throws IOException, InterruptedException {
-    DFSClient.LOG.debug("XXX Starting readBufferFastSwitch");
+    // DFSClient.LOG.debug("XXX Starting readBufferFastSwitch");
     IOException ioe;
 
     boolean retryCurrentNode = true;
@@ -1105,7 +1105,7 @@ public class DFSInputStream extends FSInputStream
         if (currentFuture == null) {
           currentFutureStartTime = Time.monotonicNow();
           readAction = new DoReadCallable(len, currentFutureStartTime);
-          DFSClient.LOG.info("XXX submit a new read");
+          // DFSClient.LOG.info("XXX submit a new read");
           currentFuture = executorCompletionService.submit(readAction);
         }
         // Timeout value will increase by each switch for the current read.
@@ -1140,6 +1140,11 @@ public class DFSInputStream extends FSInputStream
             DFSClient.LOG.warn("XXX Current read has not started yet.");
             logStackTraces();
           }
+          if (readAction.getState().equals("Finished")) {
+            DFSClient.LOG.warn("XXX Current read already done.");
+            logStackTraces();
+          }
+
           // Make sure current future is already executing.
           if (shouldSwitch && !readAction.getState().equals("Initialized")) {
             dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.COUNTER,
@@ -1179,14 +1184,14 @@ public class DFSInputStream extends FSInputStream
             }
           }
         } else {
-          DFSClient.LOG.debug("XXX got result from thread pool");
+          // DFSClient.LOG.debug("XXX got result from thread pool");
           result = finishedFuture.get();
           if (result.exception == null) {
             if (result.nread != -1) {
               ByteBuffer bb = result.bb;
               reader.copyFrom(bb, off, result.nread);
             }
-            DFSClient.LOG.debug("XXX read succeeded");
+            // DFSClient.LOG.debug("XXX read succeeded");
             return result.nread;
           } else {
             // handle exceptions, same as readBuffer

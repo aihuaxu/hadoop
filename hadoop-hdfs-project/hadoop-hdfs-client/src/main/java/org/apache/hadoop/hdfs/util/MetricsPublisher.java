@@ -6,6 +6,7 @@ import com.uber.m3.tally.*;
 import com.uber.m3.tally.m3.M3Reporter;
 import com.uber.m3.util.ImmutableMap;
 
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -87,6 +88,9 @@ public class MetricsPublisher {
    */
   public void emit(MetricType metricType, String datanode,
                             String name, long amount) {
+
+    long start = Time.monotonicNow();
+
     if (datanode == null || datanode.length() == 0) {
       LOG.warn("emit is called with empty datanode.");
       return;
@@ -107,9 +111,15 @@ public class MetricsPublisher {
         LOG.warn("Unable to emit metrics", x);
       }
     }
+
+    long span = Time.monotonicNow() - start;
+    if (span > 1000) {
+      LOG.warn("Log emission is taking too long: " + span);
+    }
   }
 
   public void emit(MetricType metricType, String name, long amount) {
+    long start = Time.monotonicNow();
     if (scope != null) {
       switch (metricType) {
         case GAUGE:
@@ -119,6 +129,11 @@ public class MetricsPublisher {
           scope.counter(name).inc(amount);
           break;
       }
+    }
+
+    long span = Time.monotonicNow() - start;
+    if (span > 1000) {
+      LOG.warn("Log emission is taking too long: " + span);
     }
   }
 
