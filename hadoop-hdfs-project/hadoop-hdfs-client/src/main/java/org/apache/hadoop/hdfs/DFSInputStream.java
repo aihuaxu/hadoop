@@ -1018,6 +1018,10 @@ public class DFSInputStream extends FSInputStream
     @Override
     public ReadResult call() {
       state = "Started";
+      final long waitTimeBeforeStart = Time.monotonicNow() - startTime;
+      if (waitTimeBeforeStart > 1000) {
+        DFSClient.LOG.info("XXX " + Thread.currentThread().getName() + " waited " + waitTimeBeforeStart + "ms before running");
+      }
       BlockReader currentReader = blockReader;
       ByteBuffer bb = ByteBuffer.allocate(len);
       try {
@@ -1033,11 +1037,12 @@ public class DFSInputStream extends FSInputStream
           state = "Closed reader";
           return new ReadResult(0, null, new IOException("This reader is closed."), blockReader);
         } catch (IOException e) {
-          state = "Finished with IOE";
+          state = "Finished with interruption-close-IOE";
           DFSClient.LOG.warn("Failed to close blockreader after reader interrupted.");
           return new ReadResult(0, null, e, blockReader);
         }
       } catch (IOException e) {
+        state = "Finished with IOE";
         return new ReadResult(0, null, e, blockReader);
       }
     }
@@ -1118,15 +1123,15 @@ public class DFSInputStream extends FSInputStream
         // Make sure we are reading from correct future.
         // They were likely finished before cancellation.
         if (finishedFuture != null && finishedFuture != currentFuture) {
-          DFSClient.LOG.info("Skipped future + " + finishedFuture);
-          DFSClient.LOG.info("Current future + " + currentFuture);
+          DFSClient.LOG.info("XXX Skipped future + " + finishedFuture + ", isCancelled=" + finishedFuture.isCancelled() + ", isDone=" + finishedFuture.isDone());
+          DFSClient.LOG.info("XXX Current future + " + currentFuture + ", isCancelled=" + currentFuture.isCancelled() + ", isDone=" + currentFuture.isDone());
           continue;
         }
         ReadResult result;
 
         // TODO: Consider other conditions to switch.
         if (finishedFuture == null) {
-          DFSClient.LOG.info("XXX Still got null for finishedFuture");
+          DFSClient.LOG.info("XXX Got null for finishedFuture");
           ThreadPoolExecutor threadpool = (ThreadPoolExecutor) bufferReaderExecutor;
           dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.GAUGE,
               FAST_SWITCH_ACTIVE_THREAD_COUNT, threadpool.getActiveCount());
@@ -1166,6 +1171,7 @@ public class DFSInputStream extends FSInputStream
               blockReader = null;
               seekToNewSource(pos);
               currentFuture.cancel(true);
+              DFSClient.LOG.info("XXX cancelling current future " + currentFuture);
               abandonedReaders.add(oldReader);
               currentFuture = null;
               currentSwitchCount++;
