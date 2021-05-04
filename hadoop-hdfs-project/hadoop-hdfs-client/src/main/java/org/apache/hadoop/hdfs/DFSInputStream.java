@@ -1107,7 +1107,6 @@ public class DFSInputStream extends FSInputStream
         // TODO: Consider other conditions to switch.
         if (finishedFuture == null) {
           ThreadPoolExecutor threadpool = (ThreadPoolExecutor) bufferReaderExecutor;
-          bufferReaderExecutor.
           dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.GAUGE,
               FAST_SWITCH_ACTIVE_THREAD_COUNT, threadpool.getActiveCount());
 
