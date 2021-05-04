@@ -1000,6 +1000,7 @@ public class DFSInputStream extends FSInputStream
 
     // TODO: use enum
     volatile String state;
+    // Start time milli as ID, todo next
     final long startTime;
     final int len;
 
@@ -1018,19 +1019,21 @@ public class DFSInputStream extends FSInputStream
         state = "Started Reading";
         int nread = blockReader.read(bb);
         bb.flip();
+        state = "Finished";
         return new ReadResult(nread, bb, null, blockReader);
       } catch (InterruptedIOException iie) {
         try {
+          state = "Finished with interruption";
           currentReader.close();
+          state = "Closed reader";
           return new ReadResult(0, null, new IOException("This reader is closed."), blockReader);
         } catch (IOException e) {
+          state = "Finished with IOE";
           DFSClient.LOG.warn("Failed to close blockreader after reader interrupted.");
           return new ReadResult(0, null, e, blockReader);
         }
       } catch (IOException e) {
         return new ReadResult(0, null, e, blockReader);
-      } finally {
-        state = "Finished";
       }
     }
 
@@ -1095,6 +1098,8 @@ public class DFSInputStream extends FSInputStream
         // Make sure we are reading from correct future.
         // They were likely finished before cancellation.
         if (finishedFuture != null && finishedFuture != currentFuture) {
+          DFSClient.LOG.info("Skipped future + " + finishedFuture);
+          DFSClient.LOG.info("Current future + " + finishedFuture);
           continue;
         }
         ReadResult result;
@@ -1102,6 +1107,7 @@ public class DFSInputStream extends FSInputStream
         // TODO: Consider other conditions to switch.
         if (finishedFuture == null) {
           ThreadPoolExecutor threadpool = (ThreadPoolExecutor) bufferReaderExecutor;
+          bufferReaderExecutor.
           dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.GAUGE,
               FAST_SWITCH_ACTIVE_THREAD_COUNT, threadpool.getActiveCount());
 
