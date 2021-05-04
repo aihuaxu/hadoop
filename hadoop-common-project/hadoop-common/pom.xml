@@ -145,7 +145,7 @@
     <dependency>
       <groupId>apphealth</groupId>
       <artifactId>apphealth-logger-log4j</artifactId>
-      <version>1.0.956-a729ea11c36</version>
+      <scope>compile</scope>
     </dependency>
     <dependency>
       <groupId>net.java.dev.jets3t</groupId>
