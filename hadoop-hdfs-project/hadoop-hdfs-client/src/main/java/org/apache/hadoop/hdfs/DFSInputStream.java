@@ -322,6 +322,7 @@ public class DFSInputStream extends FSInputStream
     this.locatedBlocks = locatedBlocks;
     openInfo(false);
 
+    threadPrefix = "Fast-Switch-Read-Thread-" + UUID.randomUUID();
     // Initialize fast switch read
     if (dfsClient.getConf().isFastSwitchReadEnabled()) {
       useFastSwitch = true;
@@ -336,7 +337,7 @@ public class DFSInputStream extends FSInputStream
     }
   }
 
-  private static final String threadPrefix = "Fast-Switch-Read-Thread-" + UUID.randomUUID().toString();
+  private final String threadPrefix;
 
   /**
    * Grab the open-file info from namenode
