@@ -21,8 +21,11 @@ package org.apache.hadoop.yarn.client;
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.logging.Log;
@@ -48,7 +51,7 @@ public class ConfiguredRMFailoverProxyProvider<T>
   private RMProxy<T> rmProxy;
   private Class<T> protocol;
   protected YarnConfiguration conf;
-  protected String[] rmServiceIds;
+  protected List<String> rmServiceIds;
 
   @Override
   public void init(Configuration configuration, RMProxy<T> rmProxy,
@@ -58,8 +61,19 @@ public class ConfiguredRMFailoverProxyProvider<T>
     this.rmProxy.checkAllowedProtocols(this.protocol);
     this.conf = new YarnConfiguration(configuration);
     Collection<String> rmIds = HAUtil.getRMHAIds(conf);
-    this.rmServiceIds = rmIds.toArray(new String[rmIds.size()]);
-    conf.set(YarnConfiguration.RM_HA_ID, rmServiceIds[currentProxyIndex]);
+    if (rmIds == null || rmIds.isEmpty()) {
+      String message = "no instances conofigured.";
+      LOG.error(message);
+      throw new IllegalStateException(message);
+    }
+    this.rmServiceIds = new ArrayList<>(rmIds);
+
+    if (conf.getBoolean(YarnConfiguration.CLIENT_RANDOM_ORDER_ENABLED, true)) {
+      // Randomize the list to prevent all clients pointing to the same one, enabled by default
+      LOG.info("Random order enabled");
+      Collections.shuffle(rmServiceIds);
+    }
+    conf.set(YarnConfiguration.RM_HA_ID, rmServiceIds.get(currentProxyIndex));
 
     conf.setInt(CommonConfigurationKeysPublic.IPC_CLIENT_CONNECT_MAX_RETRIES_KEY,
         conf.getInt(YarnConfiguration.CLIENT_FAILOVER_RETRIES,
@@ -77,27 +91,28 @@ public class ConfiguredRMFailoverProxyProvider<T>
       return RMProxy.getProxy(conf, protocol, rmAddress);
     } catch (IOException ioe) {
       LOG.error("Unable to create proxy to the ResourceManager " +
-          rmServiceIds[currentProxyIndex], ioe);
+          rmServiceIds.get(currentProxyIndex), ioe);
       return null;
     }
   }
 
   @Override
   public synchronized ProxyInfo<T> getProxy() {
-    String rmId = rmServiceIds[currentProxyIndex];
+    String rmId = rmServiceIds.get(currentProxyIndex);
     T current = proxies.get(rmId);
     if (current == null) {
       current = getProxyInternal();
       proxies.put(rmId, current);
     }
+    LOG.info("Sending request to " + rmId);
     return new ProxyInfo<T>(current, rmId);
   }
 
   @Override
   public synchronized void performFailover(T currentProxy) {
-    currentProxyIndex = (currentProxyIndex + 1) % rmServiceIds.length;
-    conf.set(YarnConfiguration.RM_HA_ID, rmServiceIds[currentProxyIndex]);
-    LOG.info("Failing over to " + rmServiceIds[currentProxyIndex]);
+    currentProxyIndex = (currentProxyIndex + 1) % rmServiceIds.size();
+    conf.set(YarnConfiguration.RM_HA_ID, rmServiceIds.get(currentProxyIndex));
+    LOG.info("Failing over to " + rmServiceIds.get(currentProxyIndex));
   }
 
   @Override

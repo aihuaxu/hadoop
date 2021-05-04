@@ -85,6 +85,12 @@
   </property>
 
   <property>
+    <description>Determines if the failover proxies are picked in random order instead of the configured order.</description>
+    <name>yarn.client.client.failover-random-order.enabled</name>
+    <value>true</value>
+  </property>
+
+  <property>
     <description>Retry times to connect with NM.</description>
     <name>yarn.resourcemanager.nodemanager-connect-retries</name>
     <value>10</value>

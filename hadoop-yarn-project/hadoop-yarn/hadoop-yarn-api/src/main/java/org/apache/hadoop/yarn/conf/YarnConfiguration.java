@@ -558,6 +558,8 @@ public class YarnConfiguration extends Configuration {
   public static final int
       DEFAULT_CLIENT_FAILOVER_RETRIES_ON_SOCKET_TIMEOUTS = 0;
 
+  public static final String CLIENT_RANDOM_ORDER_ENABLED = CLIENT_FAILOVER_PREFIX + "random-order.enabled";
+
   /** number of zookeeper operation retry times in ActiveStandbyElector */
   public static final String RM_HA_FC_ELECTOR_ZK_RETRIES_KEY = RM_HA_PREFIX
       + "failover-controller.active-standby-elector.zk.retries";
