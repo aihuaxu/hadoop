@@ -2137,14 +2137,12 @@ class DataStreamer extends Daemon {
   }
 
   private void emitSlowDatanode(long duration) {
-    dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.GAUGE,
-        SLOW_PACKET_TIME, duration);
-    dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.COUNTER,
-        NUM_SLOW_PACKET, 1);
+    dfsClient.getMetricsPublisher().gauge(SLOW_PACKET_TIME, duration);
+    dfsClient.getMetricsPublisher().counter(NUM_SLOW_PACKET, 1);
   }
 
   private void emitBadDatanode(DatanodeInfo datanodeInfo) {
-    dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.COUNTER,
+    dfsClient.getMetricsPublisher().counter(
         datanodeInfo.getHostName(), NUM_BAD_DATANODE, 1);
   }
 }

@@ -145,8 +145,10 @@ public class DFSInputStream extends FSInputStream
   private IdentityHashStore<ByteBuffer, Object> extendedReadBuffers;
 
   private static final String READ_NUM_EXCEPTIONS = "client.read.num_exceptions";
+  static final String SLOW_READ_DIST = "client.slow_read_distribution";
   static final String SLOW_READ_TIME = "client.slow_read_time";
   static final String NUM_SLOW_READ = "client.num_slow_read";
+  static final String SLOW_PREAD_DIST = "client.slow_pread_distribution";
   static final String SLOW_PREAD_TIME = "client.slow_pread_time";
   static final String NUM_SLOW_PREAD = "client.num_slow_pread";
 
@@ -922,8 +924,7 @@ public class DFSInputStream extends FSInputStream
               + currentNode, e);
         }
         ioe = e;
-        dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.COUNTER,
-            currentNode.getHostName(), READ_NUM_EXCEPTIONS, 1);
+        dfsClient.getMetricsPublisher().counter(currentNode.getHostName(),READ_NUM_EXCEPTIONS, 1);
       }
       boolean sourceFound;
       if (retryCurrentNode) {
@@ -2025,20 +2026,18 @@ public class DFSInputStream extends FSInputStream
   private void emitReadMetrics(long startTick) {
     long span = Time.monotonicNow() - startTick;
     if (span > dfsClient.getConf().getMetricsReadEmitThreshold()) {
-      dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.COUNTER,
-          NUM_SLOW_READ, 1);
-      dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.GAUGE,
-          SLOW_READ_TIME, span);
+      dfsClient.getMetricsPublisher().counter(NUM_SLOW_READ, 1);
+      dfsClient.getMetricsPublisher().gauge(SLOW_READ_TIME, span);
+      dfsClient.getMetricsPublisher().histogram(SLOW_READ_DIST, span);
     }
   }
 
   private void emitPreadMetrics(long startTick) {
     long span = Time.monotonicNow() - startTick;
     if (span > dfsClient.getConf().getMetricsReadEmitThreshold()) {
-      dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.COUNTER,
-          NUM_SLOW_PREAD, 1);
-      dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.GAUGE,
-          SLOW_PREAD_TIME, span);
+      dfsClient.getMetricsPublisher().counter(NUM_SLOW_PREAD, 1);
+      dfsClient.getMetricsPublisher().gauge(SLOW_PREAD_TIME, span);
+      dfsClient.getMetricsPublisher().histogram(SLOW_PREAD_DIST, span);
     }
   }
 }

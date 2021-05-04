@@ -49,13 +49,11 @@ public class TestBlockReaderRemote2 extends TestBlockReaderBase {
           Math.min(buf.length, random.nextInt(100)));
     }
     reader.close();
-    verify(mockPublisher, atLeast(1)).emit(
-        eq(MetricsPublisher.MetricType.GAUGE),
+    verify(mockPublisher, atLeast(1)).gauge(
         Mockito.<String>any(),
         eq(BlockReaderRemote2.SLOW_PACKET_TIME),
         Mockito.anyLong());
-    verify(mockPublisher, atLeast(1)).emit(
-        eq(MetricsPublisher.MetricType.COUNTER),
+    verify(mockPublisher, atLeast(1)).counter(
         Mockito.<String>any(),
         eq(BlockReaderRemote2.NUM_SLOW_PACKET),
         eq(1L));

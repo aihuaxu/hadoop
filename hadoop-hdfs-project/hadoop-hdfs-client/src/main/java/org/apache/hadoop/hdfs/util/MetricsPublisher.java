@@ -18,6 +18,8 @@
 package org.apache.hadoop.hdfs.util;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.uber.m3.tally.DurationBuckets;
+import com.uber.m3.tally.Histogram;
 import com.uber.m3.tally.RootScopeBuilder;
 import com.uber.m3.tally.Scope;
 import com.uber.m3.tally.ScopeBuilder;
@@ -32,6 +34,7 @@ import org.slf4j.LoggerFactory;
 
 import java.net.InetSocketAddress;
 import java.util.Collections;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * A thread-safe metrics publisher that publishes hdfs client metrics to M3.
@@ -48,27 +51,22 @@ public class MetricsPublisher {
   private static final String UBER_ENVIRONMENT_PREFIX = "uber_env_";
   private static final int SHUTDOWN_HOOK_PRIORITY = 10;
 
-  public enum MetricType {
-    GAUGE,
-    COUNTER
-  }
+  private static final String SCHEMA_TAG = "schema";
+  private static final String DEFAULT_BUCKET_SCHEMA = "default_v1";
+  private static final long MILLISECONDS_PER_SECOND = 1000;
+  private static final long MILLISECONDS_PER_MINUTE = 60 * MILLISECONDS_PER_SECOND;
+  private static final long MILLISECONDS_PER_HOUR = 60 * MILLISECONDS_PER_MINUTE;
+  private static final long[] DEFAULT_DURATION_BUCKETS =
+      {
+          10 * MILLISECONDS_PER_SECOND,  20 * MILLISECONDS_PER_SECOND,
+          40 * MILLISECONDS_PER_SECOND,
+          1  * MILLISECONDS_PER_MINUTE,  2  * MILLISECONDS_PER_MINUTE,
+          5 * MILLISECONDS_PER_MINUTE,   10 * MILLISECONDS_PER_MINUTE,
+          30 * MILLISECONDS_PER_MINUTE,  1  * MILLISECONDS_PER_HOUR
+      };
 
-  public static synchronized MetricsPublisher getInstance(DfsClientConf conf) {
-    if (INSTANCE == null) {
-      INSTANCE = new MetricsPublisher(conf);
-      ShutdownHookManager.get().addShutdownHook(shutdownHook, SHUTDOWN_HOOK_PRIORITY);
-    }
-    return INSTANCE;
-  }
-
-  private static final Runnable shutdownHook = new Runnable() {
-    @Override
-    public void run() {
-      if (INSTANCE != null) {
-        INSTANCE.close();
-      }
-    }
-  };
+  // Metrics name and schema to Histogram
+  private ConcurrentHashMap<String, Histogram> histogramMap = new ConcurrentHashMap<>();
 
   /**
    * Parent M3 scope for metrics with a "datanode" tag.
@@ -82,17 +80,28 @@ public class MetricsPublisher {
    */
   private final Scope scope;
 
+
+  public static synchronized MetricsPublisher getInstance(DfsClientConf conf) {
+    if (INSTANCE == null) {
+      INSTANCE = new MetricsPublisher(conf);
+      ShutdownHookManager.get().addShutdownHook(shutdownHook, SHUTDOWN_HOOK_PRIORITY);
+    }
+    return INSTANCE;
+  }
+
   private MetricsPublisher(DfsClientConf conf) {
     dnParentScope = createM3Client(false, conf);
     scope = createM3Client(true, conf);
   }
 
-  private static InetSocketAddress getReporterAddress(String reporterAddrStr) {
-    String[] splits = reporterAddrStr.trim().split(":");
-    String hostname = splits[0];
-    int port = Integer.parseInt(splits[1]);
-    return new InetSocketAddress(hostname, port);
-  }
+  private static final Runnable shutdownHook = new Runnable() {
+    @Override
+    public void run() {
+      if (INSTANCE != null) {
+        INSTANCE.close();
+      }
+    }
+  };
 
   private void close() {
     try {
@@ -112,53 +121,102 @@ public class MetricsPublisher {
     close();
   }
 
+  public void counter(String name, long amount) {
+    if (preEmitCheck()) {
+      scope.counter(name).inc(amount);
+    }
+  }
+
   /**
    * Emit client->datanode metrics with the "datanode" tag.
    * @param datanode the host name of the datanode
    */
-  public void emit(MetricType metricType, String datanode,
-                            String name, long amount) {
-    if (datanode == null || datanode.length() == 0) {
-      LOG.warn("emit is called with empty datanode.");
+  public void counter(String datanode, String name, long amount) {
+    if (!preEmitCheck()) {
       return;
     }
-    if (dnParentScope == null) {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("MetricsPublisher#dnParentScope is null");
-      }
+    if (datanode == null || datanode.isEmpty()) {
+      LOG.warn("counter is called with empty datanode.");
+      return;
+    }
+    Scope dnScope = getDatanodeScope(datanode);
+    dnScope.counter(name).inc(amount);
+  }
+
+  public void gauge(String name, long amount) {
+    if (preEmitCheck()) {
+      scope.gauge(name).update(amount);
+    }
+  }
+
+  /**
+   * Emit client->datanode metrics with the "datanode" tag.
+   * @param datanode the host name of the datanode
+   */
+  public void gauge(String datanode, String name, long amount) {
+    if (!preEmitCheck()) {
+      return;
+    }
+    if (datanode == null || datanode.isEmpty()) {
+      LOG.warn("gauge is called with empty datanode.");
+      return;
+    }
+    Scope dnScope = getDatanodeScope(datanode);
+    dnScope.gauge(name).update(amount);
+  }
+
+  /**
+   * Histogram is mainly for time durations.
+   * @param duration in milliseconds
+   */
+  public void histogram(String name, long duration) {
+     histogram(name, duration, DEFAULT_BUCKET_SCHEMA, DEFAULT_DURATION_BUCKETS);
+  }
+
+  /**
+   * "Schema must be bumped if bucket is changed to namespace the different buckets
+   * from each other so they don't overlap and cause the histogram function to error out
+   * due to overlapping buckets in the same query." -- M3
+   */
+  private void histogram(String name, long duration, String schema, long[] bucket) {
+    if (!preEmitCheck()) {
       return;
     }
 
-    Scope dnScope = getDatanodeScope(datanode);
-    switch (metricType) {
-      case GAUGE:
-        dnScope.gauge(name).update(amount);
-        break;
-      case COUNTER:
-        dnScope.counter(name).inc(amount);
-        break;
+    StringBuilder keyBuilder = new StringBuilder(name);
+    keyBuilder.append(':');
+    keyBuilder.append(schema);
+    String key = keyBuilder.toString();
+
+    Histogram histogram = histogramMap.get(key);
+    if (histogram == null) {
+      Duration[] durations = new Duration[bucket.length];
+      for (int i = 0; i < durations.length; i++) {
+        durations[i] = Duration.ofMillis(bucket[i]);
+      }
+      histogram = scope.tagged(Collections.singletonMap(SCHEMA_TAG, schema))
+          .histogram(name, new DurationBuckets(durations));
+      histogramMap.putIfAbsent(key, histogram);
+
+      // Neither the existing histogram in the map nor the one we just created can be closed.
+      // M3 caches subscopes and histograms, so they are actually the same object.
+      // Closing any of them will lead to a handicapped subscope and histogram
     }
+    histogram.recordDuration(Duration.ofMillis(duration));
+  }
+
+  private boolean preEmitCheck() {
+    if (scope == null || dnParentScope == null) {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("scope=" + scope + ", dnParentScope=" + dnParentScope);
+      }
+      return false;
+    }
+    return true;
   }
 
   private Scope getDatanodeScope(String datanode) {
     return dnParentScope.tagged(Collections.singletonMap(DATANODE_TAG, datanode));
-  }
-
-  public void emit(MetricType metricType, String name, long amount) {
-    if (scope == null) {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("MetricsPublisher#scope is null");
-      }
-      return;
-    }
-    switch (metricType) {
-      case GAUGE:
-        scope.gauge(name).update(amount);
-        break;
-      case COUNTER:
-        scope.counter(name).inc(amount);
-        break;
-    }
   }
 
   private static Scope createM3Client(boolean includeHost, DfsClientConf conf) {
@@ -183,6 +241,13 @@ public class MetricsPublisher {
       LOG.error("Unable to initialize m3 client.", e);
       return null;
     }
+  }
+
+  private static InetSocketAddress getReporterAddress(String reporterAddrStr) {
+    String[] splits = reporterAddrStr.trim().split(":");
+    String hostname = splits[0];
+    int port = Integer.parseInt(splits[1]);
+    return new InetSocketAddress(hostname, port);
   }
 
   private static String getMetricsEnvironment(DfsClientConf conf) {
