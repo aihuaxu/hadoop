@@ -35,6 +35,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Callable;
@@ -47,7 +48,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadLocalRandom;
-import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -134,6 +134,9 @@ public class DFSInputStream extends FSInputStream
   // Should we switch for current block.
   private boolean shouldSwitch = false;
   protected int switchCount;
+
+  // Random flag for testing
+  public final static boolean SHOULD_USE_SWITCH = new Random().nextBoolean();
 
   // state shared by stateful and positional read:
   // (protected by lock on infoLock)
@@ -324,7 +327,7 @@ public class DFSInputStream extends FSInputStream
 
     threadPrefix = "Fast-Switch-Read-Thread-" + UUID.randomUUID();
     // Initialize fast switch read
-    if (dfsClient.getConf().isFastSwitchReadEnabled()) {
+    if (dfsClient.getConf().isFastSwitchReadEnabled() && SHOULD_USE_SWITCH) {
       useFastSwitch = true;
       shouldSwitch = true;
       // TODO: Consider if we should use something else rather than FixedThreadPool.

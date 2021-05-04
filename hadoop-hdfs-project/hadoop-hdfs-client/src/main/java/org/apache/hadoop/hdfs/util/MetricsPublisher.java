@@ -6,6 +6,7 @@ import com.uber.m3.tally.*;
 import com.uber.m3.tally.m3.M3Reporter;
 import com.uber.m3.util.ImmutableMap;
 
+import org.apache.hadoop.hdfs.DFSInputStream;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -14,7 +15,6 @@ import java.net.InetSocketAddress;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -26,6 +26,7 @@ public class MetricsPublisher {
 
   private static final String SERVICE_NAME = "hadoop";
   private static final String DATANODE_TAG = "datanode";
+  private static final String GROUP_TAG = "testgroup";
 
   /**
   * Parent M3 scope for metrics with a "datanode" tag.
@@ -152,6 +153,12 @@ public class MetricsPublisher {
       uberEnviroment = M3Reporter.DEFAULT_TAG_VALUE;
     }
     tagsBuilder.put(M3Reporter.ENV_TAG, uberEnviroment);
+
+    if (DFSInputStream.SHOULD_USE_SWITCH) {
+      tagsBuilder.put(GROUP_TAG, "switch_on");
+    } else {
+      tagsBuilder.put(GROUP_TAG, "switch_off");
+    }
 
     String[] splits = metricsReporterAddr.trim().split(":");
     String hostname = splits[0];
