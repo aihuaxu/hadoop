@@ -51,6 +51,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.google.common.base.Preconditions;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.fs.ByteBufferReadable;
@@ -325,13 +326,16 @@ public class DFSInputStream extends FSInputStream
       useFastSwitch = true;
       shouldSwitch = true;
       // TODO: Consider if we should use something else rather than FixedThreadPool.
-       bufferReaderExecutor =
-          Executors.newFixedThreadPool(dfsClient.getConf().getFastSwitchThreadpoolSize());
+      bufferReaderExecutor =
+          Executors.newFixedThreadPool(dfsClient.getConf().getFastSwitchThreadpoolSize(),
+                  new ThreadFactoryBuilder().setNameFormat(threadPrefix + "-%d").build());
       executorCompletionService = new ExecutorCompletionService<>(bufferReaderExecutor);
     } else {
       useFastSwitch = false;
     }
   }
+
+  private static final String threadPrefix = "Fast-Switch-Read-Thread";
 
   /**
    * Grab the open-file info from namenode
@@ -1065,9 +1069,23 @@ public class DFSInputStream extends FSInputStream
     return sb.toString();
   }
 
+  private void logStackTraces() {
+    for (Entry<Thread, StackTraceElement[]> entry : Thread.getAllStackTraces().entrySet()) {
+      if (entry.getKey().getName().contains(threadPrefix)) {
+        StackTraceElement[] stackTraces = entry.getValue();
+        StringBuilder sb = new StringBuilder();
+        for (StackTraceElement element : stackTraces) {
+          sb.append(element).append("\n");
+        }
+        DFSClient.LOG.info("XXX found reading threads " + entry.getKey().getName() + " stack traces: " + sb);
+      }
+    }
+  }
+
   private synchronized int readBufferFastSwitch(ReaderStrategy reader, int off, int len,
       Map<ExtendedBlock, Set<DatanodeInfo>> corruptedBlockMap)
       throws IOException, InterruptedException {
+    DFSClient.LOG.debug("XXX Starting readBufferFastSwitch");
     IOException ioe;
 
     boolean retryCurrentNode = true;
@@ -1087,6 +1105,7 @@ public class DFSInputStream extends FSInputStream
         if (currentFuture == null) {
           currentFutureStartTime = Time.monotonicNow();
           readAction = new DoReadCallable(len, currentFutureStartTime);
+          DFSClient.LOG.info("XXX submit a new read");
           currentFuture = executorCompletionService.submit(readAction);
         }
         // Timeout value will increase by each switch for the current read.
@@ -1099,25 +1118,27 @@ public class DFSInputStream extends FSInputStream
         // They were likely finished before cancellation.
         if (finishedFuture != null && finishedFuture != currentFuture) {
           DFSClient.LOG.info("Skipped future + " + finishedFuture);
-          DFSClient.LOG.info("Current future + " + finishedFuture);
+          DFSClient.LOG.info("Current future + " + currentFuture);
           continue;
         }
         ReadResult result;
 
         // TODO: Consider other conditions to switch.
         if (finishedFuture == null) {
+          DFSClient.LOG.info("XXX Still got null for finishedFuture");
           ThreadPoolExecutor threadpool = (ThreadPoolExecutor) bufferReaderExecutor;
           dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.GAUGE,
               FAST_SWITCH_ACTIVE_THREAD_COUNT, threadpool.getActiveCount());
 
-          DFSClient.LOG.info("Waited time + " + (Time.monotonicNow() - currentFutureStartTime));
+          DFSClient.LOG.info("XXX Waited time + " + (Time.monotonicNow() - currentFutureStartTime));
           dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.COUNTER,
               currentNode.getHostName(),
               FAST_SWITCH_TIMEOUT_COUNT, 1);
 
-          DFSClient.LOG.info("Current state of callable: " + readAction.getState());
+          DFSClient.LOG.info("XXX Current state of callable: " + readAction.getState());
           if (readAction.getState().equals("Initialized")) {
-            DFSClient.LOG.warn("Current read has not started yet.");
+            DFSClient.LOG.warn("XXX Current read has not started yet.");
+            logStackTraces();
           }
           // Make sure current future is already executing.
           if (shouldSwitch && !readAction.getState().equals("Initialized")) {
@@ -1131,6 +1152,7 @@ public class DFSInputStream extends FSInputStream
             boolean hasCandidate =
                 getBestNode(currentLocatedBlock, slownodes).datanode != null;
             if (hasCandidate) {
+              DFSClient.LOG.info("XXX found new candidate, cancel current reader and reset blockreader");
               // Cancel previous future and save the blockreader
               // so we can monitor later if any blockreader not closed properly.
               BlockReader oldReader = blockReader;
@@ -1149,7 +1171,7 @@ public class DFSInputStream extends FSInputStream
               // Keep waiting for the currect blockreader.
               dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.COUNTER,
                   FAST_SWITCH_TOO_MANY_SLOWNESS_COUNT, 1);
-              DFSClient.LOG.info("All candidate replicas are slow, it is likely that client is slow." +
+              DFSClient.LOG.info("XXX All candidate replicas are slow, it is likely that client is slow." +
                   " Give up further read switch." +
                   " Slownode List: [" + getSlowNodesNames() + "].");
               slownodes.clear();
@@ -1157,12 +1179,14 @@ public class DFSInputStream extends FSInputStream
             }
           }
         } else {
+          DFSClient.LOG.debug("XXX got result from thread pool");
           result = finishedFuture.get();
           if (result.exception == null) {
             if (result.nread != -1) {
               ByteBuffer bb = result.bb;
               reader.copyFrom(bb, off, result.nread);
             }
+            DFSClient.LOG.debug("XXX read succeeded");
             return result.nread;
           } else {
             // handle exceptions, same as readBuffer
