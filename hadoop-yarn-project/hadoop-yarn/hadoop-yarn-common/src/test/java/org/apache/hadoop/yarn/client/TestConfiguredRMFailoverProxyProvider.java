@@ -37,6 +37,7 @@ public class TestConfiguredRMFailoverProxyProvider {
   @Before
   public void testInit() {
     conf = new Configuration();
+    conf.setBoolean(YarnConfiguration.CLIENT_RANDOM_ORDER_ENABLED, true);
     conf.set(YarnConfiguration.RM_HA_IDS, "rm1,rm2");
     RMProxy rm1Mock = mock(RMProxy.class);
     doNothing().when(rm1Mock).checkAllowedProtocols(ApplicationClientProtocol.class);
@@ -54,18 +55,17 @@ public class TestConfiguredRMFailoverProxyProvider {
   }
 
   @Test
-  public void testGetProxy() {
+  public void testGetProxyWithRandomOrder() {
     proxyProvider.getProxy();
     Map<String, ApplicationClientProtocol> proxies =  proxyProvider.proxies;
     assertEquals(proxies.size(), 1);
   }
 
   @Test
-  public void testGetProxyWithoutRandom() {
+  public void testGetProxyWithoutRandomOrder() {
     FailoverProxyProvider.ProxyInfo<ApplicationClientProtocol> proxy = proxyProvider.getProxy();
     Configuration conf = new Configuration();
     conf.set(YarnConfiguration.RM_HA_IDS, "rm1,rm2,rm3,rm4");
-    conf.setBoolean(YarnConfiguration.CLIENT_RANDOM_ORDER_ENABLED, false);
     RMProxy rm1Mock = mock(RMProxy.class);
     doNothing().when(rm1Mock).checkAllowedProtocols(ApplicationClientProtocol.class);
     ConfiguredRMFailoverProxyProvider<ApplicationClientProtocol> proxyProviderWithNoInstances = new ConfiguredRMFailoverProxyProvider<ApplicationClientProtocol>();

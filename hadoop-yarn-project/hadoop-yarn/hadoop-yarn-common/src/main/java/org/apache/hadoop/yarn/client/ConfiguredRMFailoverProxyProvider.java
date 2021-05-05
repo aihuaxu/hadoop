@@ -52,6 +52,7 @@ public class ConfiguredRMFailoverProxyProvider<T>
   private Class<T> protocol;
   protected YarnConfiguration conf;
   protected List<String> rmServiceIds;
+  private final boolean CLIENT_RANDOM_ORDER_ENABLED_DEFAULT = false;
 
   @Override
   public void init(Configuration configuration, RMProxy<T> rmProxy,
@@ -68,7 +69,7 @@ public class ConfiguredRMFailoverProxyProvider<T>
     }
     this.rmServiceIds = new ArrayList<>(rmIds);
 
-    if (conf.getBoolean(YarnConfiguration.CLIENT_RANDOM_ORDER_ENABLED, true)) {
+    if (conf.getBoolean(YarnConfiguration.CLIENT_RANDOM_ORDER_ENABLED, CLIENT_RANDOM_ORDER_ENABLED_DEFAULT)) {
       // Randomize the list to prevent all clients pointing to the same one, enabled by default
       LOG.info("Random order enabled");
       Collections.shuffle(rmServiceIds);
