@@ -54,6 +54,7 @@ public class TestMetricsPublisher {
   @Before
   public void setUp() throws Exception {
     final HdfsConfiguration conf = new HdfsConfiguration();
+    conf.setBoolean(HdfsClientConfigKeys.DFS_CLIENT_METRICS_ENABLED_KEY, true);
     conf.setInt(HdfsClientConfigKeys.DFS_CLIENT_METRICS_EMIT_READ_TIME_THRESHOLD_KEY, 1000);
     conf.setInt(HdfsClientConfigKeys.DFS_CLIENT_METRICS_EMIT_READ_PACKET_TIME_THRESHOLD_KEY, 1000);
     // use testing reporter

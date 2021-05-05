@@ -199,7 +199,7 @@ public interface HdfsClientConfigKeys {
 
   String DFS_CLIENT_METRICS_ENABLED_KEY =
       "dfs.client.metrics.enabled";
-  boolean DFS_CLIENT_METRICS_ENABLED_DEFAULT = true;
+  boolean DFS_CLIENT_METRICS_ENABLED_DEFAULT = false;
 
   String DFS_CLIENT_METRICS_REPORTER_ADDR_KEY =
       "dfs.client.metrics.reporter.addr";
