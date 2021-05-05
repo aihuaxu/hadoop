@@ -137,7 +137,7 @@ public class DFSInputStream extends FSInputStream
 
   // Random flag for testing
   // Set true so unit test can pass, will use random when test deploy.
-  public final static boolean SHOULD_USE_SWITCH = true;
+  public final static boolean SHOULD_USE_SWITCH = new Random().nextBoolean();
 
   // state shared by stateful and positional read:
   // (protected by lock on infoLock)
