@@ -383,7 +383,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
     if (dfsClientConf.getHedgedReadThreadpoolSize() > 0) {
       this.initThreadsNumForHedgedReads(dfsClientConf.getHedgedReadThreadpoolSize());
     }
-    if (dfsClientConf.isFastSwitchReadEnabled() && dfsClientConf.getFastSwitchThreadpoolSize() > 0) {
+    if (dfsClientConf.isFastSwitchReadEnabled() && DFSInputStream.SHOULD_USE_SWITCH && dfsClientConf.getFastSwitchThreadpoolSize() > 0) {
       this.threadPrefix = "Fast-Switch-Read-Thread-" + UUID.randomUUID();
       this.initFastSwitchThreadPool(dfsClientConf.getFastSwitchThreadpoolSize());
     }
