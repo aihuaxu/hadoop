@@ -152,7 +152,9 @@ import org.apache.hadoop.hdfs.server.datanode.CachingStrategy;
 import org.apache.hadoop.hdfs.server.namenode.SafeModeException;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeStorageReport;
 import org.apache.hadoop.hdfs.util.IOUtilsClient;
+import org.apache.hadoop.hdfs.util.M3MetricsPublisher;
 import org.apache.hadoop.hdfs.util.MetricsPublisher;
+import org.apache.hadoop.hdfs.util.NoOpMetricsPublisher;
 import org.apache.hadoop.io.EnumSetWritable;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.Text;
@@ -383,7 +385,12 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
     this.saslClient = new SaslDataTransferClient(
         conf, DataTransferSaslUtil.getSaslPropertiesResolver(conf),
         TrustedChannelResolver.getInstance(conf), nnFallbackToSimpleAuth);
-    metricsPublisher = MetricsPublisher.getInstance(dfsClientConf);
+
+    if (dfsClientConf.getMetricsEnabled()) {
+      metricsPublisher = M3MetricsPublisher.getInstance(dfsClientConf);
+    } else {
+      metricsPublisher = new NoOpMetricsPublisher();
+    }
   }
 
   /**

@@ -15,30 +15,27 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.hdfs.util;
+package org.apache.hadoop.hdfs;
 
 
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
+import org.apache.hadoop.hdfs.client.impl.DfsClientConf;
+import org.apache.hadoop.hdfs.util.NoOpMetricsPublisher;
+import org.junit.Assert;
+import org.junit.Test;
 
-public interface MetricsPublisher {
-  void counter(String name, long amount);
+import java.io.IOException;
+import java.net.InetSocketAddress;
 
-  /**
-   * Emit client->datanode metrics with the "datanode" tag.
-   * @param datanode the host name of the datanode
-   */
-  void counter(String datanode, String name, long amount);
+public class TestMetricsPublisherConfig {
 
-  void gauge(String name, long amount);
-
-  /**
-   * Emit client->datanode metrics with the "datanode" tag.
-   * @param datanode the host name of the datanode
-   */
-  void gauge(String datanode, String name, long amount);
-
-  /**
-   * Histogram is mainly for time durations.
-   * @param duration in milliseconds
-   */
-  void histogram(String name, long duration);
+  @Test
+  public void testNoOpMetricsPublisher() throws IOException {
+    final HdfsConfiguration conf = new HdfsConfiguration();
+    conf.setBoolean(HdfsClientConfigKeys.DFS_CLIENT_METRICS_ENABLED_KEY, false);
+    DFSClient dfsClient = new DFSClient(new InetSocketAddress(0), conf);
+    Assert.assertTrue(dfsClient.getMetricsPublisher() instanceof NoOpMetricsPublisher);
+    dfsClient.close();
+  }
 }

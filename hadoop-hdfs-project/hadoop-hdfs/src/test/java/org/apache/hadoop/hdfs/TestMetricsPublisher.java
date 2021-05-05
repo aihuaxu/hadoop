@@ -24,7 +24,7 @@ import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
 import org.apache.hadoop.hdfs.client.impl.BlockReaderRemote2;
 import org.apache.hadoop.hdfs.client.impl.DfsClientConf;
 import org.apache.hadoop.hdfs.server.datanode.DataNodeFaultInjector;
-import org.apache.hadoop.hdfs.util.MetricsPublisher;
+import org.apache.hadoop.hdfs.util.M3MetricsPublisher;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -47,7 +47,7 @@ public class TestMetricsPublisher {
   private final long delayTime = 3000;
   private DistributedFileSystem fs;
 
-  private MetricsPublisher instance;
+  private M3MetricsPublisher instance;
   private final Map<String, Long> counterMap = new ConcurrentHashMap<>();
   private final Map<String, Double> gaugeMap = new ConcurrentHashMap<>();
 
@@ -76,17 +76,17 @@ public class TestMetricsPublisher {
   }
 
   private void updateMetricsPublisher(DfsClientConf conf) throws Exception {
-    instance = MetricsPublisher.getInstance(conf);
+    instance = M3MetricsPublisher.getInstance(conf);
     final Scope dnParentScope = DFSTestUtil.createM3ClientForTest(
             reportInterval, counterMap, gaugeMap);
     final Scope scope = DFSTestUtil.createM3ClientForTest(
             reportInterval, counterMap, gaugeMap);
 
-    Field dnScopeField = MetricsPublisher.class.getDeclaredField("dnParentScope");
+    Field dnScopeField = M3MetricsPublisher.class.getDeclaredField("dnParentScope");
     dnScopeField.setAccessible(true);
     dnScopeField.set(instance, dnParentScope);
 
-    Field scopeField = MetricsPublisher.class.getDeclaredField("scope");
+    Field scopeField = M3MetricsPublisher.class.getDeclaredField("scope");
     scopeField.setAccessible(true);
     scopeField.set(instance, scope);
   }

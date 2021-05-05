@@ -197,6 +197,10 @@ public interface HdfsClientConfigKeys {
       "dfs.namenode.snapshot.capture.openfiles";
   boolean DFS_NAMENODE_SNAPSHOT_CAPTURE_OPENFILES_DEFAULT = false;
 
+  String DFS_CLIENT_METRICS_ENABLED_KEY =
+      "dfs.client.metrics.enabled";
+  boolean DFS_CLIENT_METRICS_ENABLED_DEFAULT = true;
+
   String DFS_CLIENT_METRICS_REPORTER_ADDR_KEY =
       "dfs.client.metrics.reporter.addr";
   String DFS_CLIENT_METRICS_REPORTER_ADDR_DEFAULT =
