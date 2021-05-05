@@ -20,6 +20,7 @@ package org.apache.hadoop.hdfs;
 import com.google.common.base.Supplier;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
 import org.apache.hadoop.test.GenericTestUtils;
@@ -29,6 +30,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Random;
 import java.util.concurrent.Callable;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -60,6 +62,10 @@ public class TestDFSInputStreamWithFastSwitchRead {
     DistributedFileSystem fs = cluster.getFileSystem();
     DFSClient client = fs.dfs;
     DFSInputStream fin = client.open(TEST_FILE_NAME);
+    return validateSimpleRead(fin);
+  }
+
+  private DFSInputStream validateSimpleRead(DFSInputStream fin) throws IOException {
     for (int i = 0; i < TEST_FILE_LEN; i++) {
       assertEquals(fileContent[i], (byte) fin.read());
     }
@@ -154,6 +160,36 @@ public class TestDFSInputStreamWithFastSwitchRead {
     try {
       writeFile(cluster);
       testAllCases(cluster);
+    } finally {
+      cluster.shutdown();
+    }
+  }
+
+  private Callable<Boolean> doReadFile(final DFSInputStream fin) {
+    return new Callable<Boolean>() {
+      @Override
+      public Boolean call() {
+        try {
+          validateSimpleRead(fin).close();
+        } catch (IOException e) {
+          System.out.println("testtest + " + e);
+        }
+        return true;
+      }
+    };
+  }
+
+  @Test(timeout=180000)
+  public void testConcurrentRead() throws IOException {
+    Configuration conf = generateConfig();
+    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(3).build();
+    try {
+      writeFile(cluster);
+      DistributedFileSystem fs = cluster.getFileSystem();
+      DFSClient client = fs.dfs;
+      ExecutorService service = Executors.newFixedThreadPool(2);
+      service.submit(doReadFile(client.open(TEST_FILE_NAME)));
+      service.submit(doReadFile(client.open(TEST_FILE_NAME)));
     } finally {
       cluster.shutdown();
     }

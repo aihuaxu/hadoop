@@ -45,6 +45,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -54,6 +57,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.net.SocketFactory;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
@@ -239,7 +243,11 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
   private static final DFSHedgedReadMetrics HEDGED_READ_METRIC =
       new DFSHedgedReadMetrics();
   private static ThreadPoolExecutor HEDGED_READ_THREAD_POOL;
+  private static ExecutorService FAST_SWITCH_READ_THREAD_POOL;
+
   private final int smallBufferSize;
+
+  private String threadPrefix;
 
   public DfsClientConf getConf() {
     return dfsClientConf;
@@ -374,6 +382,10 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
 
     if (dfsClientConf.getHedgedReadThreadpoolSize() > 0) {
       this.initThreadsNumForHedgedReads(dfsClientConf.getHedgedReadThreadpoolSize());
+    }
+    if (dfsClientConf.isFastSwitchReadEnabled() && dfsClientConf.getFastSwitchThreadpoolSize() > 0) {
+      this.threadPrefix = "Fast-Switch-Read-Thread-" + UUID.randomUUID();
+      this.initFastSwitchThreadPool(dfsClientConf.getFastSwitchThreadpoolSize());
     }
     this.saslClient = new SaslDataTransferClient(
         conf, DataTransferSaslUtil.getSaslPropertiesResolver(conf),
@@ -2850,8 +2862,26 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
     LOG.debug("Using hedged reads; pool threads={}", num);
   }
 
+  // todo: Use fix threadpool for a quick test
+  private synchronized void initFastSwitchThreadPool(int num) {
+    if (!getConf().isFastSwitchReadEnabled() || !DFSInputStream.SHOULD_USE_SWITCH) {
+      return;
+    }
+    if (num <= 0 || FAST_SWITCH_READ_THREAD_POOL != null) return;
+
+    // todo: tune this later
+    FAST_SWITCH_READ_THREAD_POOL = Executors.newFixedThreadPool(num,
+                  new ThreadFactoryBuilder().setNameFormat(threadPrefix + "-%d").build());
+
+    LOG.info("XXX Using fast switch reads; pool threads={}", num);
+  }
+
   ThreadPoolExecutor getHedgedReadsThreadPool() {
     return HEDGED_READ_THREAD_POOL;
+  }
+
+  ExecutorService getFastSwitchThreadPool() {
+    return FAST_SWITCH_READ_THREAD_POOL;
   }
 
   boolean isHedgedReadsEnabled() {

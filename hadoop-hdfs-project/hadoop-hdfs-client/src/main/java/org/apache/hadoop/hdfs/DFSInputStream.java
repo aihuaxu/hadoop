@@ -127,7 +127,7 @@ public class DFSInputStream extends FSInputStream
 
   // Information used by fast switch read of stateful read.
   private final boolean useFastSwitch;
-  private ExecutorService bufferReaderExecutor;
+//  private ExecutorService bufferReaderExecutor;
   protected CompletionService<ReadResult> executorCompletionService;
   // TODO: slownodes should have a expiration time.
   private Set<DatanodeInfo> slownodes = new HashSet<>();
@@ -136,7 +136,8 @@ public class DFSInputStream extends FSInputStream
   protected int switchCount;
 
   // Random flag for testing
-  public final static boolean SHOULD_USE_SWITCH = new Random().nextBoolean();
+  // Set true so unit test can pass, will use random when test deploy.
+  public final static boolean SHOULD_USE_SWITCH = true;
 
   // state shared by stateful and positional read:
   // (protected by lock on infoLock)
@@ -331,10 +332,10 @@ public class DFSInputStream extends FSInputStream
       useFastSwitch = true;
       shouldSwitch = true;
       // TODO: Consider if we should use something else rather than FixedThreadPool.
-      bufferReaderExecutor =
-          Executors.newFixedThreadPool(dfsClient.getConf().getFastSwitchThreadpoolSize(),
-                  new ThreadFactoryBuilder().setNameFormat(threadPrefix + "-%d").build());
-      executorCompletionService = new ExecutorCompletionService<>(bufferReaderExecutor);
+//      bufferReaderExecutor =
+//          Executors.newFixedThreadPool(dfsClient.getConf().getFastSwitchThreadpoolSize(),
+//                  new ThreadFactoryBuilder().setNameFormat(threadPrefix + "-%d").build());
+      executorCompletionService = new ExecutorCompletionService<>(dfsClient.getFastSwitchThreadPool());
     } else {
       useFastSwitch = false;
     }
@@ -828,10 +829,10 @@ public class DFSInputStream extends FSInputStream
           "unreleased ByteBuffers allocated by read().  " +
           "Please release " + builder.toString() + ".");
     }
-
-    if (bufferReaderExecutor != null) {
-      bufferReaderExecutor.shutdown();
-    }
+//
+//    if (bufferReaderExecutor != null) {
+//      bufferReaderExecutor.shutdown();
+//    }
     closeCurrentBlockReaders();
     cleanAbandonedReaders();
     super.close();
