@@ -196,6 +196,10 @@ public interface HdfsClientConfigKeys {
   String DFS_NAMENODE_RESOLVE_PATH_ENABLED_NAMESERVICES = "dfs.namenode.resolve-path.enabled.nameservices";
   String DFS_NAMENODE_RESOLVE_PATH_ENABLED_NAMESERVICES_DEFAULT = "ns-router";
 
+  String DFS_CLIENT_METRICS_ENABLED_KEY =
+      "dfs.client.metrics.enabled";
+  boolean DFS_CLIENT_METRICS_ENABLED_DEFAULT = true;
+
   String DFS_CLIENT_METRICS_REPORTER_ADDR_KEY =
       "dfs.client.metrics.reporter.addr";
   String DFS_CLIENT_METRICS_REPORTER_ADDR_DEFAULT =

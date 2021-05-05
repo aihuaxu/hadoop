@@ -143,6 +143,7 @@ public class DfsClientConf {
 
   private final boolean dataTransferTcpNoDelay;
 
+  private final boolean metricsEnabled;
   private final String metricsReporterAddr;
   private final long metricsReportIntervalMs;
   private final int metricsReadEmitThreshold;
@@ -273,12 +274,15 @@ public class DfsClientConf {
 
     replicaAccessorBuilderClasses = loadReplicaAccessorBuilderClasses(conf);
 
+    metricsEnabled = conf.getBoolean(HdfsClientConfigKeys.DFS_CLIENT_METRICS_ENABLED_KEY,
+        HdfsClientConfigKeys.DFS_CLIENT_METRICS_ENABLED_DEFAULT);
+
     metricsReporterAddr = conf.get(
         HdfsClientConfigKeys.DFS_CLIENT_METRICS_REPORTER_ADDR_KEY,
         HdfsClientConfigKeys.DFS_CLIENT_METRICS_REPORTER_ADDR_DEFAULT);
     metricsReportIntervalMs = conf.getLong(
-            HdfsClientConfigKeys.DFS_CLIENT_METRICS_REPORT_INTERVAL_KEY,
-            HdfsClientConfigKeys.DFS_CLIENT_METRICS_REPORT_INTERVAL_DEFAULT);
+        HdfsClientConfigKeys.DFS_CLIENT_METRICS_REPORT_INTERVAL_KEY,
+        HdfsClientConfigKeys.DFS_CLIENT_METRICS_REPORT_INTERVAL_DEFAULT);
 
     metricsReadEmitThreshold = conf.getInt(
         HdfsClientConfigKeys.DFS_CLIENT_METRICS_EMIT_READ_TIME_THRESHOLD_KEY,
@@ -623,6 +627,13 @@ public class DfsClientConf {
    */
   public int getHedgedReadThreadpoolSize() {
     return hedgedReadThreadpoolSize;
+  }
+
+  /**
+   * @return if client metrics is enabled
+   */
+  public boolean getMetricsEnabled() {
+    return metricsEnabled;
   }
 
   /**

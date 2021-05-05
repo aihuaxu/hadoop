@@ -19,26 +19,24 @@ package org.apache.hadoop.hdfs.util;
 
 
 
-public interface MetricsPublisher {
-  void counter(String name, long amount);
+public class NoOpMetricsPublisher implements MetricsPublisher {
+  @Override
+  public void counter(String name, long amount) {
+  }
 
-  /**
-   * Emit client->datanode metrics with the "datanode" tag.
-   * @param datanode the host name of the datanode
-   */
-  void counter(String datanode, String name, long amount);
+  @Override
+  public void counter(String datanode, String name, long amount) {
+  }
 
-  void gauge(String name, long amount);
+  @Override
+  public void gauge(String name, long amount) {
+  }
 
-  /**
-   * Emit client->datanode metrics with the "datanode" tag.
-   * @param datanode the host name of the datanode
-   */
-  void gauge(String datanode, String name, long amount);
+  @Override
+  public void gauge(String datanode, String name, long amount) {
+  }
 
-  /**
-   * Histogram is mainly for time durations.
-   * @param duration in milliseconds
-   */
-  void histogram(String name, long duration);
+  @Override
+  public void histogram(String name, long duration) {
+  }
 }
