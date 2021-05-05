@@ -243,7 +243,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
   private static final DFSHedgedReadMetrics HEDGED_READ_METRIC =
       new DFSHedgedReadMetrics();
   private static ThreadPoolExecutor HEDGED_READ_THREAD_POOL;
-  private static ExecutorService FAST_SWITCH_READ_THREAD_POOL;
+  private static ThreadPoolExecutor FAST_SWITCH_READ_THREAD_POOL;
 
   private final int smallBufferSize;
 
@@ -2862,25 +2862,35 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
     LOG.debug("Using hedged reads; pool threads={}", num);
   }
 
-  // todo: Use fix threadpool for a quick test
   private synchronized void initFastSwitchThreadPool(int num) {
     if (!getConf().isFastSwitchReadEnabled() || !DFSInputStream.SHOULD_USE_SWITCH) {
       return;
     }
     if (num <= 0 || FAST_SWITCH_READ_THREAD_POOL != null) return;
 
-    // todo: tune this later
-    FAST_SWITCH_READ_THREAD_POOL = Executors.newFixedThreadPool(num,
-                  new ThreadFactoryBuilder().setNameFormat(threadPrefix + "-%d").build());
+    FAST_SWITCH_READ_THREAD_POOL = new ThreadPoolExecutor(1, num, 60,
+        TimeUnit.SECONDS, new SynchronousQueue<Runnable>(),
+        new ThreadFactoryBuilder().setNameFormat(threadPrefix + "-%d").build(),
+        new ThreadPoolExecutor.CallerRunsPolicy() {
+          @Override
+          public void rejectedExecution(Runnable runnable,
+              ThreadPoolExecutor e) {
+            LOG.warn("Fast switch execution rejected, Executing in current thread. " +
+                "Consider increase dfs.client.fast_switch.read.threadpool.size value.");
+            HEDGED_READ_METRIC.incHedgedReadOpsInCurThread();
+            // will run in the current thread
+            super.rejectedExecution(runnable, e);
+          }
+        });
 
-    LOG.info("XXX Using fast switch reads; pool threads={}", num);
+    LOG.info("Using fast switch reads; pool threads={}", num);
   }
 
   ThreadPoolExecutor getHedgedReadsThreadPool() {
     return HEDGED_READ_THREAD_POOL;
   }
 
-  ExecutorService getFastSwitchThreadPool() {
+  ThreadPoolExecutor getFastSwitchThreadPool() {
     return FAST_SWITCH_READ_THREAD_POOL;
   }
 

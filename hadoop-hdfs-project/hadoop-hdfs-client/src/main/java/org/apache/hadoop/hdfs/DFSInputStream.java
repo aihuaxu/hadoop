@@ -44,15 +44,12 @@ import java.util.concurrent.CompletionService;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorCompletionService;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.google.common.base.Preconditions;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.fs.ByteBufferReadable;
@@ -317,6 +314,7 @@ public class DFSInputStream extends FSInputStream
 
   DFSInputStream(DFSClient dfsClient, String src, boolean verifyChecksum,
       LocatedBlocks locatedBlocks) throws IOException {
+    logStackTraces();
     this.dfsClient = dfsClient;
     this.verifyChecksum = verifyChecksum;
     this.src = src;
@@ -326,22 +324,15 @@ public class DFSInputStream extends FSInputStream
     this.locatedBlocks = locatedBlocks;
     openInfo(false);
 
-    threadPrefix = "Fast-Switch-Read-Thread-" + UUID.randomUUID();
     // Initialize fast switch read
     if (dfsClient.getConf().isFastSwitchReadEnabled() && SHOULD_USE_SWITCH) {
       useFastSwitch = true;
       shouldSwitch = true;
-      // TODO: Consider if we should use something else rather than FixedThreadPool.
-//      bufferReaderExecutor =
-//          Executors.newFixedThreadPool(dfsClient.getConf().getFastSwitchThreadpoolSize(),
-//                  new ThreadFactoryBuilder().setNameFormat(threadPrefix + "-%d").build());
       executorCompletionService = new ExecutorCompletionService<>(dfsClient.getFastSwitchThreadPool());
     } else {
       useFastSwitch = false;
     }
   }
-
-  private final String threadPrefix;
 
   /**
    * Grab the open-file info from namenode
@@ -829,10 +820,7 @@ public class DFSInputStream extends FSInputStream
           "unreleased ByteBuffers allocated by read().  " +
           "Please release " + builder.toString() + ".");
     }
-//
-//    if (bufferReaderExecutor != null) {
-//      bufferReaderExecutor.shutdown();
-//    }
+
     closeCurrentBlockReaders();
     cleanAbandonedReaders();
     super.close();
@@ -1081,24 +1069,12 @@ public class DFSInputStream extends FSInputStream
   }
 
   private void logStackTraces() {
-    for (Entry<Thread, StackTraceElement[]> entry : Thread.getAllStackTraces().entrySet()) {
-      if (entry.getKey().getName().contains(threadPrefix)) {
-        boolean doPrint = true;
-        StackTraceElement[] stackTraces = entry.getValue();
-        StringBuilder sb = new StringBuilder();
-        for (StackTraceElement element : stackTraces) {
-          if (element.toString().contains("java.util.concurrent.ThreadPoolExecutor.getTask")) {
-            doPrint = false;
-            DFSClient.LOG.info(entry.getKey().getName() + " is parking.");
-            break;
-          }
-          sb.append(element).append("\n");
-        }
-        if (doPrint) {
-          DFSClient.LOG.info("XXX found reading threads " + entry.getKey().getName() + " stack traces: \n" + sb);
-        }
-      }
+    StackTraceElement[] stackTraces = Thread.currentThread().getStackTrace();
+    StringBuilder sb = new StringBuilder();
+    for (StackTraceElement element : stackTraces) {
+      sb.append(element).append("\n");
     }
+    DFSClient.LOG.info("Print out stack trace when starting DFSInputStream. Stack traces: \n" + sb);
   }
 
   private synchronized int readBufferFastSwitch(ReaderStrategy reader, int off, int len,
@@ -1136,24 +1112,19 @@ public class DFSInputStream extends FSInputStream
         // Make sure we are reading from correct future.
         // They were likely finished before cancellation.
         if (finishedFuture != null && finishedFuture != currentFuture) {
-          DFSClient.LOG.info("XXX Skipped future + " + finishedFuture + ", isCancelled=" + finishedFuture.isCancelled() + ", isDone=" + finishedFuture.isDone());
-          DFSClient.LOG.info("XXX Current future + " + currentFuture + ", isCancelled=" + currentFuture.isCancelled() + ", isDone=" + currentFuture.isDone());
           continue;
         }
         ReadResult result;
 
         // TODO: Consider other conditions to switch.
         if (finishedFuture == null) {
-          DFSClient.LOG.info("XXX Got null for finishedFuture");
-          DFSClient.LOG.info("XXX Current state of callable: " + readAction.getState());
-          if (readAction.getState().equals("Initialized")) {
-            DFSClient.LOG.warn("XXX Current read has not started yet.");
-            logStackTraces();
-          }
-          if (readAction.getState().equals("Finished")) {
-            DFSClient.LOG.warn("XXX Current read already done.");
-            logStackTraces();
-          }
+
+          dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.GAUGE,
+              FAST_SWITCH_ACTIVE_THREAD_COUNT, dfsClient.getFastSwitchThreadPool().getActiveCount());
+
+          dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.COUNTER,
+              currentNode.getHostName(),
+              FAST_SWITCH_TIMEOUT_COUNT, 1);
 
           // Make sure current future is already executing.
           if (shouldSwitch && readAction.getState().equals("Started Reading")) {
@@ -1167,7 +1138,6 @@ public class DFSInputStream extends FSInputStream
             boolean hasCandidate =
                 getBestNode(currentLocatedBlock, slownodes).datanode != null;
             if (hasCandidate) {
-              DFSClient.LOG.info("XXX found new candidate, cancel current reader and reset blockreader");
               // Cancel previous future and save the blockreader
               // so we can monitor later if any blockreader not closed properly.
               BlockReader oldReader = blockReader;
@@ -1175,7 +1145,6 @@ public class DFSInputStream extends FSInputStream
               blockReader = null;
               seekToNewSource(pos);
               currentFuture.cancel(true);
-              DFSClient.LOG.info("XXX cancelling current future " + currentFuture);
               abandonedReaders.add(oldReader);
               currentFuture = null;
               currentSwitchCount++;
@@ -1187,7 +1156,7 @@ public class DFSInputStream extends FSInputStream
               // Keep waiting for the currect blockreader.
               dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.COUNTER,
                   FAST_SWITCH_TOO_MANY_SLOWNESS_COUNT, 1);
-              DFSClient.LOG.info("XXX All candidate replicas are slow, it is likely that client is slow." +
+              DFSClient.LOG.info("All candidate replicas are slow, it is likely that client is slow." +
                   " Give up further read switch." +
                   " Slownode List: [" + getSlowNodesNames() + "].");
               slownodes.clear();
