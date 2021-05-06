@@ -123,7 +123,6 @@ public class DFSInputStream extends FSInputStream
 
   // Information used by fast switch read of stateful read.
   private final boolean useFastSwitch;
-//  private ExecutorService bufferReaderExecutor;
   protected CompletionService<ReadResult> executorCompletionService;
   // TODO: slownodes should have a expiration time.
   private Set<DatanodeInfo> slownodes = new HashSet<>();
@@ -133,8 +132,8 @@ public class DFSInputStream extends FSInputStream
 
   // Random flag for testing
   // Set true so unit test can pass, will use random when test deploy.
-  // public final static boolean SHOULD_USE_SWITCH = new Random().nextBoolean();
-  public final static boolean SHOULD_USE_SWITCH = true;
+  public final static boolean SHOULD_USE_SWITCH = new Random().nextBoolean();
+  // public final static boolean SHOULD_USE_SWITCH = true;
 
   // state shared by stateful and positional read:
   // (protected by lock on infoLock)
