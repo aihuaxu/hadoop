@@ -37,7 +37,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Random;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletionService;
@@ -134,7 +133,8 @@ public class DFSInputStream extends FSInputStream
 
   // Random flag for testing
   // Set true so unit test can pass, will use random when test deploy.
-  public final static boolean SHOULD_USE_SWITCH = new Random().nextBoolean();
+  // public final static boolean SHOULD_USE_SWITCH = new Random().nextBoolean();
+  public final static boolean SHOULD_USE_SWITCH = true;
 
   // state shared by stateful and positional read:
   // (protected by lock on infoLock)
@@ -191,6 +191,7 @@ public class DFSInputStream extends FSInputStream
   private static final String FAST_SWITCH_SWITCH_COUNT = "client.fast_switch_switch_count";
   private static final String FAST_SWITCH_ACTIVE_THREAD_COUNT = "client.fast_switch_active_thread_count";
   private static final String FAST_SWITCH_TOO_MANY_SLOWNESS_COUNT = "client.fast_switch_too_many_slowness_count";
+  private static final String FAST_SWITCH_THREAD_SLOW_START_COUNT = "client.fast_switch_thread_slow_start";
 
   private synchronized IdentityHashStore<ByteBuffer, Object>
         getExtendedReadBuffers() {
@@ -314,7 +315,6 @@ public class DFSInputStream extends FSInputStream
 
   DFSInputStream(DFSClient dfsClient, String src, boolean verifyChecksum,
       LocatedBlocks locatedBlocks) throws IOException {
-    logStackTraces();
     this.dfsClient = dfsClient;
     this.verifyChecksum = verifyChecksum;
     this.src = src;
@@ -1013,6 +1013,8 @@ public class DFSInputStream extends FSInputStream
       state = "Started";
       final long waitTimeBeforeStart = Time.monotonicNow() - startTime;
       if (waitTimeBeforeStart > 1000) {
+        dfsClient.getMetricsPublisher().emit(MetricsPublisher.MetricType.COUNTER,
+            FAST_SWITCH_THREAD_SLOW_START_COUNT, 1);
         DFSClient.LOG.info("XXX " + Thread.currentThread().getName() + " waited " + waitTimeBeforeStart + "ms before running");
       }
       BlockReader currentReader = blockReader;
@@ -1068,19 +1070,9 @@ public class DFSInputStream extends FSInputStream
     return sb.toString();
   }
 
-  private void logStackTraces() {
-    StackTraceElement[] stackTraces = Thread.currentThread().getStackTrace();
-    StringBuilder sb = new StringBuilder();
-    for (StackTraceElement element : stackTraces) {
-      sb.append(element).append("\n");
-    }
-    DFSClient.LOG.info("Print out stack trace when starting DFSInputStream. Stack traces: \n" + sb);
-  }
-
   private synchronized int readBufferFastSwitch(ReaderStrategy reader, int off, int len,
       Map<ExtendedBlock, Set<DatanodeInfo>> corruptedBlockMap)
       throws IOException, InterruptedException {
-    // DFSClient.LOG.debug("XXX Starting readBufferFastSwitch");
     IOException ioe;
 
     boolean retryCurrentNode = true;
@@ -1100,7 +1092,6 @@ public class DFSInputStream extends FSInputStream
         if (currentFuture == null) {
           currentFutureStartTime = Time.monotonicNow();
           readAction = new DoReadCallable(len, currentFutureStartTime);
-          // DFSClient.LOG.info("XXX submit a new read");
           currentFuture = executorCompletionService.submit(readAction);
         }
         // Timeout value will increase by each switch for the current read.

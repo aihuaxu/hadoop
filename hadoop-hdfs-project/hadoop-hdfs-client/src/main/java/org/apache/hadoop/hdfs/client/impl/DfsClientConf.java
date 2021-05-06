@@ -139,7 +139,9 @@ public class DfsClientConf {
 
   private final boolean fastSwitchEnabled;
   private final long fastSwitchThreshold;
-  private final int fastSwitchThreadpoolSize;
+  private final int fastSwitchThreadpoolCoreSize;
+  private final int fastSwitchThreadpoolMaxSize;
+  private final int fastSwitchThreadpoolKeepAliveTime;
 
   private final long hedgedReadThresholdMillis;
   private final int hedgedReadThreadpoolSize;
@@ -270,12 +272,18 @@ public class DfsClientConf {
     fastSwitchEnabled = conf.getBoolean(
         FastSwitchRead.ENABLED,
         FastSwitchRead.ENABLED_DEFAULT);
-    fastSwitchThreadpoolSize = conf.getInt(
-        FastSwitchRead.THREADPOOL_SIZE_KEY,
-        FastSwitchRead.THREADPOOL_SIZE_DEFAULT);
     fastSwitchThreshold = conf.getLong(
         FastSwitchRead.THRESHOLD_MILLIS_KEY,
         FastSwitchRead.THRESHOLD_MILLIS_DEFAULT);
+    fastSwitchThreadpoolMaxSize = conf.getInt(
+        FastSwitchRead.THREADPOOL_MAX_SIZE_KEY,
+        FastSwitchRead.THREADPOOL_MAX_SIZE_DEFAULT);
+    fastSwitchThreadpoolCoreSize = conf.getInt(
+        FastSwitchRead.THREADPOOL_CORE_SIZE_KEY,
+        FastSwitchRead.THREADPOOL_CORE_SIZE_DEFAULT);
+    fastSwitchThreadpoolKeepAliveTime = conf.getInt(
+        FastSwitchRead.THREADPOOL_KEEP_ALIVE_TIME_KEY,
+        FastSwitchRead.THREADPOOL_KEEP_ALIVE_TIME_DEFAULT);
 
     hedgedReadThresholdMillis = conf.getLong(
         HedgedRead.THRESHOLD_MILLIS_KEY,
@@ -637,8 +645,16 @@ public class DfsClientConf {
     return fastSwitchEnabled;
   }
 
-  public int getFastSwitchThreadpoolSize() {
-    return fastSwitchThreadpoolSize;
+  public int getFastSwitchThreadpoolMaxSize() {
+    return fastSwitchThreadpoolMaxSize;
+  }
+
+  public int getFastSwitchThreadpoolCoreSize() {
+    return fastSwitchThreadpoolCoreSize;
+  }
+
+  public int getFastSwitchThreadpoolKeepAliveTime() {
+    return fastSwitchThreadpoolKeepAliveTime;
   }
 
   public long getFastSwitchThreshold() {

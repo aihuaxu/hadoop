@@ -417,8 +417,12 @@ public interface HdfsClientConfigKeys {
     boolean ENABLED_DEFAULT = false;
     String  THRESHOLD_MILLIS_KEY = PREFIX + "threshold.millis";
     long    THRESHOLD_MILLIS_DEFAULT = 10000;
-    String  THREADPOOL_SIZE_KEY = PREFIX + "threadpool.size";
-    int     THREADPOOL_SIZE_DEFAULT = 100;
+    String  THREADPOOL_MAX_SIZE_KEY = PREFIX + "threadpool.max_size";
+    int     THREADPOOL_MAX_SIZE_DEFAULT = 100;
+    String  THREADPOOL_CORE_SIZE_KEY = PREFIX + "threadpool.core_size";
+    int     THREADPOOL_CORE_SIZE_DEFAULT = 1;
+    String  THREADPOOL_KEEP_ALIVE_TIME_KEY = PREFIX + "threadpool.keep_alive_time";
+    int     THREADPOOL_KEEP_ALIVE_TIME_DEFAULT = 60;
   }
 
   /** dfs.client.hedged.read configuration properties */

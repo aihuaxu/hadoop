@@ -46,8 +46,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -383,9 +381,11 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
     if (dfsClientConf.getHedgedReadThreadpoolSize() > 0) {
       this.initThreadsNumForHedgedReads(dfsClientConf.getHedgedReadThreadpoolSize());
     }
-    if (dfsClientConf.isFastSwitchReadEnabled() && DFSInputStream.SHOULD_USE_SWITCH && dfsClientConf.getFastSwitchThreadpoolSize() > 0) {
+    if (dfsClientConf.isFastSwitchReadEnabled() &&
+        DFSInputStream.SHOULD_USE_SWITCH) {
       this.threadPrefix = "Fast-Switch-Read-Thread-" + UUID.randomUUID();
-      this.initFastSwitchThreadPool(dfsClientConf.getFastSwitchThreadpoolSize());
+      this.initFastSwitchThreadPool(dfsClientConf.getFastSwitchThreadpoolCoreSize(),
+          dfsClientConf.getFastSwitchThreadpoolMaxSize(), dfsClientConf.getFastSwitchThreadpoolKeepAliveTime());
     }
     this.saslClient = new SaslDataTransferClient(
         conf, DataTransferSaslUtil.getSaslPropertiesResolver(conf),
@@ -2862,13 +2862,15 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
     LOG.debug("Using hedged reads; pool threads={}", num);
   }
 
-  private synchronized void initFastSwitchThreadPool(int num) {
+  private synchronized void initFastSwitchThreadPool(int corePoolsize,
+      int maxPoolSize, int keepAliveTime) {
     if (!getConf().isFastSwitchReadEnabled() || !DFSInputStream.SHOULD_USE_SWITCH) {
       return;
     }
-    if (num <= 0 || FAST_SWITCH_READ_THREAD_POOL != null) return;
+    // TODO: Better validation
+    if (maxPoolSize <= 0 || FAST_SWITCH_READ_THREAD_POOL != null) return;
 
-    FAST_SWITCH_READ_THREAD_POOL = new ThreadPoolExecutor(1, num, 60,
+    FAST_SWITCH_READ_THREAD_POOL = new ThreadPoolExecutor(corePoolsize, maxPoolSize, keepAliveTime,
         TimeUnit.SECONDS, new SynchronousQueue<Runnable>(),
         new ThreadFactoryBuilder().setNameFormat(threadPrefix + "-%d").build(),
         new ThreadPoolExecutor.CallerRunsPolicy() {
@@ -2883,7 +2885,9 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
           }
         });
 
-    LOG.info("Using fast switch reads; pool threads={}", num);
+    LOG.info("Using fast switch reads: pool max threads={}," +
+            " pool core threads={}, threads keep alive time={}",
+        maxPoolSize, corePoolsize, keepAliveTime);
   }
 
   ThreadPoolExecutor getHedgedReadsThreadPool() {

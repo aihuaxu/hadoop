@@ -30,6 +30,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Random;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -165,14 +166,15 @@ public class TestDFSInputStreamWithFastSwitchRead {
     }
   }
 
-  private Callable<Boolean> doReadFile(final DFSInputStream fin) {
+  private Callable<Boolean> doReadFile(final DFSInputStream fin, final CountDownLatch counter) {
     return new Callable<Boolean>() {
       @Override
       public Boolean call() {
         try {
-          validateSimpleRead(fin).close();
+          validateSimpleRead(fin);
+          counter.countDown();
         } catch (IOException e) {
-          System.out.println("testtest + " + e);
+          fail("Do read failed: " + e);
         }
         return true;
       }
@@ -180,7 +182,7 @@ public class TestDFSInputStreamWithFastSwitchRead {
   }
 
   @Test(timeout=180000)
-  public void testConcurrentRead() throws IOException {
+  public void testConcurrentRead() throws Exception {
     Configuration conf = generateConfig();
     MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(3).build();
     try {
@@ -188,8 +190,37 @@ public class TestDFSInputStreamWithFastSwitchRead {
       DistributedFileSystem fs = cluster.getFileSystem();
       DFSClient client = fs.dfs;
       ExecutorService service = Executors.newFixedThreadPool(2);
-      service.submit(doReadFile(client.open(TEST_FILE_NAME)));
-      service.submit(doReadFile(client.open(TEST_FILE_NAME)));
+      final CountDownLatch counter = new CountDownLatch(2);
+      service.submit(doReadFile(client.open(TEST_FILE_NAME), counter));
+      service.submit(doReadFile(client.open(TEST_FILE_NAME), counter));
+      GenericTestUtils.waitFor(new Supplier<Boolean>() {
+        @Override public Boolean get() {
+          return counter.getCount() == 0;
+        }
+      }, 2000, 30000);
+    } finally {
+      cluster.shutdown();
+    }
+  }
+
+  @Test(timeout=180000)
+  public void testConcurrentReadWithSmallMaxThreadPoolSize() throws Exception {
+    Configuration conf = generateConfig();
+    conf.setInt(HdfsClientConfigKeys.FastSwitchRead.THREADPOOL_MAX_SIZE_KEY, 1);
+    MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(3).build();
+    try {
+      writeFile(cluster);
+      DistributedFileSystem fs = cluster.getFileSystem();
+      DFSClient client = fs.dfs;
+      ExecutorService service = Executors.newFixedThreadPool(2);
+      final CountDownLatch counter = new CountDownLatch(2);
+      service.submit(doReadFile(client.open(TEST_FILE_NAME), counter));
+      service.submit(doReadFile(client.open(TEST_FILE_NAME), counter));
+      GenericTestUtils.waitFor(new Supplier<Boolean>() {
+        @Override public Boolean get() {
+          return counter.getCount() == 0;
+        }
+      }, 2000, 30000);
     } finally {
       cluster.shutdown();
     }
@@ -220,7 +251,7 @@ public class TestDFSInputStreamWithFastSwitchRead {
           DFSInputStream fin = validateSimpleRead(cluster);
           fin.close();
         } catch (IOException e) {
-          System.out.println("testtest + " + e);
+          fail("Do read failed: " + e);
         }
         return true;
       }
