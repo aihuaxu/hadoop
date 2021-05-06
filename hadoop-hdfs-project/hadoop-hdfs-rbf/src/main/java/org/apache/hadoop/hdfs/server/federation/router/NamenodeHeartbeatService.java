@@ -283,6 +283,8 @@ public class NamenodeHeartbeatService extends PeriodicService {
           // TODO: dynamic timeout
           HAServiceProtocol haProtocol = localTarget.getProxy(conf, 30*1000);
           HAServiceStatus status = haProtocol.getServiceStatus();
+          LOG.info("XXX: service status " + status.getState() +
+                  " for " + localTarget.getNameServiceId() + localTarget.getNameNodeId());
           report.setHAServiceState(status.getState());
         } catch (Throwable e) {
           if (e.getMessage().startsWith("HA for namenode is not enabled")) {

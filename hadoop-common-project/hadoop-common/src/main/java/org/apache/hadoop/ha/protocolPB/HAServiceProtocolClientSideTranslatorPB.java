@@ -141,6 +141,8 @@ public class HAServiceProtocolClientSideTranslatorPB implements
       return HAServiceState.ACTIVE;
     case STANDBY:
       return HAServiceState.STANDBY;
+    case OBSERVER:
+      return HAServiceState.OBSERVER;
     case INITIALIZING:
     default:
       return HAServiceState.INITIALIZING;

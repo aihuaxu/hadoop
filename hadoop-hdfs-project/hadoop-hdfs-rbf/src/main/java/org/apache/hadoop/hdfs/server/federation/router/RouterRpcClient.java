@@ -412,6 +412,14 @@ public class RouterRpcClient {
     if (rpcMonitor != null) {
       rpcMonitor.proxyOp();
     }
+
+    // ObserverRouter could have namenodes with all observers or active/standby
+    // namenodes. Shuffle for only observers case.
+    if (isObserverRouter &&
+            namenodes.get(0).getState() == FederationNamenodeServiceState.OBSERVER) {
+      Collections.shuffle(namenodes);
+    }
+
     boolean failover = false;
     Map<FederationNamenodeContext, IOException> ioes = new LinkedHashMap<>();
     for (FederationNamenodeContext namenode : namenodes) {
@@ -607,22 +615,12 @@ public class RouterRpcClient {
         if (nnContext.getState() == FederationNamenodeServiceState.ACTIVE) {
           return false;
         }
-        if (nnContext.getState() == FederationNamenodeServiceState.STANDBY) {
-          standbyCount++;
+
+        // If there is one observer for ObserverRouter, then cluster is available
+        if (isObserverRouter &&
+                nnContext.getState() == FederationNamenodeServiceState.OBSERVER) {
+          return false;
         }
-      }
-      // At this moment, there is no ACTIVE nn in the cluster.
-      // Here are some cases:
-      // if this is a normal router, no retry;
-      // if this is a router on observer, sub cases are:
-      //    if all states are standby, then they are all observers, retry;
-      //    if not all states are standby, either this is a normal
-      //        active-standby cluster and no active is working OR this is
-      //        active-standby-observer cluster with some observer is broken
-      //        Right now we cannot distinguish HA state for observer from
-      //        standby so there is no way to decide thus no retry.
-      if (isObserverRouter) {
-        return standbyCount != nnState.size();
       }
     }
 

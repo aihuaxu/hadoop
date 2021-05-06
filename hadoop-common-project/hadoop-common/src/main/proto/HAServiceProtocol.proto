@@ -32,6 +32,7 @@ enum HAServiceStateProto {
   INITIALIZING = 0;
   ACTIVE = 1;
   STANDBY = 2;
+  OBSERVER = 3;
 }
 
 enum HARequestSource {

@@ -51,6 +51,7 @@ public interface HAServiceProtocol {
     INITIALIZING("initializing"),
     ACTIVE("active"),
     STANDBY("standby"),
+    OBSERVER("observer"),
     STOPPING("stopping");
 
     private String name;
@@ -150,7 +151,7 @@ public interface HAServiceProtocol {
 
   /**
    * Return the current status of the service. The status indicates
-   * the current <em>state</em> (e.g ACTIVE/STANDBY) as well as
+   * the current <em>state</em> (e.g ACTIVE/STANDBY/OBSERVER) as well as
    * some additional information.
    * 
    * @throws AccessControlException
