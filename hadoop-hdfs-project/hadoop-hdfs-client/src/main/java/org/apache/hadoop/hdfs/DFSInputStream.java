@@ -144,7 +144,6 @@ public class DFSInputStream extends FSInputStream
    */
   private IdentityHashStore<ByteBuffer, Object> extendedReadBuffers;
 
-  private static final String READ_NUM_EXCEPTIONS = "client.read.num_exceptions";
   static final String SLOW_READ_DIST = "client.slow_read_distribution";
   static final String SLOW_READ_TIME = "client.slow_read_time";
   static final String NUM_SLOW_READ = "client.num_slow_read";
@@ -924,7 +923,6 @@ public class DFSInputStream extends FSInputStream
               + currentNode, e);
         }
         ioe = e;
-        dfsClient.getMetricsPublisher().counter(currentNode.getHostName(),READ_NUM_EXCEPTIONS, 1);
       }
       boolean sourceFound;
       if (retryCurrentNode) {

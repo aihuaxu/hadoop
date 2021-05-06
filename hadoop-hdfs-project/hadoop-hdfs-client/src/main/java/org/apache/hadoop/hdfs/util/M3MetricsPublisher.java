@@ -43,7 +43,7 @@ public class M3MetricsPublisher implements MetricsPublisher {
   private static final Logger LOG = LoggerFactory.getLogger(M3MetricsPublisher.class);
   private static M3MetricsPublisher INSTANCE;
 
-  private static final String SERVICE_NAME = "hadoop";
+  private static final String SERVICE_NAME = "hdfs";
   private static final String DATANODE_TAG = "datanode";
   private static final String UBER_ENVIRONMENT = "UBER_ENVIRONMENT";
   // If client doesn't configure an environment name, use the UBER_ENVIRONMENT
@@ -224,24 +224,32 @@ public class M3MetricsPublisher implements MetricsPublisher {
     return dnParentScope.tagged(Collections.singletonMap(DATANODE_TAG, datanode));
   }
 
-  private static Scope createM3Client(boolean includeHost, DfsClientConf conf) {
+  /**
+   * M3 requires total cardinality to be less than 100K. As we could have 10K datanodes,
+   * set withCommonTags to false to keep as few other tags as possible for metrics
+   * with the "datanode" tag.
+   */
+  private static Scope createM3Client(boolean withCommonTags, DfsClientConf conf) {
+    ImmutableMap.Builder<String, String> tagsBuilder = new ImmutableMap.Builder<>();
+    tagsBuilder.put(M3Reporter.SERVICE_TAG, SERVICE_NAME);
+    // ENV_TAG is mandatory
+    tagsBuilder.put(M3Reporter.ENV_TAG,
+      withCommonTags ? getMetricsEnvironment(conf) : UBER_ENVIRONMENT_PREFIX);
+
+    if (withCommonTags) {
+      tagsBuilder.put("language", "java");
+      String version = MetricsPublisher.class.getPackage().getImplementationVersion();
+      if (version != null) {
+        tagsBuilder.put("version", version);
+      }
+    }
+
     final InetSocketAddress reporterAddr =
       getReporterAddress(conf.getMetricsReporterAddr());
     final long reportInterval = conf.getMetricsReportIntervalMs();
-    final String metricsEnvironment = getMetricsEnvironment(conf);
-
-    ImmutableMap.Builder<String, String> tagsBuilder = new ImmutableMap.Builder<>();
-    tagsBuilder.put(M3Reporter.SERVICE_TAG, SERVICE_NAME);
-    tagsBuilder.put(M3Reporter.ENV_TAG, metricsEnvironment);
-    tagsBuilder.put("language", "java");
-    String version = MetricsPublisher.class.getPackage().getImplementationVersion();
-    if (version != null) {
-      tagsBuilder.put("version", version);
-    }
-
     try {
       StatsReporter reporter = new M3Reporter.Builder(reporterAddr)
-        .includeHost(includeHost)
+        .includeHost(withCommonTags)
         .commonTags(tagsBuilder.build())
         .build();
 

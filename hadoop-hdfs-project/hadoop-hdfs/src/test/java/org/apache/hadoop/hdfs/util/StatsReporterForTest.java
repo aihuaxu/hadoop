@@ -85,7 +85,7 @@ public class StatsReporterForTest implements StatsReporter {
 
   @Override
   public void reportHistogramDurationSamples(String name, Map<String, String> tags, Buckets buckets, Duration bucketLowerBound, Duration bucketUpperBound, long samples) {
-    throw new UnsupportedOperationException();
+    // TODO: Add unit test for histogram
   }
 
   @Override
