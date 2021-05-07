@@ -32,6 +32,8 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
 
   <properties>
     <hadoop.component>hdfs</hadoop.component>
+    <!-- Package to use when relocating shaded classes. -->
+    <hadoop.shade.packageName>org.apache.hadoop.shaded</hadoop.shade.packageName>
   </properties>
 
   <dependencies>
@@ -109,12 +111,10 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <dependency>
       <groupId>com.uber.m3</groupId>
       <artifactId>tally-core</artifactId>
-      <version>0.10.0</version>
     </dependency>
     <dependency>
       <groupId>com.uber.m3</groupId>
       <artifactId>tally-m3</artifactId>
-      <version>0.10.0</version>
     </dependency>
   </dependencies>
 
@@ -190,6 +190,39 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
         <configuration>
           <excludePackageNames>org.apache.hadoop.hdfs.protocol.proto</excludePackageNames>
         </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-shade-plugin</artifactId>
+        <version>3.2.1</version>
+        <executions>
+          <execution>
+            <phase>package</phase>
+            <goals>
+              <goal>shade</goal>
+            </goals>
+            <configuration>
+              <shadedArtifactAttached>false</shadedArtifactAttached>
+              <artifactSet>
+                <includes>
+                  <include>com.uber.m3:tally-core</include>
+                  <include>com.uber.m3:tally-m3</include>
+                  <include>org.apache.thrift:libthrift</include>
+                </includes>
+              </artifactSet>
+              <relocations>
+                <relocation>
+                  <pattern>com.uber.m3</pattern>
+                  <shadedPattern>${hadoop.shade.packageName}.m3</shadedPattern>
+                </relocation>
+                <relocation>
+                  <pattern>org.apache.thrift</pattern>
+                  <shadedPattern>${hadoop.shade.packageName}.thrift</shadedPattern>
+                </relocation>
+              </relocations>
+            </configuration>
+          </execution>
+        </executions>
       </plugin>
     </plugins>
   </build>
