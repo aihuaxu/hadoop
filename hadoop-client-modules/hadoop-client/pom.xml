@@ -98,6 +98,10 @@
           <groupId>org.slf4j</groupId>
           <artifactId>slf4j-log4j12</artifactId>
         </exclusion>
+        <exclusion>
+          <groupId>apphealth</groupId>
+          <artifactId>apphealth-logger-log4j</artifactId>
+        </exclusion>
       </exclusions>
     </dependency>
 
