@@ -110,12 +110,10 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <dependency>
       <groupId>com.uber.m3</groupId>
       <artifactId>tally-core</artifactId>
-      <version>0.10.0</version>
     </dependency>
     <dependency>
       <groupId>com.uber.m3</groupId>
       <artifactId>tally-m3</artifactId>
-      <version>0.10.0</version>
     </dependency>
   </dependencies>
 
@@ -192,6 +190,63 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
         <configuration>
           <excludePackageNames>org.apache.hadoop.hdfs.protocol.proto</excludePackageNames>
         </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-shade-plugin</artifactId>
+        <version>3.2.1</version>
+        <executions>
+          <execution>
+            <phase>package</phase>
+            <goals>
+              <goal>shade</goal>
+            </goals>
+            <configuration>
+              <shadedArtifactAttached>false</shadedArtifactAttached>
+              <artifactSet>
+                <includes>
+                  <include>com.uber.m3:tally-core</include>
+                  <include>com.uber.m3:tally-m3</include>
+                  <include>org.apache.thrift:libthrift</include>
+                </includes>
+              </artifactSet>
+              <relocations>
+                <relocation>
+                  <pattern>com.uber.m3</pattern>
+                  <shadedPattern>${hadoop.shade.packageName}.$0</shadedPattern>
+                </relocation>
+                <relocation>
+                  <pattern>org.apache.thrift</pattern>
+                  <shadedPattern>${hadoop.shade.packageName}.$0</shadedPattern>
+                </relocation>
+              </relocations>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <executions>
+          <!-- hadoop distribution includes the original non-shaded hadoop-hdfs-client jar.  So here we store jars
+               in their original form which are added when the classpath is computed. -->
+          <execution>
+            <id>copy-dependencies</id>
+            <phase>package</phase>
+            <goals>
+              <goal>copy-dependencies</goal>
+            </goals>
+           <configuration>
+              <outputDirectory>${project.build.directory}</outputDirectory>
+              <overWriteReleases>false</overWriteReleases>
+              <overWriteSnapshots>false</overWriteSnapshots>
+              <overWriteIfNewer>true</overWriteIfNewer>
+              <useSubDirectoryPerType>true</useSubDirectoryPerType>
+              <includeArtifactIds>tally-core,tally-m3,libthrift</includeArtifactIds>
+              <silent>true</silent>
+            </configuration>
+          </execution>
+        </executions>
       </plugin>
     </plugins>
   </build>

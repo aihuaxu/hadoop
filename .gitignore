@@ -15,6 +15,7 @@
 .settings
 target
 build
+dependency-reduced-pom.xml
 
 # Filesystem contract test options and credentials
 auth-keys.xml
