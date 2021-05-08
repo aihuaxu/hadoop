@@ -98,7 +98,6 @@
     <hikari.version>2.4.12</hikari.version>
     <mssql.version>6.2.1.jre7</mssql.version>
     <okhttp.version>2.7.5</okhttp.version>
-    <tally.version>0.10.0</tally.version>
 
     <!-- define the Java language version used by the compiler -->
     <javac.version>1.7</javac.version>
@@ -1257,18 +1256,6 @@
           </exclusion>
         </exclusions>
       </dependency>
- 
-      <dependency>
-        <groupId>com.uber.m3</groupId>
-        <artifactId>tally-core</artifactId>
-        <version>${tally.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.uber.m3</groupId>
-        <artifactId>tally-m3</artifactId>
-        <version>${tally.version}</version>
-      </dependency>
-
     </dependencies>
   </dependencyManagement>
 

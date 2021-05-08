@@ -225,16 +225,6 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
       <artifactId>curator-test</artifactId>
       <scope>test</scope>
     </dependency>
-    <dependency>
-    <groupId>com.uber.m3</groupId>
-      <artifactId>tally-core</artifactId>
-      <scope>test</scope>
-     </dependency>
-     <dependency>
-      <groupId>com.uber.m3</groupId>
-      <artifactId>tally-m3</artifactId>
-      <scope>test</scope>
-     </dependency>
   </dependencies>
 
   <build>
