@@ -92,6 +92,7 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 import javax.management.ObjectName;
 
@@ -3089,6 +3090,32 @@ public class DataNode extends ReconfigurableBase
           }
         }
       }
+    }
+  }
+
+  private volatile boolean delayDataNodeForTest = false;
+  private AtomicLong delayTimeInMsPerPacket = new AtomicLong(0L);
+
+  protected AtomicLong getDelayTimeInMsPerPacket() {
+    return delayTimeInMsPerPacket;
+  }
+
+  protected boolean getDelayDataNodeForTest() {
+    return delayDataNodeForTest;
+  }
+
+
+  @Override
+  public void setDelayDataNodeForTest(boolean setDelayDataNodeForTest,
+          long delayTimeInMsPerPacket) {
+    if (setDelayDataNodeForTest) {
+      LOG.info("Setting read delay for testing." +
+          " Delay time for each BlockSender (ms): " + delayTimeInMsPerPacket);
+      this.delayDataNodeForTest = true;
+      this.delayTimeInMsPerPacket.set(delayTimeInMsPerPacket);
+    } else {
+      this.delayDataNodeForTest = false;
+      this.delayTimeInMsPerPacket.set(0);
     }
   }
 

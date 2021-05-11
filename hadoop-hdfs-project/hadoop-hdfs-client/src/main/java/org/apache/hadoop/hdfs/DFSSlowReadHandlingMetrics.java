@@ -27,17 +27,17 @@ import java.util.concurrent.atomic.AtomicLong;
  * we can grab them from client side, like HBase.
  */
 @InterfaceAudience.Private
-public class DFSHedgedReadMetrics {
+public class DFSSlowReadHandlingMetrics {
   public final AtomicLong hedgedReadOps = new AtomicLong();
   public final AtomicLong hedgedReadOpsWin = new AtomicLong();
-  public final AtomicLong hedgedReadOpsInCurThread = new AtomicLong();
+  public final AtomicLong readOpsInCurThread = new AtomicLong();
 
   public void incHedgedReadOps() {
     hedgedReadOps.incrementAndGet();
   }
 
-  public void incHedgedReadOpsInCurThread() {
-    hedgedReadOpsInCurThread.incrementAndGet();
+  public void incReadOpsInCurThread() {
+    readOpsInCurThread.incrementAndGet();
   }
 
   public void incHedgedReadWins() {
@@ -48,8 +48,8 @@ public class DFSHedgedReadMetrics {
     return hedgedReadOps.longValue();
   }
 
-  public long getHedgedReadOpsInCurThread() {
-    return hedgedReadOpsInCurThread.longValue();
+  public long getReadOpsInCurThread() {
+    return readOpsInCurThread.longValue();
   }
 
   public long getHedgedReadWins() {

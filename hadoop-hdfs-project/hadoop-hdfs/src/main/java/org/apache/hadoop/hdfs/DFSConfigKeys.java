@@ -1213,13 +1213,6 @@ public class DFSConfigKeys extends CommonConfigurationKeys {
   @Deprecated
   public static final long    DEFAULT_DFSCLIENT_HEDGED_READ_THRESHOLD_MILLIS
       = HdfsClientConfigKeys.HedgedRead.THRESHOLD_MILLIS_DEFAULT;
-  @Deprecated
-  public static final String  DFS_DFSCLIENT_HEDGED_READ_THREADPOOL_SIZE
-      = HdfsClientConfigKeys.HedgedRead.THREADPOOL_SIZE_KEY;
-  @Deprecated
-  public static final int     DEFAULT_DFSCLIENT_HEDGED_READ_THREADPOOL_SIZE
-      = HdfsClientConfigKeys.HedgedRead.THREADPOOL_SIZE_DEFAULT;
-
 
   @Deprecated
   public static final String  DFS_CLIENT_WRITE_PACKET_SIZE_KEY =

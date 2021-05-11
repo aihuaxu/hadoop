@@ -45,15 +45,16 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.UUID;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.net.SocketFactory;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
@@ -176,7 +177,6 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.SecretManager.InvalidToken;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenRenewer;
-import org.apache.hadoop.util.Daemon;
 import org.apache.hadoop.util.DataChecksum;
 import org.apache.hadoop.util.DataChecksum.Type;
 import org.apache.hadoop.util.Progressable;
@@ -237,9 +237,11 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
   private final CachingStrategy defaultWriteCachingStrategy;
   private final ClientContext clientContext;
 
-  private static final DFSHedgedReadMetrics HEDGED_READ_METRIC =
-      new DFSHedgedReadMetrics();
-  private static ThreadPoolExecutor HEDGED_READ_THREAD_POOL;
+  private static final DFSSlowReadHandlingMetrics SLOW_READ_HANDLING_METRIC =
+      new DFSSlowReadHandlingMetrics();
+  static final String READ_THREAD_PREFIX = "Hedge-Switch-Read-Thread-" + UUID.randomUUID();
+  private static ThreadPoolExecutor READ_THREAD_POOL;
+
   private final int smallBufferSize;
 
   public DfsClientConf getConf() {
@@ -373,9 +375,13 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
         conf.get(DFS_CLIENT_CONTEXT, DFS_CLIENT_CONTEXT_DEFAULT),
         dfsClientConf);
 
-    if (dfsClientConf.getHedgedReadThreadpoolSize() > 0) {
-      this.initThreadsNumForHedgedReads(dfsClientConf.getHedgedReadThreadpoolSize());
+    if (dfsClientConf.isHedgedReadEnabled() || dfsClientConf.isFastSwitchReadEnabled()) {
+      this.initReadThreadPool(dfsClientConf.getReadThreadpoolCoreSize(),
+              dfsClientConf.getReadThreadpoolMaxSize(),
+              dfsClientConf.getReadThreadpoolKeepAliveTime(),
+              dfsClientConf.isReadThreadPoolCoreThreadTimeoutAllowed());
     }
+
     this.saslClient = new SaslDataTransferClient(
         conf, DataTransferSaslUtil.getSaslPropertiesResolver(conf),
         TrustedChannelResolver.getInstance(conf), nnFallbackToSimpleAuth);
@@ -2815,49 +2821,49 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
   }
 
   /**
-   * Create hedged reads thread pool, HEDGED_READ_THREAD_POOL, if
-   * it does not already exist.
-   * @param num Number of threads for hedged reads thread pool.
-   * If zero, skip hedged reads thread pool creation.
+   * Create thread pool for hedge/fast-switch reads, if it does not exist.
    */
-  private synchronized void initThreadsNumForHedgedReads(int num) {
-    if (num <= 0 || HEDGED_READ_THREAD_POOL != null) return;
-    HEDGED_READ_THREAD_POOL = new ThreadPoolExecutor(1, num, 60,
-        TimeUnit.SECONDS, new SynchronousQueue<Runnable>(),
-        new Daemon.DaemonFactory() {
-          private final AtomicInteger threadIndex = new AtomicInteger(0);
-          @Override
-          public Thread newThread(Runnable r) {
-            Thread t = super.newThread(r);
-            t.setName("hedgedRead-" + threadIndex.getAndIncrement());
-            return t;
-          }
-        },
+  private synchronized void initReadThreadPool(int corePoolsize,
+      int maxPoolSize, int keepAliveTime, boolean allowCoreThreadTimeout) {
+    if (!getConf().isFastSwitchReadEnabled() && !getConf().isHedgedReadEnabled()) {
+      return;
+    }
+    // TODO: Better validation
+    if (maxPoolSize <= 0 || READ_THREAD_POOL != null) {
+      return;
+    }
+
+    READ_THREAD_POOL = new ThreadPoolExecutor(corePoolsize, maxPoolSize,
+        keepAliveTime, TimeUnit.SECONDS, new SynchronousQueue<Runnable>(),
+        new ThreadFactoryBuilder().setNameFormat(READ_THREAD_PREFIX + "-%d").build(),
         new ThreadPoolExecutor.CallerRunsPolicy() {
           @Override
           public void rejectedExecution(Runnable runnable,
               ThreadPoolExecutor e) {
-            LOG.info("Execution rejected, Executing in current thread");
-            HEDGED_READ_METRIC.incHedgedReadOpsInCurThread();
+            LOG.warn("Read execution rejected, Executing in current thread. " +
+                "Consider increasing dfs.client.read.threadpool.max_size value.");
+            SLOW_READ_HANDLING_METRIC.incReadOpsInCurThread();
             // will run in the current thread
             super.rejectedExecution(runnable, e);
           }
         });
-    HEDGED_READ_THREAD_POOL.allowCoreThreadTimeOut(true);
-    LOG.debug("Using hedged reads; pool threads={}", num);
+    READ_THREAD_POOL.allowCoreThreadTimeOut(allowCoreThreadTimeout);
+    LOG.info("Using fast-switch/hedge reads: pool max threads={}," +
+            " pool core threads={}, threads keep alive time={}," +
+            " allow core thread timeout={}",
+        maxPoolSize, corePoolsize, keepAliveTime, allowCoreThreadTimeout);
   }
 
-  ThreadPoolExecutor getHedgedReadsThreadPool() {
-    return HEDGED_READ_THREAD_POOL;
+  ThreadPoolExecutor getReadThreadPool() {
+    return READ_THREAD_POOL;
   }
 
   boolean isHedgedReadsEnabled() {
-    return (HEDGED_READ_THREAD_POOL != null) &&
-        HEDGED_READ_THREAD_POOL.getMaximumPoolSize() > 0;
+    return dfsClientConf.isHedgedReadEnabled() && READ_THREAD_POOL != null;
   }
 
-  DFSHedgedReadMetrics getHedgedReadMetrics() {
-    return HEDGED_READ_METRIC;
+  DFSSlowReadHandlingMetrics getHedgedReadMetrics() {
+    return SLOW_READ_HANDLING_METRIC;
   }
 
   /**

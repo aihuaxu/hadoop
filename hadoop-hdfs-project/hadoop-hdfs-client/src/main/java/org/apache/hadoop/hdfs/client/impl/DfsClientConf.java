@@ -26,6 +26,7 @@ import org.apache.hadoop.fs.Options.ChecksumOpt;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
 import org.apache.hadoop.hdfs.ReplicaAccessorBuilder;
+import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys.ReadThreadPool;
 import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.hdfs.util.ByteArrayManager;
 import org.apache.hadoop.ipc.Client;
@@ -80,6 +81,7 @@ import static org.apache.hadoop.hdfs.client.HdfsClientConfigKeys.DFS_SHORT_CIRCU
 import static org.apache.hadoop.hdfs.client.HdfsClientConfigKeys.DFS_SHORT_CIRCUIT_SHARED_MEMORY_WATCHER_INTERRUPT_CHECK_MS_DEFAULT;
 import static org.apache.hadoop.hdfs.client.HdfsClientConfigKeys.Failover;
 import static org.apache.hadoop.hdfs.client.HdfsClientConfigKeys.HedgedRead;
+import static org.apache.hadoop.hdfs.client.HdfsClientConfigKeys.FastSwitchRead;
 import static org.apache.hadoop.hdfs.client.HdfsClientConfigKeys.Mmap;
 import static org.apache.hadoop.hdfs.client.HdfsClientConfigKeys.Read;
 import static org.apache.hadoop.hdfs.client.HdfsClientConfigKeys.Retry;
@@ -136,8 +138,17 @@ public class DfsClientConf {
 
   private final ShortCircuitConf shortCircuitConf;
 
+  private final boolean fastSwitchEnabled;
+  private final long fastSwitchThreshold;
+
+  private final int readThreadpoolCoreSize;
+  private final int readThreadpoolMaxSize;
+  private final int readThreadpoolKeepAliveTime;
+  private final boolean readThreadPoolCoreThreadTimeoutAllowed;
+
+  private final boolean hedgedReadEnabled;
   private final long hedgedReadThresholdMillis;
-  private final int hedgedReadThreadpoolSize;
+
   private final List<Class<? extends ReplicaAccessorBuilder>>
       replicaAccessorBuilderClasses;
 
@@ -265,12 +276,32 @@ public class DfsClientConf {
 
     shortCircuitConf = new ShortCircuitConf(conf);
 
+    fastSwitchEnabled = conf.getBoolean(
+        FastSwitchRead.ENABLED,
+        FastSwitchRead.ENABLED_DEFAULT);
+    fastSwitchThreshold = conf.getLong(
+        FastSwitchRead.THRESHOLD_MILLIS_KEY,
+        FastSwitchRead.THRESHOLD_MILLIS_DEFAULT);
+
+    readThreadpoolMaxSize = conf.getInt(
+        ReadThreadPool.MAX_SIZE_KEY,
+        ReadThreadPool.MAX_SIZE_DEFAULT);
+    readThreadpoolCoreSize = conf.getInt(
+        ReadThreadPool.CORE_SIZE_KEY,
+        ReadThreadPool.CORE_SIZE_DEFAULT);
+    readThreadpoolKeepAliveTime = conf.getInt(
+        ReadThreadPool.KEEP_ALIVE_TIME_KEY,
+        ReadThreadPool.KEEP_ALIVE_TIME_DEFAULT);
+    readThreadPoolCoreThreadTimeoutAllowed = conf.getBoolean(
+        ReadThreadPool.ALLOW_CORE_THREAD_TIMEOUT_KEY,
+        ReadThreadPool.ALLOW_CORE_THREAD_TIMEOUT_DEFAULT);
+
+    hedgedReadEnabled = conf.getBoolean(
+        HedgedRead.ENABLED,
+        HedgedRead.ENABLED_DEFAULT);
     hedgedReadThresholdMillis = conf.getLong(
         HedgedRead.THRESHOLD_MILLIS_KEY,
         HedgedRead.THRESHOLD_MILLIS_DEFAULT);
-    hedgedReadThreadpoolSize = conf.getInt(
-        HdfsClientConfigKeys.HedgedRead.THREADPOOL_SIZE_KEY,
-        HdfsClientConfigKeys.HedgedRead.THREADPOOL_SIZE_DEFAULT);
 
     replicaAccessorBuilderClasses = loadReplicaAccessorBuilderClasses(conf);
 
@@ -616,6 +647,14 @@ public class DfsClientConf {
   }
 
   /**
+   * @return if hedged read is enabled. Note currently hedge read is only
+   * supported for pread
+   */
+  public boolean isHedgedReadEnabled() {
+    return hedgedReadEnabled;
+  }
+
+  /**
    * @return the hedgedReadThresholdMillis
    */
   public long getHedgedReadThresholdMillis() {
@@ -623,10 +662,22 @@ public class DfsClientConf {
   }
 
   /**
-   * @return the hedgedReadThreadpoolSize
+   * @return the max size of the read thread pool
    */
-  public int getHedgedReadThreadpoolSize() {
-    return hedgedReadThreadpoolSize;
+  public int getReadThreadpoolMaxSize() {
+    return readThreadpoolMaxSize;
+  }
+
+  public int getReadThreadpoolCoreSize() {
+    return readThreadpoolCoreSize;
+  }
+
+  public int getReadThreadpoolKeepAliveTime() {
+    return readThreadpoolKeepAliveTime;
+  }
+
+  public boolean isReadThreadPoolCoreThreadTimeoutAllowed() {
+    return readThreadPoolCoreThreadTimeoutAllowed;
   }
 
   /**
@@ -634,6 +685,14 @@ public class DfsClientConf {
    */
   public boolean getMetricsEnabled() {
     return metricsEnabled;
+  }
+
+  public boolean isFastSwitchReadEnabled() {
+    return fastSwitchEnabled;
+  }
+
+  public long getFastSwitchThreshold() {
+    return fastSwitchThreshold;
   }
 
   /**

@@ -420,14 +420,36 @@ public interface HdfsClientConfigKeys {
     long    RETRY_TIMEOUT_MS_DEFAULT = 5*MINUTE;
   }
 
+  /** dfs.client.fast_switch.read configuration properties */
+  interface FastSwitchRead {
+    String PREFIX = HdfsClientConfigKeys.PREFIX + "fast_switch.read.";
+
+    String  ENABLED = PREFIX + "enabled";
+    boolean ENABLED_DEFAULT = false;
+    String  THRESHOLD_MILLIS_KEY = PREFIX + "threshold.millis";
+    long    THRESHOLD_MILLIS_DEFAULT = 10000;
+  }
+
   /** dfs.client.hedged.read configuration properties */
   interface HedgedRead {
     String PREFIX = HdfsClientConfigKeys.PREFIX + "hedged.read.";
 
+    String  ENABLED = PREFIX + "enabled";
+    boolean ENABLED_DEFAULT = false;
     String  THRESHOLD_MILLIS_KEY = PREFIX + "threshold.millis";
     long    THRESHOLD_MILLIS_DEFAULT = 500;
-    String  THREADPOOL_SIZE_KEY = PREFIX + "threadpool.size";
-    int     THREADPOOL_SIZE_DEFAULT = 0;
+  }
+
+  interface ReadThreadPool {
+    String PREFIX = HdfsClientConfigKeys.PREFIX + "read.threadpool.";
+    String  MAX_SIZE_KEY = PREFIX + "max_size";
+    int     MAX_SIZE_DEFAULT = 100;
+    String  CORE_SIZE_KEY = PREFIX + "core_size";
+    int     CORE_SIZE_DEFAULT = 1;
+    String  KEEP_ALIVE_TIME_KEY = PREFIX + "keep_alive_time";
+    int     KEEP_ALIVE_TIME_DEFAULT = 60;
+    String  ALLOW_CORE_THREAD_TIMEOUT_KEY = PREFIX + "core-thread.timeout.allowed";
+    boolean ALLOW_CORE_THREAD_TIMEOUT_DEFAULT = true;
   }
 
   /** dfs.http.client configuration properties */

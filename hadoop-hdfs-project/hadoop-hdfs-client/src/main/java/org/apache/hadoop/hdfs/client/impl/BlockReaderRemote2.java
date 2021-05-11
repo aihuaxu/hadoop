@@ -143,6 +143,7 @@ public class BlockReaderRemote2 implements BlockReader {
   @VisibleForTesting
   public static final String SLOW_PACKET_TIME = "client.blockreader.slow_packet_time";
   public static final String NUM_SLOW_PACKET = "client.blockreader.num_slow_packet";
+  static final String SLOW_PACKET_TIME_SOURCE = "client.blockreader.slow_packet_time_source";
 
   @VisibleForTesting
   public Peer getPeer() {
@@ -208,9 +209,11 @@ public class BlockReaderRemote2 implements BlockReader {
     long duration = Time.monotonicNow() - start;
     if (duration > conf.getMetricsReadPacketEmitThreshold()) {
       LOG.warn("BlockReaderRemote2 slow read packet took " + duration
-          + "ms for block " + blockId);
+          + "ms for block " + blockId + ". Datanode: " + datanodeID.toString());
       if (metricsPublisher != null) {
+        // report metrics with both the datanode tag and the local host tag.
         metricsPublisher.gauge(datanodeID.getHostName(), SLOW_PACKET_TIME, duration);
+        metricsPublisher.gauge(SLOW_PACKET_TIME_SOURCE, duration);
         metricsPublisher.counter(datanodeID.getHostName(), NUM_SLOW_PACKET, 1);
       }
     }

@@ -386,7 +386,7 @@
     </doc>
   </class>
   <!-- end class org.apache.hadoop.hdfs.DFSClient.DFSDataInputStream -->
-  <!-- start class org.apache.hadoop.hdfs.DFSHedgedReadMetrics -->
+  <!-- start class org.apache.hadoop.hdfs.DFSSlowReadHandlingMetrics -->
   <class name="DFSHedgedReadMetrics" extends="java.lang.Object"
     abstract="false"
     static="false" final="false" visibility="public"
@@ -446,7 +446,7 @@
  we can grab them from client side, like HBase.]]>
     </doc>
   </class>
-  <!-- end class org.apache.hadoop.hdfs.DFSHedgedReadMetrics -->
+  <!-- end class org.apache.hadoop.hdfs.DFSSlowReadHandlingMetrics -->
   <!-- start class org.apache.hadoop.hdfs.DFSInotifyEventInputStream -->
   <class name="DFSInotifyEventInputStream" extends="java.lang.Object"
     abstract="false"

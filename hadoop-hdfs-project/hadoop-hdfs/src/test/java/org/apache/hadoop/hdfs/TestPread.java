@@ -255,8 +255,12 @@ public class TestPread {
   private Callable<Void> getPReadFileCallable(final FileSystem fileSys,
       final Path file) {
     return new Callable<Void>() {
-      public Void call() throws IOException {
-        pReadFile(fileSys, file);
+      public Void call() {
+        try {
+          pReadFile(fileSys, file);
+        } catch (IOException e) {
+          DFSClient.LOG.error("Exception while reading", e);
+        }
         return null;
       }
     };
@@ -288,7 +292,8 @@ public class TestPread {
   public void testHedgedPreadDFSBasic() throws IOException {
     isHedgedRead = true;
     Configuration conf = new Configuration();
-    conf.setInt(HdfsClientConfigKeys.HedgedRead.THREADPOOL_SIZE_KEY, 5);
+    conf.setBoolean(HdfsClientConfigKeys.HedgedRead.ENABLED, true);
+    conf.setInt(HdfsClientConfigKeys.ReadThreadPool.MAX_SIZE_KEY, 5);
     conf.setLong(HdfsClientConfigKeys.HedgedRead.THRESHOLD_MILLIS_KEY, 1);
     dfsPreadTest(conf, false, true); // normal pread
     dfsPreadTest(conf, true, true); // trigger read code path without
@@ -301,7 +306,8 @@ public class TestPread {
     int numHedgedReadPoolThreads = 5;
     final int hedgedReadTimeoutMillis = 50;
 
-    conf.setInt(HdfsClientConfigKeys.HedgedRead.THREADPOOL_SIZE_KEY,
+    conf.setBoolean(HdfsClientConfigKeys.HedgedRead.ENABLED, true);
+    conf.setInt(HdfsClientConfigKeys.ReadThreadPool.MAX_SIZE_KEY,
         numHedgedReadPoolThreads);
     conf.setLong(HdfsClientConfigKeys.HedgedRead.THRESHOLD_MILLIS_KEY,
         hedgedReadTimeoutMillis);
@@ -376,7 +382,8 @@ public class TestPread {
     int numHedgedReadPoolThreads = 5;
     final int initialHedgedReadTimeoutMillis = 50000;
     final int fixedSleepIntervalMillis = 50;
-    conf.setInt(HdfsClientConfigKeys.HedgedRead.THREADPOOL_SIZE_KEY,
+    conf.setBoolean(HdfsClientConfigKeys.HedgedRead.ENABLED, true);
+    conf.setInt(HdfsClientConfigKeys.ReadThreadPool.MAX_SIZE_KEY,
         numHedgedReadPoolThreads);
     conf.setLong(HdfsClientConfigKeys.HedgedRead.THRESHOLD_MILLIS_KEY,
         initialHedgedReadTimeoutMillis);
@@ -397,11 +404,11 @@ public class TestPread {
         .format(true).build();
     DistributedFileSystem fileSys = cluster.getFileSystem();
     DFSClient dfsClient = fileSys.getClient();
-    DFSHedgedReadMetrics metrics = dfsClient.getHedgedReadMetrics();
+    DFSSlowReadHandlingMetrics metrics = dfsClient.getHedgedReadMetrics();
     // Metrics instance is static, so we need to reset counts from prior tests.
     metrics.hedgedReadOps.set(0);
     metrics.hedgedReadOpsWin.set(0);
-    metrics.hedgedReadOpsInCurThread.set(0);
+    metrics.readOpsInCurThread.set(0);
 
     try {
       Path file1 = new Path("hedgedReadMaxOut.dat");
@@ -411,7 +418,7 @@ public class TestPread {
       pReadFile(fileSys, file1);
       // assert that there were no hedged reads. 50ms + delta < 500ms
       assertTrue(metrics.getHedgedReadOps() == 0);
-      assertTrue(metrics.getHedgedReadOpsInCurThread() == 0);
+      assertTrue(metrics.getReadOpsInCurThread() == 0);
       /*
        * Reads take longer than timeout. But, only one thread reading. Assert
        * that there were hedged reads. But, none of the reads had to run in the
@@ -428,7 +435,7 @@ public class TestPread {
       pReadFile(fileSys, file1);
       // assert that there were hedged reads
       assertTrue(metrics.getHedgedReadOps() > 0);
-      assertTrue(metrics.getHedgedReadOpsInCurThread() == 0);
+      assertTrue(metrics.getReadOpsInCurThread() == 0);
       /*
        * Multiple threads reading. Reads take longer than timeout. Assert that
        * there were hedged reads. And that reads had to run in the current
@@ -446,7 +453,7 @@ public class TestPread {
         futures.get(i).get();
       }
       assertTrue(metrics.getHedgedReadOps() > initialReadOpsValue);
-      assertTrue(metrics.getHedgedReadOpsInCurThread() > 0);
+      assertTrue(metrics.getReadOpsInCurThread() > 0);
       cleanupFile(fileSys, file1);
       executor.shutdown();
     } finally {
@@ -593,7 +600,8 @@ public class TestPread {
     conf.setInt(DFSConfigKeys.DFS_REPLICATION_KEY, 2);
     conf.setInt(DFSConfigKeys.DFS_HEARTBEAT_INTERVAL_KEY, 1);
     if (isHedgedRead) {
-      conf.setInt(HdfsClientConfigKeys.HedgedRead.THREADPOOL_SIZE_KEY, 2);
+      conf.setBoolean(HdfsClientConfigKeys.HedgedRead.ENABLED, true);
+      conf.setInt(HdfsClientConfigKeys.ReadThreadPool.MAX_SIZE_KEY, 2);
     }
     try (MiniDFSCluster cluster =
         new MiniDFSCluster.Builder(conf).numDataNodes(3).build()) {

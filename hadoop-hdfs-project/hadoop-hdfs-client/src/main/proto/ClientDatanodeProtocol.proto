@@ -206,6 +206,14 @@ message GetBalancerBandwidthResponseProto {
   required uint64 bandwidth = 1;
 }
 
+message SetDelayDataNodeForTestRequestProto {
+  optional bool delayDataNodeForTest = 1;
+  optional int64 delayTimeInMsPerPacket = 2;
+}
+
+message SetDelayDataNodeForTestResponseProto {
+}
+
 /**
  * Protocol used from client to the Datanode.
  * See the request and response for details of rpc call.
@@ -271,4 +279,7 @@ service ClientDatanodeProtocolService {
    */
   rpc getBalancerBandwidth(GetBalancerBandwidthRequestProto)
       returns(GetBalancerBandwidthResponseProto);
+
+  rpc setDelayDataNodeForTest(SetDelayDataNodeForTestRequestProto)
+      returns(SetDelayDataNodeForTestResponseProto);
 }
