@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdfs;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_CRYPTO_CODEC_CLASSES_KEY_PREFIX;
+import static org.apache.hadoop.hdfs.DFSSlowReadHandlingMetrics.READ_THREADPOOL_REJECTION_COUNT;
 import static org.apache.hadoop.hdfs.client.HdfsClientConfigKeys.DFS_CLIENT_CACHE_DROP_BEHIND_READS;
 import static org.apache.hadoop.hdfs.client.HdfsClientConfigKeys.DFS_CLIENT_CACHE_DROP_BEHIND_WRITES;
 import static org.apache.hadoop.hdfs.client.HdfsClientConfigKeys.DFS_CLIENT_CACHE_READAHEAD;
@@ -375,6 +376,12 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
         conf.get(DFS_CLIENT_CONTEXT, DFS_CLIENT_CONTEXT_DEFAULT),
         dfsClientConf);
 
+    if (dfsClientConf.getMetricsEnabled()) {
+      metricsPublisher = M3MetricsPublisher.getInstance(dfsClientConf);
+    } else {
+      metricsPublisher = new NoOpMetricsPublisher();
+    }
+
     if (dfsClientConf.isHedgedReadEnabled() || dfsClientConf.isFastSwitchReadEnabled()) {
       this.initReadThreadPool(dfsClientConf.getReadThreadpoolCoreSize(),
               dfsClientConf.getReadThreadpoolMaxSize(),
@@ -385,12 +392,6 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
     this.saslClient = new SaslDataTransferClient(
         conf, DataTransferSaslUtil.getSaslPropertiesResolver(conf),
         TrustedChannelResolver.getInstance(conf), nnFallbackToSimpleAuth);
-
-    if (dfsClientConf.getMetricsEnabled()) {
-      metricsPublisher = M3MetricsPublisher.getInstance(dfsClientConf);
-    } else {
-      metricsPublisher = new NoOpMetricsPublisher();
-    }
   }
 
   /**
@@ -2828,7 +2829,6 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
     if (!getConf().isFastSwitchReadEnabled() && !getConf().isHedgedReadEnabled()) {
       return;
     }
-    // TODO: Better validation
     if (maxPoolSize <= 0 || READ_THREAD_POOL != null) {
       return;
     }
@@ -2843,6 +2843,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
             LOG.warn("Read execution rejected, Executing in current thread. " +
                 "Consider increasing dfs.client.read.threadpool.max_size value.");
             SLOW_READ_HANDLING_METRIC.incReadOpsInCurThread();
+            metricsPublisher.counter(READ_THREADPOOL_REJECTION_COUNT, 1);
             // will run in the current thread
             super.rejectedExecution(runnable, e);
           }
@@ -2862,7 +2863,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
     return dfsClientConf.isHedgedReadEnabled() && READ_THREAD_POOL != null;
   }
 
-  DFSSlowReadHandlingMetrics getHedgedReadMetrics() {
+  static DFSSlowReadHandlingMetrics getSlowReadHandlingMetrics() {
     return SLOW_READ_HANDLING_METRIC;
   }
 

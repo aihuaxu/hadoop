@@ -61,6 +61,10 @@ import org.apache.htrace.core.Tracer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.hdfs.DFSSlowReadHandlingMetrics.NUM_SLOW_PACKET;
+import static org.apache.hadoop.hdfs.DFSSlowReadHandlingMetrics.SLOW_PACKET_TIME;
+import static org.apache.hadoop.hdfs.DFSSlowReadHandlingMetrics.SLOW_PACKET_TIME_SOURCE;
+
 /**
  * This is a wrapper around connection to datanode
  * and understands checksum, offset etc.
@@ -137,14 +141,6 @@ public class BlockReaderRemote2 implements BlockReader {
 
   private DfsClientConf conf;
 
-  /**
-   * Metrics
-   */
-  @VisibleForTesting
-  public static final String SLOW_PACKET_TIME = "client.blockreader.slow_packet_time";
-  public static final String NUM_SLOW_PACKET = "client.blockreader.num_slow_packet";
-  static final String SLOW_PACKET_TIME_SOURCE = "client.blockreader.slow_packet_time_source";
-
   @VisibleForTesting
   public Peer getPeer() {
     return peer;
@@ -202,14 +198,11 @@ public class BlockReaderRemote2 implements BlockReader {
     return nRead;
   }
 
-  private void readNextPacket() throws IOException {
-    //Read packet headers.
-    long start = Time.monotonicNow();
-    packetReceiver.receiveNextPacket(in);
+  private void emitSlowReadPacketMetrics(long start) {
     long duration = Time.monotonicNow() - start;
     if (duration > conf.getMetricsReadPacketEmitThreshold()) {
       LOG.warn("BlockReaderRemote2 slow read packet took " + duration
-          + "ms for block " + blockId + ". Datanode: " + datanodeID.toString());
+              + "ms for block " + blockId + ". Datanode: " + datanodeID.toString());
       if (metricsPublisher != null) {
         // report metrics with both the datanode tag and the local host tag.
         metricsPublisher.gauge(datanodeID.getHostName(), SLOW_PACKET_TIME, duration);
@@ -217,6 +210,13 @@ public class BlockReaderRemote2 implements BlockReader {
         metricsPublisher.counter(datanodeID.getHostName(), NUM_SLOW_PACKET, 1);
       }
     }
+  }
+
+  private void readNextPacket() throws IOException {
+    //Read packet headers.
+    long start = Time.monotonicNow();
+    packetReceiver.receiveNextPacket(in);
+    emitSlowReadPacketMetrics(start);
 
     PacketHeader curHeader = packetReceiver.getHeader();
     curDataSlice = packetReceiver.getDataSlice();

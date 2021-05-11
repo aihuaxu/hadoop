@@ -17,9 +17,9 @@
  */
 package org.apache.hadoop.hdfs.client.impl;
 
+import org.apache.hadoop.hdfs.DFSSlowReadHandlingMetrics;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
-import org.apache.hadoop.hdfs.net.Peer;
 import org.apache.hadoop.hdfs.util.MetricsPublisher;
 import org.junit.Test;
 import org.mockito.Mockito;
@@ -51,11 +51,11 @@ public class TestBlockReaderRemote2 extends TestBlockReaderBase {
     reader.close();
     verify(mockPublisher, atLeast(1)).gauge(
         Mockito.<String>any(),
-        eq(BlockReaderRemote2.SLOW_PACKET_TIME),
+        eq(DFSSlowReadHandlingMetrics.SLOW_PACKET_TIME),
         Mockito.anyLong());
     verify(mockPublisher, atLeast(1)).counter(
         Mockito.<String>any(),
-        eq(BlockReaderRemote2.NUM_SLOW_PACKET),
+        eq(DFSSlowReadHandlingMetrics.NUM_SLOW_PACKET),
         eq(1L));
   }
 }

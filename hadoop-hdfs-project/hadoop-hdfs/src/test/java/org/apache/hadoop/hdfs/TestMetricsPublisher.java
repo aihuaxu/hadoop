@@ -17,11 +17,9 @@
  */
 package org.apache.hadoop.hdfs;
 
-import com.uber.m3.tally.Scope;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
-import org.apache.hadoop.hdfs.client.impl.BlockReaderRemote2;
 import org.apache.hadoop.hdfs.client.impl.DfsClientConf;
 import org.apache.hadoop.hdfs.server.datanode.DataNodeFaultInjector;
 import org.apache.hadoop.hdfs.util.M3MetricsPublisher;
@@ -33,11 +31,14 @@ import org.mockito.Mockito;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 
-import java.lang.reflect.Field;
-import java.util.Collections;
-import java.util.Map;
 import java.util.Random;
-import java.util.concurrent.ConcurrentHashMap;
+
+import static org.apache.hadoop.hdfs.DFSSlowReadHandlingMetrics.NUM_SLOW_PACKET;
+import static org.apache.hadoop.hdfs.DFSSlowReadHandlingMetrics.NUM_SLOW_PREAD;
+import static org.apache.hadoop.hdfs.DFSSlowReadHandlingMetrics.NUM_SLOW_READ;
+import static org.apache.hadoop.hdfs.DFSSlowReadHandlingMetrics.SLOW_PACKET_TIME;
+import static org.apache.hadoop.hdfs.DFSSlowReadHandlingMetrics.SLOW_PREAD_TIME;
+import static org.apache.hadoop.hdfs.DFSSlowReadHandlingMetrics.SLOW_READ_TIME;
 
 public class TestMetricsPublisher {
   private static final long reportInterval = 500;
@@ -46,10 +47,8 @@ public class TestMetricsPublisher {
   private final Random random = new Random();
   private final long delayTime = 3000;
   private DistributedFileSystem fs;
-
+  private MetricsPublisherTestUtil.MetricsTestSink metricsSink;
   private M3MetricsPublisher instance;
-  private final Map<String, Long> counterMap = new ConcurrentHashMap<>();
-  private final Map<String, Double> gaugeMap = new ConcurrentHashMap<>();
 
   @Before
   public void setUp() throws Exception {
@@ -57,8 +56,11 @@ public class TestMetricsPublisher {
     conf.setBoolean(HdfsClientConfigKeys.DFS_CLIENT_METRICS_ENABLED_KEY, true);
     conf.setInt(HdfsClientConfigKeys.DFS_CLIENT_METRICS_EMIT_READ_TIME_THRESHOLD_KEY, 1000);
     conf.setInt(HdfsClientConfigKeys.DFS_CLIENT_METRICS_EMIT_READ_PACKET_TIME_THRESHOLD_KEY, 1000);
+    DfsClientConf dconf = new DfsClientConf(conf);
+    instance = M3MetricsPublisher.getInstance(dconf);
     // use testing reporter
-    updateMetricsPublisher(new DfsClientConf(conf));
+    metricsSink = MetricsPublisherTestUtil.createTestMetricsPublisher(dconf,
+            reportInterval);
 
     cluster = new MiniDFSCluster.Builder(conf).numDataNodes(1).build();
     cluster.waitActive();
@@ -69,27 +71,10 @@ public class TestMetricsPublisher {
   @After
   public void tearDown() throws Exception {
     resetDataNode();
-    counterMap.clear();
-    gaugeMap.clear();
+    metricsSink.clear();
     if (cluster != null) {
       cluster.shutdown();
     }
-  }
-
-  private void updateMetricsPublisher(DfsClientConf conf) throws Exception {
-    instance = M3MetricsPublisher.getInstance(conf);
-    final Scope dnParentScope = DFSTestUtil.createM3ClientForTest(
-            reportInterval, counterMap, gaugeMap);
-    final Scope scope = DFSTestUtil.createM3ClientForTest(
-            reportInterval, counterMap, gaugeMap);
-
-    Field dnScopeField = M3MetricsPublisher.class.getDeclaredField("dnParentScope");
-    dnScopeField.setAccessible(true);
-    dnScopeField.set(instance, dnParentScope);
-
-    Field scopeField = M3MetricsPublisher.class.getDeclaredField("scope");
-    scopeField.setAccessible(true);
-    scopeField.set(instance, scope);
   }
 
   private void delayDataNodeRead() {
@@ -121,8 +106,8 @@ public class TestMetricsPublisher {
     DFSTestUtil.writeFile(fs, file, fileContent);
 
     // make sure we do not have any slow read captured in the metrics map
-    Assert.assertTrue(counterMap.isEmpty());
-    Assert.assertTrue(gaugeMap.isEmpty());
+    Assert.assertTrue(metricsSink.isCounterEmpty());
+    Assert.assertTrue(metricsSink.isGaugeEmpty());
 
     // read the whole file, and check the metrics
     byte[] result = DFSTestUtil.readFileBuffer(fs, file);
@@ -131,21 +116,19 @@ public class TestMetricsPublisher {
     // make sure the metrics has been reported
     Thread.sleep(reportInterval * 2);
     // check the metrics
-    String slowReadNumKey = DFSInputStream.NUM_SLOW_READ + ":{}";
-    long slowReadNum = counterMap.get(slowReadNumKey);
+    long slowReadNum = metricsSink.getCounterValue(NUM_SLOW_READ);
     Assert.assertEquals(1L, slowReadNum);
-    String slowReadTimeKey = DFSInputStream.SLOW_READ_TIME + ":{}";
-    double slowReadTime = gaugeMap.get(slowReadTimeKey);
+    double slowReadTime = metricsSink.getGaugeValue(SLOW_READ_TIME);
     Assert.assertTrue(slowReadTime > delayTime && slowReadTime < delayTime * 2);
 
     // read again
     DFSTestUtil.readFileBuffer(fs, file);
     Thread.sleep(reportInterval * 2);
-    slowReadNum = counterMap.get(slowReadNumKey);
+    slowReadNum = metricsSink.getCounterValue(NUM_SLOW_READ);
     // in StatsReporterForTest we simply add reported counter together based on
     // their keys, so the current slow read number should be 2
     Assert.assertEquals(2L, slowReadNum);
-    slowReadTime = gaugeMap.get(slowReadTimeKey);
+    slowReadTime = metricsSink.getGaugeValue(SLOW_READ_TIME);
     // we should have 2 slow read each is greater than 3s. StatsReporterForTest
     // simply adds them together so the current slowReadTime should be > 6s
     Assert.assertTrue("slowReadTime:" + slowReadTime, slowReadTime > delayTime * 2);
@@ -157,13 +140,11 @@ public class TestMetricsPublisher {
     }
     Thread.sleep(reportInterval * 2);
     // pread will not affect stateful read metrics
-    slowReadNum = counterMap.get(slowReadNumKey);
+    slowReadNum = metricsSink.getCounterValue(NUM_SLOW_READ);
     Assert.assertEquals(2L, slowReadNum);
     // check metrics for pread
-    String slowPreadNumKey = DFSInputStream.NUM_SLOW_PREAD + ":{}";
-    Assert.assertEquals(1L, (long) counterMap.get(slowPreadNumKey));
-    String slowPreadTimeKey = DFSInputStream.SLOW_PREAD_TIME + ":{}";
-    double slowPreadTime = gaugeMap.get(slowPreadTimeKey);
+    Assert.assertEquals(1L, metricsSink.getCounterValue(NUM_SLOW_PREAD));
+    double slowPreadTime = metricsSink.getGaugeValue(SLOW_PREAD_TIME);
     Assert.assertTrue("slowPreadTime:" + slowPreadTime,
             slowPreadTime > delayTime && slowPreadTime < delayTime * 2);
 
@@ -173,19 +154,15 @@ public class TestMetricsPublisher {
     }
     // instead of wait for report interval, close publisher
     instance.closeForTest();
-    Assert.assertEquals(2L, (long) counterMap.get(slowPreadNumKey));
-    slowPreadTime = gaugeMap.get(slowPreadTimeKey);
+    Assert.assertEquals(2L, metricsSink.getCounterValue(NUM_SLOW_PREAD));
+    slowPreadTime = metricsSink.getGaugeValue(SLOW_PREAD_TIME);
     Assert.assertTrue("slowPreadTime:" + slowPreadTime,
             slowPreadTime > delayTime * 2);
 
     // check the block reader metrics
     String dn = cluster.getDataNodes().get(0).getDatanodeId().getHostName();
-    String slowBlockReaderNumKey = BlockReaderRemote2.NUM_SLOW_PACKET + ":" +
-            Collections.singletonMap("datanode", dn);
-    String slowBlockReaderTimeKey = BlockReaderRemote2.SLOW_PACKET_TIME + ":" +
-            Collections.singletonMap("datanode", dn);
-    Assert.assertEquals(4L, (long) counterMap.get(slowBlockReaderNumKey));
-    double slowReaderTime = gaugeMap.get(slowBlockReaderTimeKey);
+    Assert.assertEquals(4L, metricsSink.getCounterValue(NUM_SLOW_PACKET, dn));
+    double slowReaderTime = metricsSink.getGaugeValue(SLOW_PACKET_TIME, dn);
     Assert.assertTrue("slow reader time: " + slowReaderTime,
             slowReaderTime > delayTime * 4);
   }

@@ -3114,6 +3114,7 @@ public class DataNode extends ReconfigurableBase
       this.delayDataNodeForTest = true;
       this.delayTimeInMsPerPacket.set(delayTimeInMsPerPacket);
     } else {
+      LOG.info("Resetting read delay to false for testing.");
       this.delayDataNodeForTest = false;
       this.delayTimeInMsPerPacket.set(0);
     }

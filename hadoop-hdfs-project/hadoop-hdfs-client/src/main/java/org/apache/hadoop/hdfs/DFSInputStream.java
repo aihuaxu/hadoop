@@ -93,6 +93,19 @@ import com.google.common.annotations.VisibleForTesting;
 
 import javax.annotation.Nonnull;
 
+import static org.apache.hadoop.hdfs.DFSSlowReadHandlingMetrics.FAST_SWITCH_ACTIVE_THREAD_COUNT;
+import static org.apache.hadoop.hdfs.DFSSlowReadHandlingMetrics.FAST_SWITCH_SWITCH_COUNT;
+import static org.apache.hadoop.hdfs.DFSSlowReadHandlingMetrics.FAST_SWITCH_THREAD_SLOW_START_COUNT;
+import static org.apache.hadoop.hdfs.DFSSlowReadHandlingMetrics.FAST_SWITCH_TIMEOUT_COUNT;
+import static org.apache.hadoop.hdfs.DFSSlowReadHandlingMetrics.FAST_SWITCH_TOO_MANY_SLOWNESS_COUNT;
+import static org.apache.hadoop.hdfs.DFSSlowReadHandlingMetrics.NUM_SLOW_PREAD;
+import static org.apache.hadoop.hdfs.DFSSlowReadHandlingMetrics.NUM_SLOW_READ;
+import static org.apache.hadoop.hdfs.DFSSlowReadHandlingMetrics.SLOW_BLOCKREADER_CREATION;
+import static org.apache.hadoop.hdfs.DFSSlowReadHandlingMetrics.SLOW_PREAD_DIST;
+import static org.apache.hadoop.hdfs.DFSSlowReadHandlingMetrics.SLOW_PREAD_TIME;
+import static org.apache.hadoop.hdfs.DFSSlowReadHandlingMetrics.SLOW_READ_DIST;
+import static org.apache.hadoop.hdfs.DFSSlowReadHandlingMetrics.SLOW_READ_TIME;
+
 /****************************************************************
  * DFSInputStream provides bytes from a named file.  It handles
  * negotiation of the namenode and various datanodes as necessary.
@@ -172,21 +185,6 @@ public class DFSInputStream extends FSInputStream
    * whether we this is a memory-mapped buffer or not.
    */
   private IdentityHashStore<ByteBuffer, Object> extendedReadBuffers;
-
-  static final String SLOW_READ_DIST = "client.slow_read_distribution";
-  static final String SLOW_READ_TIME = "client.slow_read_time";
-  static final String NUM_SLOW_READ = "client.num_slow_read";
-  static final String SLOW_PREAD_DIST = "client.slow_pread_distribution";
-  static final String SLOW_PREAD_TIME = "client.slow_pread_time";
-  static final String NUM_SLOW_PREAD = "client.num_slow_pread";
-  static final String SLOW_BLOCKREADER_CREATION = "client.slow_blockreader_creation";
-
-  // Fast switch metrics
-  static final String FAST_SWITCH_SWITCH_COUNT = "client.fast_switch_switch_count";
-  static final String FAST_SWITCH_TOO_MANY_SLOWNESS_COUNT = "client.fast_switch_too_many_slowness_count";
-  static final String FAST_SWITCH_ACTIVE_THREAD_COUNT = "client.fast_switch_active_thread_count";
-  static final String FAST_SWITCH_TIMEOUT_COUNT = "client.fast_switch_timeout_count";
-  static final String FAST_SWITCH_THREAD_SLOW_START_COUNT = "client.fast_switch_thread_slow_start";
 
   private synchronized IdentityHashStore<ByteBuffer, Object>
         getExtendedReadBuffers() {
@@ -674,8 +672,6 @@ public class DFSInputStream extends FSInputStream
    * We get block ID and the IDs of the destinations at startup, from the namenode.
    */
   private synchronized DatanodeInfo blockSeekTo(long target) throws IOException {
-    long startTick = Time.monotonicNow();
-
     if (target >= getFileLength()) {
       throw new IOException("Attempted to read past end of file");
     }
@@ -693,6 +689,7 @@ public class DFSInputStream extends FSInputStream
     boolean connectFailedOnce = false;
 
     while (true) {
+      long startTick = Time.monotonicNow();
       //
       // Compute desired block
       //
@@ -708,6 +705,8 @@ public class DFSInputStream extends FSInputStream
 
       DNAddrPair retval;
 
+      // chooseDataNode will never return null. It either returns a valid result
+      // or throws Exception
       if (!slownodes.isEmpty()) {
         retval = chooseDataNode(targetBlock, slownodes);
       } else {
@@ -1098,6 +1097,7 @@ public class DFSInputStream extends FSInputStream
         // Make sure we are reading from correct future.
         // They were likely finished before cancellation.
         if (finishedFuture != null && finishedFuture != currentFuture) {
+          DFSClient.LOG.info("Got previous future.");
           continue;
         }
         ReadResult result;
@@ -1140,7 +1140,7 @@ public class DFSInputStream extends FSInputStream
               // All available nodes are either slow or dead.
               // We consider it is due to client slow or timeout value too low.
               // Give up on any further switch for this block and empty slownodes list.
-              // Keep waiting for the currect blockreader.
+              // Keep waiting for the current blockreader.
               dfsClient.getMetricsPublisher().counter(FAST_SWITCH_TOO_MANY_SLOWNESS_COUNT, 1);
               DFSClient.LOG.info("All candidate replicas are slow, it is likely that client is slow." +
                   " Give up further read switch." +
@@ -1679,7 +1679,7 @@ public class DFSInputStream extends FSInputStream
               + "read", conf.getHedgedReadThresholdMillis(), chosenNode.info);
           // Ignore this node on next go around.
           ignored.add(chosenNode.info);
-          dfsClient.getHedgedReadMetrics().incHedgedReadOps();
+          DFSClient.getSlowReadHandlingMetrics().incHedgedReadOps();
           // continue; no need to refresh block locations
         } catch (InterruptedException | ExecutionException e) {
           // Ignore
@@ -1712,7 +1712,7 @@ public class DFSInputStream extends FSInputStream
           ByteBuffer result = getFirstToComplete(hedgedService, futures);
           // cancel the rest.
           cancelAll(futures);
-          dfsClient.getHedgedReadMetrics().incHedgedReadWins();
+          dfsClient.getSlowReadHandlingMetrics().incHedgedReadWins();
           System.arraycopy(result.array(), result.position(), buf, offset,
               len);
           return;

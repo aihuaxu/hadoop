@@ -404,7 +404,7 @@ public class TestPread {
         .format(true).build();
     DistributedFileSystem fileSys = cluster.getFileSystem();
     DFSClient dfsClient = fileSys.getClient();
-    DFSSlowReadHandlingMetrics metrics = dfsClient.getHedgedReadMetrics();
+    DFSSlowReadHandlingMetrics metrics = dfsClient.getSlowReadHandlingMetrics();
     // Metrics instance is static, so we need to reset counts from prior tests.
     metrics.hedgedReadOps.set(0);
     metrics.hedgedReadOpsWin.set(0);
@@ -430,7 +430,7 @@ public class TestPread {
         conf2.setLong(HdfsClientConfigKeys.HedgedRead.THRESHOLD_MILLIS_KEY, 50);
         fileSys.close();
         fileSys = (DistributedFileSystem)FileSystem.get(cluster.getURI(0), conf2);
-        metrics = fileSys.getClient().getHedgedReadMetrics();
+        metrics = fileSys.getClient().getSlowReadHandlingMetrics();
       }
       pReadFile(fileSys, file1);
       // assert that there were hedged reads

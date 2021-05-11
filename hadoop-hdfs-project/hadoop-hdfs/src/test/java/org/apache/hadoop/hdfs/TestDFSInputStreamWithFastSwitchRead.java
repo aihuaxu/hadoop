@@ -21,12 +21,22 @@ import com.google.common.base.Supplier;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hdfs.MetricsPublisherTestUtil.MetricsTestSink;
 import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
+import org.apache.hadoop.hdfs.client.impl.DfsClientConf;
+import org.apache.hadoop.hdfs.server.datanode.DataNode;
+import org.apache.hadoop.hdfs.util.M3MetricsPublisher;
 import org.apache.hadoop.test.GenericTestUtils;
+import org.junit.Assert;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
@@ -35,7 +45,9 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeoutException;
 
+import static org.apache.hadoop.hdfs.DFSSlowReadHandlingMetrics.READ_THREADPOOL_REJECTION_COUNT;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
@@ -47,6 +59,7 @@ public class TestDFSInputStreamWithFastSwitchRead {
   private static final int TEST_FILE_LEN = 64 * 1024 * 15;
   private static final int BLOCK_SIZE = 64 * 1000 * 4;
   private final byte[] fileContent = new byte[TEST_FILE_LEN];
+  private M3MetricsPublisher instance;
 
   private void writeFile(MiniDFSCluster cluster) throws IOException {
     DistributedFileSystem fs = cluster.getFileSystem();
@@ -387,5 +400,210 @@ public class TestDFSInputStreamWithFastSwitchRead {
       }
     };
   }
-}
 
+  private Callable<Boolean> readInternal(final DFSInputStream in,
+          final int chunkSize, final byte[] content, final long blockSize) {
+    return new Callable<Boolean>() {
+      @Override
+      public Boolean call() {
+        byte[] buf = new byte[content.length];
+        synchronized (in) {
+          try {
+            in.seek(0);
+            int offset = 0;
+            while (offset < content.length) {
+              int ret = readAndSeek(in, buf, offset, chunkSize, blockSize);
+              if (ret < 0) {
+                throw new IOException("Premature EOF from inputStream");
+              } else if (ret == 0) {
+                DFSClient.LOG.info("read 0 bytes");
+              }
+              offset += ret;
+              DFSClient.LOG.info("Current offset: " + offset);
+            }
+            Assert.assertArrayEquals(content, buf);
+          } catch (IOException e) {
+            fail("Do read failed: " + e);
+          }
+        }
+        return true;
+      }
+    };
+  }
+
+  private int readAndSeek(DFSInputStream in, byte[] buf, int offset,
+          int chunkSize, long blockSize) throws IOException {
+    final long pos = in.getPos();
+    boolean back = false;
+    if (pos % blockSize > 0) {
+      // seek backwards so that we will re-create block reader
+      in.seek(pos - 1);
+      offset--;
+      back = true;
+    }
+    int ret = in.read(buf, offset, Math.min(chunkSize, buf.length - offset));
+    return back ? ret - 1 : ret;
+  }
+
+  private MetricsTestSink setupMetricPublisher(Configuration conf) throws Exception {
+    conf.setBoolean(HdfsClientConfigKeys.DFS_CLIENT_METRICS_ENABLED_KEY, true);
+    DfsClientConf dconf = new DfsClientConf(conf);
+    instance = M3MetricsPublisher.getInstance(dconf);
+    // use testing reporter
+    return MetricsPublisherTestUtil.createTestMetricsPublisher(dconf, 1000 * 60);
+  }
+
+  private static class DataNodeDelayThread extends Thread {
+    private volatile boolean running;
+    private final Map<DataNode, Boolean> map = new HashMap<>();
+    private final List<DataNode> nodes;
+
+    DataNodeDelayThread(List<DataNode> nodes) {
+      this.nodes = new ArrayList<>(nodes);
+      for (DataNode dn : nodes) {
+        map.put(dn, false);
+      }
+      running = true;
+    }
+
+    @Override
+    public void run() {
+      int index = 0;
+      while (running) {
+        DataNode dn1 = nodes.get(index % nodes.size());
+        DataNode dn2 = nodes.get((index + 1) % nodes.size());
+        index += 2;
+        delayDataNode(dn1);
+        delayDataNode(dn2);
+        try {
+          if (running) {
+            Thread.sleep(500);
+          }
+        } catch (InterruptedException ignored) {
+        }
+      }
+    }
+
+    private void delayDataNode(DataNode dn) {
+      if (!map.get(dn)) {
+        dn.setDelayDataNodeForTest(true, 100);
+        map.put(dn, true);
+      } else {
+        dn.setDelayDataNodeForTest(false, 0);
+        map.put(dn, false);
+      }
+    }
+
+    void stopDelay() {
+      running = false;
+    }
+  }
+
+  private void resetClientThreadPoolAndMetrics() throws Exception {
+    Field threadPoolField = DFSClient.class.getDeclaredField("READ_THREAD_POOL");
+    threadPoolField.setAccessible(true);
+    threadPoolField.set(null, null);
+    DFSClient.getSlowReadHandlingMetrics().readOpsInCurThread.set(0L);
+  }
+
+  private void testParallelRead(boolean shareInputStream, boolean expectReject)
+          throws Exception {
+    resetClientThreadPoolAndMetrics();
+    Configuration conf = new HdfsConfiguration();
+    conf.setBoolean(HdfsClientConfigKeys.FastSwitchRead.ENABLED, true);
+    conf.setLong(HdfsClientConfigKeys.FastSwitchRead.THRESHOLD_MILLIS_KEY, 100);
+    final int numReadPoolThreads = 5;
+    conf.setInt(HdfsClientConfigKeys.ReadThreadPool.MAX_SIZE_KEY, numReadPoolThreads);
+    // set block size to 128KB
+    final int blockSize = 64 * 1024 * 2;
+    conf.setLong(DFSConfigKeys.DFS_BLOCK_SIZE_KEY, blockSize);
+    MetricsTestSink sink = setupMetricPublisher(conf);
+
+    final MiniDFSCluster cluster = new MiniDFSCluster.Builder(conf).numDataNodes(3)
+            .format(true).build();
+    cluster.waitActive();
+    final DistributedFileSystem fs = cluster.getFileSystem();
+    final byte[] content = new byte[blockSize * 2];
+    new Random().nextBytes(content);
+    final String file = "/test-file";
+    try {
+      DFSTestUtil.writeFile(fs, new Path(file), content);
+      DFSSlowReadHandlingMetrics metrics = DFSClient.getSlowReadHandlingMetrics();
+      assertEquals(0, metrics.getReadOpsInCurThread());
+
+      // delay DataNodes
+      DataNodeDelayThread t = null;
+      if (expectReject) {
+        // delay the DN longer to drain thread pool
+        cluster.getDataNodes().get(0).setDelayDataNodeForTest(true, 200);
+        cluster.getDataNodes().get(1).setDelayDataNodeForTest(true, 200);
+      } else {
+        t = new DataNodeDelayThread(cluster.getDataNodes());
+        t.start();
+      }
+
+      final int numReads = numReadPoolThreads * 10;
+      ExecutorService executor = Executors.newFixedThreadPool(numReads);
+      ArrayList<Future<Boolean>> futures = new ArrayList<>();
+
+      final Callable<Boolean> callable;
+      final DFSInputStream fin;
+      if (shareInputStream) {
+        fin = fs.getClient().open(file);
+        callable = readInternal(fin, 512, content, blockSize);
+      } else {
+        fin = null;
+        callable = new Callable<Boolean>() {
+          @Override
+          public Boolean call() throws Exception {
+            byte[] readContent = DFSTestUtil.readFileBuffer(fs, new Path(file));
+            Assert.assertArrayEquals(content, readContent);
+            return true;
+          }
+        };
+      }
+
+      for (int i = 0; i < numReads; i++) {
+        futures.add(executor.submit(callable));
+      }
+      for (int i = 0; i < numReads; i++) {
+        Assert.assertTrue(futures.get(i).get());
+      }
+
+      DFSClient.LOG.info("readOpsInCurThread: " + metrics.getReadOpsInCurThread());
+      // make sure the metrics was reported to M3
+      instance.closeForTest();
+      long rejectionNum = sink.getCounterValue(READ_THREADPOOL_REJECTION_COUNT);
+      DFSClient.LOG.info("rejection number reported to metrics publisher: " + rejectionNum);
+
+      if (expectReject) {
+        assertTrue(metrics.getReadOpsInCurThread() > 0);
+        assertEquals(metrics.getReadOpsInCurThread(), rejectionNum);
+      } else {
+        assertEquals(0, metrics.getReadOpsInCurThread());
+        assertEquals(0, rejectionNum);
+      }
+
+      if (fin != null) {
+        fin.close();
+      }
+      executor.shutdown();
+      if (t != null) {
+        t.stopDelay();
+        t.interrupt();
+      }
+    } finally {
+      cluster.shutdown();
+    }
+  }
+
+  @Test
+  public void testMaxoutThreadPool() throws Exception {
+    testParallelRead(false, true);
+  }
+
+  @Test
+  public void testShareDFSInputStream() throws Exception {
+    testParallelRead(true, false);
+  }
+}

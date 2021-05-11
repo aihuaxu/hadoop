@@ -94,6 +94,15 @@ public class BlockReaderTestUtil {
     cluster.waitActive();
   }
 
+  public BlockReaderTestUtil(int replicationFactor, HdfsConfiguration config,
+          int numDataNodes) throws Exception {
+    this.conf = config;
+    conf.setInt(DFSConfigKeys.DFS_REPLICATION_KEY, replicationFactor);
+    cluster = new MiniDFSCluster.Builder(conf).format(true)
+            .numDataNodes(numDataNodes).build();
+    cluster.waitActive();
+  }
+
   /**
    * Shutdown cluster
    */

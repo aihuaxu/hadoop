@@ -75,6 +75,15 @@ public class TestParallelReadUtil {
     rand = new Random(seed);
   }
 
+  public static void setupCluster(int replicationFactor, HdfsConfiguration conf,
+          int numDataNodes) throws Exception {
+    util = new BlockReaderTestUtil(replicationFactor, conf, numDataNodes);
+    dfsClient = util.getDFSClient();
+    long seed = Time.now();
+    LOG.info("Random seed: " + seed);
+    rand = new Random(seed);
+  }
+
   /**
    * Providers of this interface implement two different read APIs. Instances of
    * this interface are shared across all ReadWorkerThreads, so should be stateless.
@@ -190,7 +199,7 @@ public class TestParallelReadUtil {
    */
   static class ReadWorker extends Thread {
 
-    static public final int N_ITERATIONS = 1024;
+    public static volatile int N_ITERATIONS = 1024;
 
     private static final double PROPORTION_NON_POSITIONAL_READ = 0.10;
 

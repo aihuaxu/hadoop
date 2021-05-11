@@ -18,8 +18,12 @@
 package org.apache.hadoop.hdfs;
 
 import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
+import org.apache.hadoop.hdfs.server.datanode.DataNode;
 import org.junit.AfterClass;
+import org.junit.Assert;
 import org.junit.BeforeClass;
+
+import java.util.List;
 
 /**
  * Test normal read when turning on fast switch
@@ -28,19 +32,25 @@ public class TestParallelFastSwitchRead extends TestParallelReadUtil {
   @BeforeClass
   static public void setupCluster() throws Exception {
     HdfsConfiguration conf = new HdfsConfiguration();
-    conf.setBoolean(HdfsClientConfigKeys.Read.ShortCircuit.KEY, false);
-    conf.setBoolean(HdfsClientConfigKeys.DFS_CLIENT_DOMAIN_SOCKET_DATA_TRAFFIC,
-                    false);
-
-    conf.set(DFSConfigKeys.DFS_DOMAIN_SOCKET_PATH_KEY, "/will/not/be/created");
-
     conf.setBoolean(HdfsClientConfigKeys.FastSwitchRead.ENABLED, true);
+    conf.setLong(HdfsClientConfigKeys.FastSwitchRead.THRESHOLD_MILLIS_KEY, 50);
+    conf.setInt(HdfsClientConfigKeys.ReadThreadPool.MAX_SIZE_KEY, 50);
+    ReadWorker.N_ITERATIONS = 128;
 
-    setupCluster(DEFAULT_REPLICATION_FACTOR, conf);
+    final int numDataNodes = 3;
+    setupCluster(numDataNodes, conf, numDataNodes);
+    List<DataNode> datanodes = util.getCluster().getDataNodes();
+    Assert.assertEquals(numDataNodes, datanodes.size());
+    // delay one DataNode
+    datanodes.get(0).setDelayDataNodeForTest(true, 100);
+    datanodes.get(1).setDelayDataNodeForTest(true, 100);
   }
 
   @AfterClass
   static public void teardownCluster() throws Exception {
+    DFSSlowReadHandlingMetrics metrics = util.getCluster().getFileSystem()
+            .getClient().getSlowReadHandlingMetrics();
+    Assert.assertEquals(0, metrics.getReadOpsInCurThread());
     TestParallelReadUtil.teardownCluster();
   }
 }
