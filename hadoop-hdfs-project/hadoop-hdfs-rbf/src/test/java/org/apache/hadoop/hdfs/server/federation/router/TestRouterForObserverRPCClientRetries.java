@@ -21,10 +21,11 @@ import static org.apache.hadoop.hdfs.client.HdfsClientConfigKeys.DFS_HA_OBSERVER
 import static org.apache.hadoop.hdfs.server.federation.router.RBFConfigKeys.DFS_ROUTER_MONITOR_NAMENODE;
 import static org.apache.hadoop.hdfs.server.federation.router.RBFConfigKeys.DFS_ROUTER_STARTUP_KEY;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.fail;
+import static org.junit.Assert.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
+import com.google.common.collect.Lists;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
@@ -35,11 +36,17 @@ import org.apache.hadoop.hdfs.server.federation.MiniRouterDFSCluster.NamenodeCon
 import org.apache.hadoop.hdfs.server.federation.MiniRouterDFSCluster.RouterContext;
 import org.apache.hadoop.hdfs.server.federation.StateStoreDFSCluster;
 import org.apache.hadoop.hdfs.server.federation.metrics.FederationRPCMetrics;
+import org.apache.hadoop.hdfs.server.federation.resolver.FederationNamenodeContext;
+import org.apache.hadoop.hdfs.server.federation.resolver.FederationNamenodeServiceState;
 import org.apache.hadoop.hdfs.server.federation.resolver.MembershipNamenodeResolver;
 import org.apache.hadoop.ipc.RemoteException;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * Test retry behavior of the Router RPC Client.
@@ -133,5 +140,34 @@ public class TestRouterForObserverRPCClientRetries {
     FederationRPCMetrics rpcMetrics = routerContext.getRouter()
         .getRpcServer().getRPCMetrics();
     assertEquals(0, rpcMetrics.getProxyOpRetries());
+  }
+
+  @Test
+  public void testShuffleObservers() throws Exception {
+    FederationNamenodeContext nn1 = mock(FederationNamenodeContext.class);
+    FederationNamenodeContext nn2 = mock(FederationNamenodeContext.class);
+    when(nn1.getState()).thenReturn(FederationNamenodeServiceState.STANDBY);
+    when(nn2.getState()).thenReturn(FederationNamenodeServiceState.STANDBY);
+
+    List<? extends FederationNamenodeContext> list =
+            Collections.unmodifiableList(Lists.newArrayList(nn1, nn2));
+
+    Configuration conf = new Configuration();
+    RouterRpcClient client = new RouterRpcClient(conf, null, null, null);
+    List<FederationNamenodeContext> result = new ArrayList<>();
+    for (int i = 0; i < 10; i++) {
+      result.add(client.shuffleNameNodes(list).get(0));
+    }
+    assertTrue(result.contains(nn1));
+    assertFalse(result.contains(nn2));
+
+    conf.set(DFS_ROUTER_STARTUP_KEY, StartupOption.OBSERVER.toString());
+    client = new RouterRpcClient(conf, null, null, null);
+    result = new ArrayList<>();
+    for (int i = 0; i < 10; i++) {
+      result.add(client.shuffleNameNodes(list).get(0));
+    }
+    assertTrue(result.contains(nn1));
+    assertTrue(result.contains(nn2));
   }
 }
